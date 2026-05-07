@@ -1,0 +1,15 @@
+node_modules/
+.git/
+.expo/
+play-store/
+secrets/
+static-build/
+scripts/
+server/
+expo-start.log
+expo-start.err.log
+*.log
+.env
+.env.local
+pnpm-lock.yaml
+package-lock.json
