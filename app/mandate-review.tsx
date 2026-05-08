@@ -12,7 +12,8 @@ import { REFORMS } from "@/data/reforms";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import type { NationalIndicators, PromiseDomain } from "@/types/strategy";
+import { useResponsive } from "@/utils/responsive";
+import type { DecisionTrace, NationalIndicators, PromiseDomain } from "@/types/strategy";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -55,6 +56,7 @@ export default function MandateReviewScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, startNewMandate } = useStrategy();
+  const { isLandscape } = useResponsive();
 
   if (!state) return null;
 
@@ -64,6 +66,11 @@ export default function MandateReviewScreen() {
   const reward = getMandateReward(score);
   const playerRank = getPlayerRank(state.ranking);
   const bilanNumber = Math.floor(state.mandateDay / 100);
+  const oppositionPower = state.oppositionPower ?? 35;
+  const oppositionColor = oppositionPower >= 65 ? PALETTE.danger : oppositionPower >= 40 ? PALETTE.warning : PALETTE.success;
+  const allTraces = (state.publicMemory?.traces ?? []) as DecisionTrace[];
+  const negativeTraces = allTraces.filter((t) => t.politicalImpact < 0);
+  const positiveTraces = allTraces.filter((t) => t.politicalImpact > 0);
 
   const handleNewMandate = () => {
     startNewMandate();
@@ -91,7 +98,7 @@ export default function MandateReviewScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* SCORE GLOBAL */}
+        {/* SCORE GLOBAL — always full width */}
         <LinearGradient colors={["#1c1408", "#0d1119"]} style={styles.scoreCard}>
           <Text style={styles.scoreKicker}>SCORE DU MANDAT</Text>
           <Text style={[styles.scoreNum, { color: mandate.color }]}>{score}</Text>
@@ -110,8 +117,11 @@ export default function MandateReviewScreen() {
           </View>
         </LinearGradient>
 
+        {/* Panel grid — 2-col in landscape */}
+        <View style={[styles.panelGrid, isLandscape && styles.panelGridLandscape]}>
+
         {/* INDICATEURS DÉTAILLÉS */}
-        <Panel style={styles.section}>
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="gauge" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>ÉTAT DES INDICATEURS NATIONAUX</Text>
@@ -139,7 +149,7 @@ export default function MandateReviewScreen() {
         </Panel>
 
         {/* STATISTIQUES CLÉS */}
-        <Panel style={styles.section}>
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="trophy-outline" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>STATISTIQUES DU MANDAT</Text>
@@ -168,7 +178,7 @@ export default function MandateReviewScreen() {
           const completedReforms = state.reforms.filter((r) => r.applied);
           const promises = state.campaignPromises;
           return (
-            <Panel style={styles.section}>
+            <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="crown-outline" size={14} color={PALETTE.gold} />
                 <Text style={styles.sectionTitle}>DOCTRINE & BILAN POLITIQUE</Text>
@@ -216,9 +226,63 @@ export default function MandateReviewScreen() {
           );
         })()}
 
+        {/* BILAN OPPOSITION */}
+        <Panel variant={oppositionPower >= 65 ? "danger" : undefined} style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account-multiple-remove" size={14} color={oppositionColor} />
+            <Text style={[styles.sectionTitle, { color: oppositionColor }]}>BILAN OPPOSITION</Text>
+          </View>
+          <View style={styles.indicatorRow}>
+            <MaterialCommunityIcons name="sword-cross" size={14} color={oppositionColor} style={{ width: 18 }} />
+            <Text style={styles.indicatorLabel}>Force oppos.</Text>
+            <View style={styles.indicatorTrack}>
+              <View style={[styles.indicatorFill, { width: `${oppositionPower}%`, backgroundColor: oppositionColor }]} />
+            </View>
+            <Text style={[styles.indicatorVal, { color: oppositionColor }]}>{oppositionPower}</Text>
+          </View>
+          <View style={styles.traceStats}>
+            <View style={styles.traceStatCell}>
+              <Text style={[styles.traceStatNum, { color: PALETTE.danger }]}>{negativeTraces.length}</Text>
+              <Text style={styles.traceStatLabel}>Décisions contestées</Text>
+            </View>
+            <View style={styles.traceStatCell}>
+              <Text style={[styles.traceStatNum, { color: PALETTE.success }]}>{positiveTraces.length}</Text>
+              <Text style={styles.traceStatLabel}>Décisions saluées</Text>
+            </View>
+            <View style={styles.traceStatCell}>
+              <Text style={[styles.traceStatNum, { color: PALETTE.gold }]}>{allTraces.length}</Text>
+              <Text style={styles.traceStatLabel}>Traces mémorielles</Text>
+            </View>
+          </View>
+        </Panel>
+
+        {/* MÉMOIRE DU PEUPLE */}
+        {negativeTraces.length > 0 && (
+          <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="history" size={14} color="#a78bfa" />
+              <Text style={[styles.sectionTitle, { color: "#a78bfa" }]}>MÉMOIRE DU PEUPLE</Text>
+            </View>
+            {negativeTraces.slice(-5).reverse().map((trace) => (
+              <View key={trace.id} style={styles.memTraceRow}>
+                <View style={[styles.memorySeverityDot, {
+                  backgroundColor: trace.severity === "critical" ? PALETTE.danger
+                    : trace.severity === "high" ? PALETTE.warning
+                    : "#a78bfa",
+                }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.memTraceTitle}>{trace.title}</Text>
+                  <Text style={styles.memTraceDesc} numberOfLines={1}>{trace.description}</Text>
+                </View>
+                <Text style={styles.memTraceImpact}>{trace.politicalImpact}</Text>
+              </View>
+            ))}
+          </Panel>
+        )}
+
         {/* ACHIEVEMENTS */}
         {state.achievements.length > 0 && (
-          <Panel style={styles.section}>
+          <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons name="medal-outline" size={14} color={PALETTE.gold} />
               <Text style={styles.sectionTitle}>DISTINCTIONS OBTENUES</Text>
@@ -241,6 +305,8 @@ export default function MandateReviewScreen() {
             </View>
           </Panel>
         )}
+
+        </View>{/* /panelGrid */}
 
         {/* RÉCOMPENSES */}
         {(reward.money > 0 || reward.influence > 0 || reward.points > 0) && (
@@ -335,4 +401,19 @@ const styles = StyleSheet.create({
   newMandateText: { fontSize: 12, fontFamily: FONT.bold, color: "#fff", letterSpacing: 3 },
   mandateRule: { width: 16, height: 1, backgroundColor: "rgba(255,255,255,0.4)" },
   newMandateHint: { textAlign: "center", fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, letterSpacing: 0.3 },
+
+  panelGrid: { gap: 10 },
+  panelGridLandscape: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  sectionLandscape: { flexBasis: "48%", flexGrow: 1 },
+
+  traceStats: { flexDirection: "row", gap: 8 },
+  traceStatCell: { flex: 1, alignItems: "center", gap: 2, paddingVertical: 8, borderRadius: RADIUS.xs, backgroundColor: PALETTE.panelHi, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge },
+  traceStatNum: { fontSize: 18, fontFamily: FONT.bold },
+  traceStatLabel: { fontSize: 7, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5, textAlign: "center" },
+
+  memTraceRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  memorySeverityDot: { width: 7, height: 7, borderRadius: 4, marginTop: 4 },
+  memTraceTitle: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textHigh },
+  memTraceDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13 },
+  memTraceImpact: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.danger, minWidth: 24, textAlign: "right" },
 });

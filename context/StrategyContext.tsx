@@ -36,6 +36,7 @@ import type {
   BuildingId,
   CampaignPromises,
   CountryId,
+  DecisionTrace,
   DelayedConsequence,
   GovernanceDoctrine,
   HiddenPolitics,
@@ -151,6 +152,8 @@ function buildInitialState(playerName: string): StrategyGameState {
     trainingQueue: [],
     militaryDoctrine: "defensive",
     premiumGold: 0,
+    publicMemory: { traces: [] },
+    oppositionPower: 35,
   };
 }
 
@@ -206,6 +209,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           trainingQueue: saved.trainingQueue ?? [],
           militaryDoctrine: saved.militaryDoctrine ?? "defensive",
           premiumGold: saved.premiumGold ?? 0,
+          publicMemory: saved.publicMemory ?? { traces: [] },
+          oppositionPower: saved.oppositionPower ?? 35,
         });
       }
       setLoaded(true);
@@ -515,7 +520,20 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       if (!canAfford(def.switchCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
       update((prev) => {
         const resources = deductCost(def.switchCost, prev.resources);
-        return withNews(advanceMandateDay({ ...prev, resources, governanceDoctrine: id }, 1));
+        let next = { ...prev, resources, governanceDoctrine: id };
+        if (id === "autoritaire") {
+          next = addDecisionTrace(next, {
+            type: "authoritarian_decision",
+            title: "Virage autoritaire",
+            description: "Le gouvernement adopte une doctrine autoritaire, renforçant le contrôle de l'État.",
+            createdAtDay: prev.mandateDay,
+            severity: "high",
+            politicalImpact: -15,
+            canResurface: true,
+            tags: ["doctrine", "autoritarisme"],
+          });
+        }
+        return withNews(advanceMandateDay(next, 1));
       });
       return { success: true };
     },
@@ -536,7 +554,18 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           completesAtDay: prev.mandateDay + def.durationDays,
           applied: false,
         };
-        return withNews(advanceMandateDay({ ...prev, resources, reforms: [...prev.reforms, newReform] }, 1));
+        let next = { ...prev, resources, reforms: [...prev.reforms, newReform] };
+        next = addDecisionTrace(next, {
+          type: "reform_courageous",
+          title: `Réforme lancée : ${def.name}`,
+          description: `Le gouvernement a engagé la réforme ${def.name}.`,
+          createdAtDay: prev.mandateDay,
+          severity: "medium",
+          politicalImpact: -5,
+          canResurface: true,
+          tags: ["reforme", id],
+        });
+        return withNews(advanceMandateDay(next, 1));
       });
       return { success: true };
     },
@@ -619,7 +648,19 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         );
         const hiddenPolitics = applyHiddenPoliticsEffects(prev.hiddenPolitics, { eliteTrust: -5 });
         const nationalIndicators = applyIndicatorEffects(prev.nationalIndicators, { popularity: -3 });
-        return advanceMandateDay({ ...prev, strategyMinisters, hiddenPolitics, nationalIndicators }, 1);
+        let next = { ...prev, strategyMinisters, hiddenPolitics, nationalIndicators };
+        const firedDef = STRATEGY_MINISTERS[id as StrategyMinisterId];
+        next = addDecisionTrace(next, {
+          type: "scandal_revealed",
+          title: `Limogeage : ${firedDef?.title ?? id}`,
+          description: `Le président a révoqué le ${firedDef?.title ?? "ministre"} en raison d'un manque de loyauté.`,
+          createdAtDay: prev.mandateDay,
+          severity: "medium",
+          politicalImpact: -8,
+          canResurface: true,
+          tags: ["remaniement", id],
+        });
+        return advanceMandateDay(next, 1);
       });
     },
     [update],
@@ -774,6 +815,13 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
     if (s.nationalDebt > 350 && state.nationalDebt <= 350) {
       s = { ...s, news: queueNews(s.news, "debt_escalation") };
     }
+
+    // Update opposition pressure
+    const newOpposition = evaluateOppositionPressure(s);
+    if (newOpposition >= 70 && s.oppositionPower < 70) {
+      s = { ...s, news: queueNews(s.news, "opposition_rise") };
+    }
+    s = { ...s, oppositionPower: newOpposition };
   }
 
   // Check achievements
@@ -870,6 +918,40 @@ export function computeMandateScore(ind: NationalIndicators): number {
     ind.ecology    * 0.10 +
     ind.cohesion   * 0.15,
   );
+}
+
+function evaluateOppositionPressure(state: StrategyGameState): number {
+  const ind = state.nationalIndicators;
+  const hp = state.hiddenPolitics;
+  let pressure = 35;
+
+  pressure += (50 - ind.popularity) * 0.4;
+  pressure += (50 - ind.cohesion) * 0.2;
+  pressure += (50 - ind.economy) * 0.15;
+  pressure += (100 - hp.institutionalStability) * 0.1;
+  pressure += hp.popularFatigue * 0.1;
+  pressure += (state.nationalDebt / 500) * 20;
+
+  const badTraces = (state.publicMemory?.traces ?? []).filter((t) => t.politicalImpact < 0);
+  pressure += Math.min(badTraces.length * 2, 20);
+
+  if (state.governanceDoctrine === "autoritaire") pressure += 10;
+  if (state.governanceDoctrine === "populiste") pressure += 5;
+
+  return Math.min(100, Math.max(0, Math.round(pressure)));
+}
+
+function addDecisionTrace(
+  state: StrategyGameState,
+  partial: Omit<DecisionTrace, "id" | "resurfacedCount">,
+): StrategyGameState {
+  const trace: DecisionTrace = {
+    ...partial,
+    id: `trace_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    resurfacedCount: 0,
+  };
+  const traces = [...(state.publicMemory?.traces ?? []), trace];
+  return { ...state, publicMemory: { traces } };
 }
 
 function applyRewards(resources: StrategyResources, rewards: Partial<StrategyResources>): StrategyResources {

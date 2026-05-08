@@ -240,6 +240,40 @@ export interface PlayerReform {
   applied: boolean;
 }
 
+// ── Mémoire du peuple ─────────────────────────────────────────
+export type DecisionTraceType =
+  | "promise_kept"
+  | "promise_broken"
+  | "crisis_handled"
+  | "crisis_mishandled"
+  | "scandal_ignored"
+  | "reform_courageous"
+  | "reform_unjust"
+  | "authoritarian_decision"
+  | "military_op_contested"
+  | "excessive_spending"
+  | "public_lie"
+  | "transparency_praised"
+  | "debt_assumed"
+  | "scandal_revealed";
+
+export interface DecisionTrace {
+  id: string;
+  type: DecisionTraceType;
+  title: string;
+  description: string;
+  createdAtDay: number;
+  severity: "low" | "medium" | "high" | "critical";
+  politicalImpact: number;  // negative = bad for player
+  canResurface: boolean;
+  resurfacedCount: number;
+  tags: string[];
+}
+
+export interface PublicMemory {
+  traces: DecisionTrace[];
+}
+
 export type AchievementId =
   | "premier_serment"
   | "premiere_reforme"
@@ -387,4 +421,7 @@ export interface StrategyGameState {
   trainingQueue: import("@/types/units").TrainingQueueEntry[];
   militaryDoctrine: import("@/types/units").MilitaryDoctrineId;
   premiumGold: number;
+  // Mémoire du peuple + opposition
+  publicMemory: PublicMemory;
+  oppositionPower: number; // 0-100
 }

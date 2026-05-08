@@ -5,7 +5,13 @@ export type StrategyMinisterId =
   | "economie"
   | "defense"
   | "affaires_etrangeres"
-  | "ecologie";
+  | "ecologie"
+  | "sante"
+  | "cybersecurite"
+  | "renseignement"
+  | "interieur"
+  | "industrie"
+  | "communication";
 
 // Which national indicator drives loyalty drift for this minister
 export const MINISTER_INDICATOR: Record<StrategyMinisterId, keyof NationalIndicators> = {
@@ -14,6 +20,12 @@ export const MINISTER_INDICATOR: Record<StrategyMinisterId, keyof NationalIndica
   defense:           "security",
   affaires_etrangeres: "cohesion",
   ecologie:          "ecology",
+  sante:             "cohesion",
+  cybersecurite:     "security",
+  renseignement:     "security",
+  interieur:         "popularity",
+  industrie:         "economy",
+  communication:     "popularity",
 };
 
 // Pool of replacements (2-3 per position) drawn when a minister is fired
@@ -49,6 +61,36 @@ export const MINISTER_POOL: Record<StrategyMinisterId, MinisterPoolEntry[]> = {
     { name: "Pierre Vidal",    loyalty: 58, competence: 68, scandalRisk: 16 },
     { name: "Nathalie Simon",  loyalty: 65, competence: 72, scandalRisk: 12 },
     { name: "Julien Roux",     loyalty: 70, competence: 65, scandalRisk: 18 },
+  ],
+  sante: [
+    { name: "Caroline Dumas",  loyalty: 72, competence: 78, scandalRisk: 10 },
+    { name: "Xavier Morel",    loyalty: 65, competence: 82, scandalRisk: 16 },
+    { name: "Valérie Huet",    loyalty: 68, competence: 75, scandalRisk: 12 },
+  ],
+  cybersecurite: [
+    { name: "Alexis Gauthier", loyalty: 70, competence: 85, scandalRisk: 8  },
+    { name: "Laura Perrier",   loyalty: 62, competence: 90, scandalRisk: 14 },
+    { name: "Samuel Aubry",    loyalty: 75, competence: 80, scandalRisk: 10 },
+  ],
+  renseignement: [
+    { name: "Bernard Clément", loyalty: 78, competence: 80, scandalRisk: 12 },
+    { name: "Christine Roy",   loyalty: 65, competence: 88, scandalRisk: 20 },
+    { name: "Éric Bonnet",     loyalty: 72, competence: 76, scandalRisk: 15 },
+  ],
+  interieur: [
+    { name: "Frédéric Colin",  loyalty: 68, competence: 72, scandalRisk: 22 },
+    { name: "Martine Leconte", loyalty: 75, competence: 68, scandalRisk: 14 },
+    { name: "Patrick Millet",  loyalty: 60, competence: 76, scandalRisk: 25 },
+  ],
+  industrie: [
+    { name: "Gilles Renaud",   loyalty: 65, competence: 80, scandalRisk: 20 },
+    { name: "Stéphanie Koch",  loyalty: 72, competence: 76, scandalRisk: 14 },
+    { name: "Michel Gros",     loyalty: 58, competence: 84, scandalRisk: 28 },
+  ],
+  communication: [
+    { name: "Julie Mercier",   loyalty: 70, competence: 70, scandalRisk: 18 },
+    { name: "Benoît Laborde",  loyalty: 65, competence: 74, scandalRisk: 22 },
+    { name: "Camille Pons",    loyalty: 78, competence: 68, scandalRisk: 12 },
   ],
 };
 
@@ -134,6 +176,82 @@ export const STRATEGY_MINISTERS: Record<StrategyMinisterId, StrategyMinisterDef>
     indicatorBonus: { ecology: 2 },
     resourceBonus: { energy: 15 },
   },
+  sante: {
+    id: "sante",
+    title: "Ministre de la Santé",
+    name: "Élise Garnier",
+    specialty: "Santé publique",
+    specialtyColor: "#f472b6",
+    defaultLoyalty: 68,
+    defaultCompetence: 74,
+    defaultScandalRisk: 10,
+    indicatorBonus: { cohesion: 1, popularity: 1 },
+    resourceBonus: {},
+  },
+  cybersecurite: {
+    id: "cybersecurite",
+    title: "Min. de la Cybersécurité",
+    name: "Kevin Arnoux",
+    specialty: "Cyber",
+    specialtyColor: "#22d3ee",
+    linkedBuildingId: "cyber_ministry",
+    defaultLoyalty: 72,
+    defaultCompetence: 82,
+    defaultScandalRisk: 8,
+    indicatorBonus: { security: 1 },
+    resourceBonus: { cyberDefense: 10 },
+  },
+  renseignement: {
+    id: "renseignement",
+    title: "Directeur du Renseignement",
+    name: "François Noel",
+    specialty: "Renseignement",
+    specialtyColor: "#818cf8",
+    linkedBuildingId: "intelligence_ministry",
+    defaultLoyalty: 76,
+    defaultCompetence: 78,
+    defaultScandalRisk: 12,
+    indicatorBonus: {},
+    resourceBonus: { intelligence: 10 },
+  },
+  interieur: {
+    id: "interieur",
+    title: "Ministre de l'Intérieur",
+    name: "Olivier Bertrand",
+    specialty: "Sécurité intérieure",
+    specialtyColor: "#fb923c",
+    defaultLoyalty: 65,
+    defaultCompetence: 70,
+    defaultScandalRisk: 20,
+    indicatorBonus: { security: 1, popularity: 1 },
+    resourceBonus: {},
+  },
+  industrie: {
+    id: "industrie",
+    title: "Ministre de l'Industrie",
+    name: "Véronique Legrand",
+    specialty: "Économie industrielle",
+    specialtyColor: "#facc15",
+    defaultLoyalty: 64,
+    defaultCompetence: 76,
+    defaultScandalRisk: 18,
+    indicatorBonus: { economy: 1 },
+    resourceBonus: { money: 15, technology: 5 },
+  },
+  communication: {
+    id: "communication",
+    title: "Min. de la Communication",
+    name: "Aurélie Martin",
+    specialty: "Médias",
+    specialtyColor: "#f97316",
+    defaultLoyalty: 70,
+    defaultCompetence: 68,
+    defaultScandalRisk: 16,
+    indicatorBonus: { popularity: 2 },
+    resourceBonus: { influence: 6 },
+  },
 };
 
 export const MINISTER_LIST: StrategyMinisterDef[] = Object.values(STRATEGY_MINISTERS);
+export const CABINET_PRIMARY: StrategyMinisterId[] = ["pm", "economie", "defense", "affaires_etrangeres", "ecologie"];
+export const CABINET_SECONDARY: StrategyMinisterId[] = ["sante", "cybersecurite", "renseignement", "interieur", "industrie", "communication"];

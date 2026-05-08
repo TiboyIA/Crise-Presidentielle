@@ -13,7 +13,8 @@ import { BUILDINGS } from "@/data/buildings";
 import { COUNTRIES } from "@/data/countries";
 import { DOCTRINES, DOCTRINE_LIST } from "@/data/doctrines";
 import { REFORMS, REFORM_LIST, CATEGORY_COLOR } from "@/data/reforms";
-import { STRATEGY_MINISTERS, MINISTER_LIST } from "@/data/strategyMinisters";
+import { STRATEGY_MINISTERS, CABINET_PRIMARY, CABINET_SECONDARY } from "@/data/strategyMinisters";
+import type { StrategyMinisterId } from "@/data/strategyMinisters";
 import type { GovernanceDoctrine, ReformId } from "@/types/strategy";
 import { timeRemaining, formatDuration } from "@/logic/buildingEngine";
 import { getPlayerRank, getRankTitle, getTitleIcon } from "@/logic/botEngine";
@@ -60,6 +61,7 @@ export default function NationScreen() {
   const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister } = useStrategy();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
   const [reformsExpanded, setReformsExpanded] = useState(false);
+  const [secondaryExpanded, setSecondaryExpanded] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
 
   if (!state) return null;
@@ -310,44 +312,28 @@ export default function NationScreen() {
               </View>
             );
           })()}
+          {/* Primary ministers */}
           <View style={styles.cabinetGrid}>
-            {state.strategyMinisters.map((m) => {
-              const def = STRATEGY_MINISTERS[m.id as keyof typeof STRATEGY_MINISTERS];
-              if (!def) return null;
-              const displayName = m.name ?? def.name;
-              const loyaltyColor = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
-              const canFire = m.loyalty < 40;
-              return (
-                <View key={m.id} style={styles.ministerChip}>
-                  <Text style={[styles.ministerSpec, { color: def.specialtyColor }]}>{def.specialty[0]}</Text>
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={styles.ministerName} numberOfLines={1}>{displayName.split(" ")[0]} {displayName.split(" ").slice(-1)}</Text>
-                    <View style={styles.ministerLoyaltyRow}>
-                      <View style={styles.ministerLoyaltyTrack}>
-                        <View style={[styles.ministerLoyaltyFill, { width: `${m.loyalty}%`, backgroundColor: loyaltyColor }]} />
-                      </View>
-                      <Text style={[styles.ministerLoyaltyVal, { color: loyaltyColor }]}>{m.loyalty}</Text>
-                    </View>
-                  </View>
-                  {canFire && (
-                    <Pressable
-                      onPress={() => Alert.alert(
-                        "Limoger le ministre",
-                        `Remplacer ${displayName} ? (-5 confiance élites, -3 popularité)`,
-                        [
-                          { text: "Annuler", style: "cancel" },
-                          { text: "Limoger", style: "destructive", onPress: () => fireMinister(m.id) },
-                        ],
-                      )}
-                      style={({ pressed }) => [styles.fireBtn, { opacity: pressed ? 0.7 : 1 }]}
-                    >
-                      <MaterialCommunityIcons name="account-remove-outline" size={14} color={PALETTE.danger} />
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })}
+            {state.strategyMinisters
+              .filter((m) => CABINET_PRIMARY.includes(m.id as any))
+              .map((m) => <MinisterRow key={m.id} m={m} onFire={fireMinister} />)}
           </View>
+
+          {/* Secondary ministers — collapsible */}
+          <Pressable onPress={() => setSecondaryExpanded((v) => !v)} style={styles.secondaryCabinetToggle}>
+            <MaterialCommunityIcons name="account-multiple-outline" size={12} color={PALETTE.textLow} />
+            <Text style={styles.secondaryCabinetLabel}>
+              {secondaryExpanded ? "MASQUER LE GOUVERNEMENT ÉTENDU" : "VOIR LE GOUVERNEMENT ÉTENDU"}
+            </Text>
+            <MaterialCommunityIcons name={secondaryExpanded ? "chevron-up" : "chevron-down"} size={14} color={PALETTE.textLow} />
+          </Pressable>
+          {secondaryExpanded && (
+            <View style={styles.cabinetGrid}>
+              {state.strategyMinisters
+                .filter((m) => CABINET_SECONDARY.includes(m.id as any))
+                .map((m) => <MinisterRow key={m.id} m={m} onFire={fireMinister} />)}
+            </View>
+          )}
         </Panel>
 
         {/* BILAN DISPONIBLE BANNER */}
@@ -444,6 +430,43 @@ export default function NationScreen() {
           </>
         )}
       </ScrollView>
+    </View>
+  );
+}
+
+function MinisterRow({ m, onFire }: { m: { id: string; name?: string; loyalty: number; competence: number; scandalRisk: number }; onFire: (id: string) => void }) {
+  const def = STRATEGY_MINISTERS[m.id as StrategyMinisterId];
+  if (!def) return null;
+  const displayName = m.name ?? def.name;
+  const loyaltyColor = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
+  const canFire = m.loyalty < 40;
+  return (
+    <View style={styles.ministerChip}>
+      <Text style={[styles.ministerSpec, { color: def.specialtyColor }]}>{def.specialty[0]}</Text>
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text style={styles.ministerName} numberOfLines={1}>{displayName.split(" ")[0]} {displayName.split(" ").slice(-1)}</Text>
+        <View style={styles.ministerLoyaltyRow}>
+          <View style={styles.ministerLoyaltyTrack}>
+            <View style={[styles.ministerLoyaltyFill, { width: `${m.loyalty}%`, backgroundColor: loyaltyColor }]} />
+          </View>
+          <Text style={[styles.ministerLoyaltyVal, { color: loyaltyColor }]}>{m.loyalty}</Text>
+        </View>
+      </View>
+      {canFire && (
+        <Pressable
+          onPress={() => Alert.alert(
+            "Limoger le ministre",
+            `Remplacer ${displayName} ? (-5 confiance élites, -3 popularité)`,
+            [
+              { text: "Annuler", style: "cancel" },
+              { text: "Limoger", style: "destructive", onPress: () => onFire(m.id) },
+            ],
+          )}
+          style={({ pressed }) => [styles.fireBtn, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="account-remove-outline" size={14} color={PALETTE.danger} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -579,4 +602,7 @@ const styles = StyleSheet.create({
   ministerLoyaltyFill: { height: "100%", borderRadius: 2 },
   ministerLoyaltyVal: { fontSize: 9, fontFamily: FONT.bold, width: 22, textAlign: "right" },
   fireBtn: { padding: 6, borderRadius: RADIUS.xs, backgroundColor: PALETTE.danger + "22", borderWidth: 1, borderColor: PALETTE.danger + "44" },
+
+  secondaryCabinetToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, justifyContent: "center" },
+  secondaryCabinetLabel: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1.5, flex: 1, textAlign: "center" },
 });

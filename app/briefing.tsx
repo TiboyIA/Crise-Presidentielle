@@ -8,7 +8,8 @@ import { useStrategy } from "@/context/StrategyContext";
 import { computeMandateScore } from "@/context/StrategyContext";
 import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import type { HiddenPolitics, NationalIndicators, PromiseDomain, PromiseStatus } from "@/types/strategy";
+import { useResponsive } from "@/utils/responsive";
+import type { DecisionTrace, HiddenPolitics, NationalIndicators, PromiseDomain, PromiseStatus } from "@/types/strategy";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -94,10 +95,17 @@ function getApprovalLabel(score: number): { label: string; color: string } {
   return                   { label: "Très défavorable", color: "#ff2040" };
 }
 
+function getOppositionColor(power: number): string {
+  if (power >= 65) return PALETTE.danger;
+  if (power >= 40) return PALETTE.warning;
+  return PALETTE.success;
+}
+
 export default function BriefingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, shouldShowPoll, acknowledgePoll } = useStrategy();
+  const { isLandscape } = useResponsive();
 
   if (!state) return null;
 
@@ -110,6 +118,12 @@ export default function BriefingScreen() {
   const pendingNews = state.news.pendingIds.length > 0;
   const pollCycle = Math.floor(state.mandateDay / 10);
   const hiddenAlert = hp.eliteTrust < 35 || hp.mediaMood < 30 || hp.scandalRisk > 65;
+  const oppositionPower = state.oppositionPower ?? 35;
+  const oppositionColor = getOppositionColor(oppositionPower);
+  const criticalTraces = (state.publicMemory?.traces ?? [])
+    .filter((t: DecisionTrace) => t.politicalImpact < -8)
+    .slice(-3)
+    .reverse();
 
   const handleAcknowledgePoll = () => {
     acknowledgePoll();
@@ -139,7 +153,7 @@ export default function BriefingScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* SONDAGE — Poll section */}
+        {/* SONDAGE — Poll section (always full width) */}
         {shouldShowPoll && (
           <Panel variant="gold" glow style={styles.pollCard}>
             <View style={styles.pollHeader}>
@@ -167,8 +181,11 @@ export default function BriefingScreen() {
           </Panel>
         )}
 
+        {/* 2-col panels grid */}
+        <View style={[styles.panelGrid, isLandscape && styles.panelGridLandscape]}>
+
         {/* INDICATEURS */}
-        <Panel style={styles.section}>
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="gauge" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>BAROMÈTRE NATIONAL</Text>
@@ -196,7 +213,7 @@ export default function BriefingScreen() {
         </Panel>
 
         {/* SIGNAUX POLITIQUES CACHÉS */}
-        <Panel variant={hiddenAlert ? "danger" : undefined} style={styles.section}>
+        <Panel variant={hiddenAlert ? "danger" : undefined} style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="eye-outline" size={14} color={hiddenAlert ? PALETTE.danger : "#a78bfa"} />
             <Text style={[styles.sectionTitle, { color: hiddenAlert ? PALETTE.danger : "#a78bfa" }]}>SIGNAUX POLITIQUES</Text>
@@ -218,8 +235,47 @@ export default function BriefingScreen() {
           })}
         </Panel>
 
+        {/* OPPOSITION */}
+        <Panel variant={oppositionPower >= 65 ? "danger" : undefined} style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account-multiple-remove" size={14} color={oppositionColor} />
+            <Text style={[styles.sectionTitle, { color: oppositionColor }]}>PRESSION DE L'OPPOSITION</Text>
+          </View>
+          <View style={styles.indicatorRow}>
+            <MaterialCommunityIcons name="sword-cross" size={14} color={oppositionColor} style={{ width: 18 }} />
+            <Text style={styles.indicatorLabel}>Force oppos.</Text>
+            <View style={styles.indicatorTrack}>
+              <View style={[styles.indicatorFill, { width: `${oppositionPower}%`, backgroundColor: oppositionColor }]} />
+            </View>
+            <Text style={[styles.indicatorVal, { color: oppositionColor }]}>{oppositionPower}</Text>
+          </View>
+          {oppositionPower >= 65 && (
+            <Text style={styles.oppositionAlert}>L'opposition est en position de force. Des actions concrètes sont nécessaires.</Text>
+          )}
+        </Panel>
+
+        {/* MÉMOIRE DU PEUPLE — critical traces */}
+        {criticalTraces.length > 0 && (
+          <Panel variant="danger" style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="history" size={14} color={PALETTE.danger} />
+              <Text style={[styles.sectionTitle, { color: PALETTE.danger }]}>MÉMOIRE COLLECTIVE</Text>
+            </View>
+            {criticalTraces.map((trace: DecisionTrace) => (
+              <View key={trace.id} style={styles.traceRow}>
+                <MaterialCommunityIcons name="alert-outline" size={12} color={PALETTE.danger} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.traceTitle}>{trace.title}</Text>
+                  <Text style={styles.traceDesc} numberOfLines={1}>{trace.description}</Text>
+                </View>
+                <Text style={styles.traceImpact}>{trace.politicalImpact}</Text>
+              </View>
+            ))}
+          </Panel>
+        )}
+
         {/* HUMEUR DES MÉDIAS */}
-        <Panel style={styles.section}>
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="broadcast" size={14} color="#4a9fff" />
             <Text style={[styles.sectionTitle, { color: "#4a9fff" }]}>PAYSAGE MÉDIATIQUE</Text>
@@ -242,7 +298,7 @@ export default function BriefingScreen() {
 
         {/* PROMESSES DE CAMPAGNE */}
         {promises.selected.length > 0 && (
-          <Panel style={styles.section}>
+          <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons name="flag-checkered" size={14} color={PALETTE.gold} />
               <Text style={styles.sectionTitle}>PROMESSES DE CAMPAGNE</Text>
@@ -264,7 +320,7 @@ export default function BriefingScreen() {
         )}
 
         {/* APPROBATION GLOBALE */}
-        <Panel style={styles.section}>
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="chart-pie" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>INDICE D'APPROBATION</Text>
@@ -290,7 +346,7 @@ export default function BriefingScreen() {
 
         {/* ALERTES ACTIVES */}
         {pendingNews && (
-          <Panel variant="danger" style={styles.section}>
+          <Panel variant="danger" style={[styles.section, isLandscape && styles.sectionLandscape]}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons name="alert-circle" size={14} color={PALETTE.danger} />
               <Text style={[styles.sectionTitle, { color: PALETTE.danger }]}>DÉCISION EN ATTENTE</Text>
@@ -308,7 +364,7 @@ export default function BriefingScreen() {
         )}
 
         {/* RECOMMANDATION STRATÉGIQUE */}
-        <Panel style={styles.section}>
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="lightbulb-on-outline" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>RECOMMANDATION STRATÉGIQUE</Text>
@@ -318,6 +374,8 @@ export default function BriefingScreen() {
             <Text style={styles.recText}>{recommendation.text}</Text>
           </View>
         </Panel>
+
+        </View>{/* /panelGrid */}
 
         {/* ACTIONS */}
         <View style={styles.actions}>
@@ -409,4 +467,15 @@ const styles = StyleSheet.create({
   promiseChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1 },
   promiseLabel: { fontSize: 10, fontFamily: FONT.semi, letterSpacing: 0.3 },
   promiseStatus: { fontSize: 10, fontFamily: FONT.bold },
+
+  panelGrid: { gap: 10 },
+  panelGridLandscape: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  sectionLandscape: { flexBasis: "48%", flexGrow: 1 },
+
+  oppositionAlert: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.danger, lineHeight: 15, marginTop: 2 },
+
+  traceRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  traceTitle: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textHigh },
+  traceDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13 },
+  traceImpact: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.danger, minWidth: 24, textAlign: "right" },
 });
