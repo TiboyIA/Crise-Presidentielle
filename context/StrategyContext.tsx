@@ -21,17 +21,26 @@ import {
 } from "@/logic/newsEngine";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
+import { DOCTRINES } from "@/data/doctrines";
+import { REFORMS } from "@/data/reforms";
+import { STRATEGY_MINISTERS, MINISTER_LIST } from "@/data/strategyMinisters";
+import type { StrategyMinisterId } from "@/data/strategyMinisters";
+import { COUNTRIES } from "@/data/countries";
 import type {
   BuildingId,
   CampaignPromises,
   CountryId,
   DelayedConsequence,
+  GovernanceDoctrine,
   HiddenPolitics,
   NationalIndicators,
   OperationType,
   PlayerBuilding,
+  PlayerReform,
   PromiseDomain,
+  ReformId,
   StrategyGameState,
+  StrategyMinister,
   StrategyResources,
 } from "@/types/strategy";
 
@@ -47,6 +56,15 @@ const INITIAL_HIDDEN_POLITICS: HiddenPolitics = {
 const PROMISE_DOMAINS: PromiseDomain[] = [
   "securite", "economie", "ecologie", "souverainete", "pouvoir_achat", "innovation", "diplomatie",
 ];
+
+function buildInitialMinisters(): StrategyMinister[] {
+  return MINISTER_LIST.map((def) => ({
+    id: def.id,
+    loyalty: def.defaultLoyalty,
+    competence: def.defaultCompetence,
+    scandalRisk: def.defaultScandalRisk,
+  }));
+}
 
 function buildInitialPromises(): CampaignPromises {
   const selected: PromiseDomain[] = PROMISE_DOMAINS.slice(0, 3);
@@ -118,6 +136,9 @@ function buildInitialState(playerName: string): StrategyGameState {
     hiddenPolitics: { ...INITIAL_HIDDEN_POLITICS },
     delayedConsequences: [],
     campaignPromises: buildInitialPromises(),
+    governanceDoctrine: "democratique",
+    reforms: [],
+    strategyMinisters: buildInitialMinisters(),
   };
 }
 
@@ -135,6 +156,8 @@ interface StrategyContextValue {
   markNewsRead: () => void;
   acknowledgePoll: () => void;
   startNewMandate: () => void;
+  adoptDoctrine: (id: GovernanceDoctrine) => { success: boolean; reason?: string };
+  launchReform: (id: ReformId) => { success: boolean; reason?: string };
   tick: () => void;
 }
 
@@ -158,6 +181,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           hiddenPolitics: saved.hiddenPolitics ?? { ...INITIAL_HIDDEN_POLITICS },
           delayedConsequences: saved.delayedConsequences ?? [],
           campaignPromises: saved.campaignPromises ?? buildInitialPromises(),
+          governanceDoctrine: saved.governanceDoctrine ?? "democratique",
+          reforms: saved.reforms ?? [],
+          strategyMinisters: saved.strategyMinisters ?? buildInitialMinisters(),
         });
       }
       setLoaded(true);
@@ -282,7 +308,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           type: "upgrade_building",
           buildingId: id,
         });
-        return withNews({ ...prev, resources, buildings, missions, mandateDay: prev.mandateDay + 1 });
+        return withNews(advanceMandateDay({ ...prev, resources, buildings, missions }, 1));
       });
 
       return { success: true };
@@ -311,7 +337,17 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           if (r.countryId !== targetCountryId) return r;
           const { score, status } = updateRelationScore(r.score, result.relationDelta);
           const cooldowns = { ...r.operationCooldowns, [type]: Date.now() + op.cooldown * 1000 };
-          return { ...r, score, status, operationCooldowns: cooldowns };
+          const country = COUNTRIES[targetCountryId];
+          const revealedIntel = (type === "espionage" && result.success)
+            ? {
+                military: Math.max(0, Math.min(100, country.military + Math.floor(Math.random() * 14) - 7)),
+                cyber: Math.max(0, Math.min(100, country.cyber + Math.floor(Math.random() * 14) - 7)),
+                economy: Math.max(0, Math.min(100, country.economy + Math.floor(Math.random() * 14) - 7)),
+                stability: Math.max(0, Math.min(100, 50 + Math.floor(Math.random() * 40) - 10)),
+                revealedAtAction: prev.news.actionCount,
+              }
+            : r.revealedIntel;
+          return { ...r, score, status, operationCooldowns: cooldowns, revealedIntel };
         });
 
         const power = calculateGlobalPower(prev.buildings, rewardedResources);
@@ -327,7 +363,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           ? checkMissionProgress(missions, rewardedResources, prev.buildings, power, { type: "spy_country" })
           : missions;
 
-        return withNews({
+        const baseOp = {
           ...prev,
           resources: rewardedResources,
           relations,
@@ -341,8 +377,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             operationsWon: prev.stats.operationsWon + (result.success ? 1 : 0),
           },
           missions: spyMissions,
-          mandateDay: prev.mandateDay + (result.success ? 1 : 0),
-        });
+        };
+        return withNews(advanceMandateDay(baseOp, result.success ? 1 : 0));
       });
 
       return { success: result.success, message: result.message };
@@ -389,7 +425,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           delayedConsequences = [...delayedConsequences, newConsequence];
         }
 
-        return { ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, mandateDay: prev.mandateDay + 2 };
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 2);
       });
     },
     [update],
@@ -418,7 +454,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const resources = applyRewards(prev.resources, def.reward);
         const missions = prev.missions.filter((m) => m.defId !== defId);
 
-        return {
+        return advanceMandateDay({
           ...prev,
           resources,
           missions,
@@ -426,8 +462,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             ...prev.stats,
             rankingPoints: prev.stats.rankingPoints + def.rewardPoints,
           },
-          mandateDay: prev.mandateDay + 1,
-        };
+        }, 1);
       });
     },
     [update],
@@ -436,6 +471,42 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const acknowledgePoll = useCallback(() => {
     update((prev) => ({ ...prev, lastPollShownAt: prev.mandateDay }));
   }, [update]);
+
+  const adoptDoctrine = useCallback(
+    (id: GovernanceDoctrine): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      if (state.governanceDoctrine === id) return { success: false, reason: "Doctrine déjà active" };
+      const def = DOCTRINES[id];
+      if (!canAfford(def.switchCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      update((prev) => {
+        const resources = deductCost(def.switchCost, prev.resources);
+        return withNews(advanceMandateDay({ ...prev, resources, governanceDoctrine: id }, 1));
+      });
+      return { success: true };
+    },
+    [state, update],
+  );
+
+  const launchReform = useCallback(
+    (id: ReformId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      const def = REFORMS[id];
+      if (!canAfford(def.cost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      if (state.reforms.some((r) => r.id === id && !r.applied)) return { success: false, reason: "Réforme déjà en cours" };
+      update((prev) => {
+        const resources = deductCost(def.cost, prev.resources);
+        const newReform: PlayerReform = {
+          id,
+          launchedAtDay: prev.mandateDay,
+          completesAtDay: prev.mandateDay + def.durationDays,
+          applied: false,
+        };
+        return withNews(advanceMandateDay({ ...prev, resources, reforms: [...prev.reforms, newReform] }, 1));
+      });
+      return { success: true };
+    },
+    [state, update],
+  );
 
   const startNewMandate = useCallback(() => {
     update((prev) => {
@@ -474,12 +545,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       state, loaded, shouldShowPoll, shouldShowBilan,
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, tick,
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, tick,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, tick],
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, tick],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;
@@ -489,6 +560,67 @@ export function useStrategy(): StrategyContextValue {
   const ctx = useContext(StrategyContext);
   if (!ctx) throw new Error("useStrategy must be used within StrategyProvider");
   return ctx;
+}
+
+function processReformCompletions(state: StrategyGameState): StrategyGameState {
+  if (!state.reforms.some((r) => !r.applied && state.mandateDay >= r.completesAtDay)) return state;
+  let ind = state.nationalIndicators;
+  let hp = state.hiddenPolitics;
+  let res = state.resources;
+  const reforms = state.reforms.map((r) => {
+    if (r.applied || state.mandateDay < r.completesAtDay) return r;
+    const def = REFORMS[r.id];
+    ind = applyIndicatorEffects(ind, def.indicatorBoost);
+    hp = applyHiddenPoliticsEffects(hp, def.hiddenEffect);
+    res = applyRewards(res, def.resourceBoost);
+    return { ...r, applied: true };
+  });
+  return { ...state, reforms, nationalIndicators: ind, hiddenPolitics: hp, resources: res };
+}
+
+function applyMinisterBonuses(state: StrategyGameState): StrategyGameState {
+  let ind = state.nationalIndicators;
+  let res = state.resources;
+  for (const minister of state.strategyMinisters) {
+    const def = STRATEGY_MINISTERS[minister.id as StrategyMinisterId];
+    if (!def) continue;
+    const scale = minister.competence / 100;
+    const scaledInd: Partial<NationalIndicators> = {};
+    for (const [k, v] of Object.entries(def.indicatorBonus) as [keyof NationalIndicators, number][]) {
+      scaledInd[k] = Math.round(v * scale);
+    }
+    const scaledRes: Partial<StrategyResources> = {};
+    for (const [k, v] of Object.entries(def.resourceBonus) as [keyof StrategyResources, number][]) {
+      scaledRes[k] = Math.round(v * scale);
+    }
+    ind = applyIndicatorEffects(ind, scaledInd);
+    res = applyRewards(res, scaledRes);
+  }
+  return { ...state, nationalIndicators: ind, resources: res };
+}
+
+function advanceMandateDay(state: StrategyGameState, days: number): StrategyGameState {
+  if (days <= 0) return state;
+  const prevDay = state.mandateDay;
+  const newDay = prevDay + days;
+  let s = { ...state, mandateDay: newDay };
+
+  // Check reform completions
+  s = processReformCompletions(s);
+
+  // Apply doctrine drift + minister bonuses every 10 days
+  if (Math.floor(newDay / 10) > Math.floor(prevDay / 10)) {
+    const doctrineDef = DOCTRINES[s.governanceDoctrine];
+    s = {
+      ...s,
+      nationalIndicators: applyIndicatorEffects(s.nationalIndicators, doctrineDef.indicatorDrift),
+      hiddenPolitics: applyHiddenPoliticsEffects(s.hiddenPolitics, doctrineDef.hiddenDrift),
+      resources: applyRewards(s.resources, doctrineDef.resourceBonus),
+    };
+    s = applyMinisterBonuses(s);
+  }
+
+  return s;
 }
 
 function withNews(state: StrategyGameState): StrategyGameState {

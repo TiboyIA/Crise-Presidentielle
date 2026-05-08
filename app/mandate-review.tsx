@@ -7,9 +7,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { computeMandateScore } from "@/context/StrategyContext";
 import { getPlayerRank } from "@/logic/botEngine";
+import { DOCTRINES } from "@/data/doctrines";
+import { REFORMS } from "@/data/reforms";
 import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import type { NationalIndicators } from "@/types/strategy";
+import type { NationalIndicators, PromiseDomain } from "@/types/strategy";
+
+const PROMISE_LABELS: Record<PromiseDomain, string> = {
+  securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
+  souverainete: "Souveraineté", pouvoir_achat: "Pouvoir d'achat",
+  innovation: "Innovation", diplomatie: "Diplomatie",
+};
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -152,6 +160,60 @@ export default function MandateReviewScreen() {
             ))}
           </View>
         </Panel>
+
+        {/* DOCTRINE & RÉFORMES DU MANDAT */}
+        {(() => {
+          const doctrine = DOCTRINES[state.governanceDoctrine];
+          const completedReforms = state.reforms.filter((r) => r.applied);
+          const promises = state.campaignPromises;
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="crown-outline" size={14} color={PALETTE.gold} />
+                <Text style={styles.sectionTitle}>DOCTRINE & BILAN POLITIQUE</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 }}>
+                <MaterialCommunityIcons name={doctrine.icon as any} size={18} color={doctrine.color} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontFamily: FONT.bold, color: doctrine.color }}>{doctrine.name}</Text>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2 }}>{doctrine.slogan}</Text>
+                </View>
+              </View>
+              {completedReforms.length > 0 && (
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2, marginTop: 4 }}>RÉFORMES ACCOMPLIES</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                    {completedReforms.map((r) => {
+                      const def = REFORMS[r.id];
+                      return (
+                        <View key={r.id} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.xs, backgroundColor: "rgba(63,190,122,0.12)", borderWidth: 1, borderColor: "#3fbe7a44" }}>
+                          <MaterialCommunityIcons name={def.icon as any} size={10} color="#3fbe7a" />
+                          <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: "#3fbe7a" }}>{def.name}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+              {promises.selected.length > 0 && (
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2, marginTop: 4 }}>PROMESSES DE CAMPAGNE</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                    {promises.selected.map((domain) => {
+                      const status = promises.status[domain] ?? "en cours";
+                      const color = status === "tenue" ? "#3fbe7a" : status === "trahie" ? PALETTE.danger : status === "partielle" ? PALETTE.warning : "#4a9fff";
+                      return (
+                        <View key={domain} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: color + "44", backgroundColor: color + "11" }}>
+                          <Text style={{ fontSize: 9, fontFamily: FONT.bold, color }}>{PROMISE_LABELS[domain]}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </Panel>
+          );
+        })()}
 
         {/* RÉCOMPENSES */}
         {(reward.money > 0 || reward.influence > 0 || reward.points > 0) && (

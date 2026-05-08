@@ -315,6 +315,34 @@ export default function WorldMapScreen() {
         ))}
       </View>
 
+      {selectedRelation.revealedIntel && (() => {
+        const intel = selectedRelation.revealedIntel!;
+        const isStale = state.news.actionCount - intel.revealedAtAction > 50;
+        return (
+          <Panel style={{ padding: 12, marginTop: 8, borderColor: "#52c97a44", borderWidth: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <MaterialCommunityIcons name="eye-check-outline" size={13} color="#52c97a" />
+              <Text style={[styles.sectionKicker, { color: "#52c97a", flex: 1 }]}>INTELLIGENCE RÉVÉLÉE</Text>
+              {isStale && <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.warning, letterSpacing: 1 }}>DATÉE</Text>}
+            </View>
+            {([
+              { label: "Capacité militaire", value: intel.military },
+              { label: "Cybersécurité",      value: intel.cyber },
+              { label: "Économie réelle",    value: intel.economy },
+              { label: "Stabilité interne",  value: intel.stability },
+            ]).map(({ label, value }) => (
+              <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <Text style={{ fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid, width: 110 }}>{label}</Text>
+                <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" }}>
+                  <View style={{ height: "100%", width: `${value}%`, borderRadius: 2, backgroundColor: isStale ? PALETTE.textLow : "#52c97a" }} />
+                </View>
+                <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: isStale ? PALETTE.textLow : "#52c97a", width: 24, textAlign: "right" }}>{value}</Text>
+              </View>
+            ))}
+          </Panel>
+        );
+      })()}
+
       <View style={{ marginTop: 12 }}>
         <PrimaryButton
           label="Lancer une opération"

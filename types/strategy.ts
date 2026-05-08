@@ -99,12 +99,21 @@ export interface CountryDef {
   description: string;
 }
 
+export interface RevealedIntel {
+  military: number;
+  cyber: number;
+  economy: number;
+  stability: number;
+  revealedAtAction: number;
+}
+
 export interface CountryRelation {
   countryId: CountryId;
   status: RelationStatus;
   score: number; // -100 to 100
   threatLevel: number; // 0-100
   operationCooldowns: Partial<Record<OperationType, number>>; // expiry timestamps
+  revealedIntel?: RevealedIntel;
 }
 
 export type OperationType =
@@ -216,6 +225,27 @@ export type NewsType =
   | "classement";
 
 export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
+
+export type GovernanceDoctrine =
+  | "democratique" | "technocratique" | "securitaire" | "populiste" | "autoritaire";
+
+export type ReformId =
+  | "fiscal" | "securite" | "energie" | "industrie"
+  | "cyber" | "diplomatique" | "sociale" | "education";
+
+export interface PlayerReform {
+  id: ReformId;
+  launchedAtDay: number;
+  completesAtDay: number;
+  applied: boolean;
+}
+
+export interface StrategyMinister {
+  id: string;          // matches StrategyMinisterId
+  loyalty: number;     // 0-100, can drift
+  competence: number;  // 0-100
+  scandalRisk: number; // 0-100, can increase
+}
 
 export interface HiddenPolitics {
   eliteTrust: number;              // 0-100 — confiance des élites / hauts fonctionnaires
@@ -332,4 +362,7 @@ export interface StrategyGameState {
   hiddenPolitics: HiddenPolitics;
   delayedConsequences: DelayedConsequence[];
   campaignPromises: CampaignPromises;
+  governanceDoctrine: GovernanceDoctrine;
+  reforms: PlayerReform[];
+  strategyMinisters: StrategyMinister[];
 }

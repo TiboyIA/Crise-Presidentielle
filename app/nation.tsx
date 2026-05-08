@@ -1,5 +1,5 @@
-import React from "react";
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -11,6 +11,10 @@ import { MissionCard } from "@/components/MissionCard";
 import { Badge, Panel, SectionHeader } from "@/components/ui";
 import { BUILDINGS } from "@/data/buildings";
 import { COUNTRIES } from "@/data/countries";
+import { DOCTRINES, DOCTRINE_LIST } from "@/data/doctrines";
+import { REFORMS, REFORM_LIST, CATEGORY_COLOR } from "@/data/reforms";
+import { STRATEGY_MINISTERS, MINISTER_LIST } from "@/data/strategyMinisters";
+import type { GovernanceDoctrine, ReformId } from "@/types/strategy";
 import { timeRemaining, formatDuration } from "@/logic/buildingEngine";
 import { getPlayerRank, getRankTitle, getTitleIcon } from "@/logic/botEngine";
 import { RESOURCE_LABELS } from "@/types/strategy";
@@ -52,7 +56,9 @@ const INDICATOR_COLORS: Record<string, string> = {
 export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, collectMissionReward, shouldShowBilan } = useStrategy();
+  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform } = useStrategy();
+  const [doctrineExpanded, setDoctrineExpanded] = useState(false);
+  const [reformsExpanded, setReformsExpanded] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
 
   if (!state) return null;
@@ -165,6 +171,144 @@ export default function NationScreen() {
                   </View>
                   <View style={styles.barometreTrack}>
                     <View style={[styles.barometreFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: isLow ? PALETTE.danger : color }]} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Panel>
+
+        {/* DOCTRINE DE GOUVERNANCE */}
+        {(() => {
+          const doctrine = DOCTRINES[state.governanceDoctrine];
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="crown-outline" size={14} color={PALETTE.gold} />
+                <Text style={styles.sectionTitle}>DOCTRINE DE GOUVERNANCE</Text>
+                <Pressable onPress={() => setDoctrineExpanded((v) => !v)} style={styles.expandBtn}>
+                  <MaterialCommunityIcons name={doctrineExpanded ? "chevron-up" : "chevron-down"} size={16} color={PALETTE.textMid} />
+                </Pressable>
+              </View>
+              <View style={styles.doctrineRow}>
+                <MaterialCommunityIcons name={doctrine.icon as any} size={22} color={doctrine.color} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.doctrineName, { color: doctrine.color }]}>{doctrine.name}</Text>
+                  <Text style={styles.doctrineSlogan}>"{doctrine.slogan}"</Text>
+                </View>
+              </View>
+              {doctrineExpanded && (
+                <View style={styles.doctrineAlt}>
+                  <Text style={styles.doctrineAltTitle}>CHANGER DE DOCTRINE :</Text>
+                  {DOCTRINE_LIST.filter((d) => d.id !== state.governanceDoctrine).map((d) => (
+                    <Pressable
+                      key={d.id}
+                      onPress={() => {
+                        const r = adoptDoctrine(d.id as GovernanceDoctrine);
+                        if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur");
+                        else setDoctrineExpanded(false);
+                      }}
+                      style={({ pressed }) => [styles.doctrineOption, { opacity: pressed ? 0.75 : 1, borderColor: d.color + "44" }]}
+                    >
+                      <MaterialCommunityIcons name={d.icon as any} size={16} color={d.color} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.doctrineOptionName, { color: d.color }]}>{d.name}</Text>
+                        <Text style={styles.doctrineRisk}>{d.risks}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </Panel>
+          );
+        })()}
+
+        {/* RÉFORMES NATIONALES */}
+        {(() => {
+          const activeReforms = state.reforms.filter((r) => !r.applied);
+          const availableReforms = REFORM_LIST.filter((def) => !state.reforms.some((r) => r.id === def.id && !r.applied));
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="text-box-check-outline" size={14} color={PALETTE.gold} />
+                <Text style={styles.sectionTitle}>RÉFORMES NATIONALES</Text>
+                {activeReforms.length > 0 && (
+                  <View style={styles.reformBadge}>
+                    <Text style={styles.reformBadgeText}>{activeReforms.length}</Text>
+                  </View>
+                )}
+                <Pressable onPress={() => setReformsExpanded((v) => !v)} style={styles.expandBtn}>
+                  <MaterialCommunityIcons name={reformsExpanded ? "chevron-up" : "chevron-down"} size={16} color={PALETTE.textMid} />
+                </Pressable>
+              </View>
+              {activeReforms.length === 0 && !reformsExpanded && (
+                <Text style={styles.reformEmpty}>Aucune réforme en cours — lancez-en une</Text>
+              )}
+              {activeReforms.map((r) => {
+                const def = REFORMS[r.id];
+                const daysLeft = Math.max(0, r.completesAtDay - state.mandateDay);
+                const pct = Math.min(100, ((r.completesAtDay - r.launchedAtDay - daysLeft) / (r.completesAtDay - r.launchedAtDay)) * 100);
+                return (
+                  <View key={r.id} style={styles.reformActive}>
+                    <MaterialCommunityIcons name={def.icon as any} size={14} color={CATEGORY_COLOR[def.category]} />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={styles.reformName}>{def.name}</Text>
+                      <View style={styles.reformTrack}>
+                        <View style={[styles.reformFill, { width: `${pct}%`, backgroundColor: CATEGORY_COLOR[def.category] }]} />
+                      </View>
+                    </View>
+                    <Text style={styles.reformEta}>{daysLeft}j</Text>
+                  </View>
+                );
+              })}
+              {reformsExpanded && (
+                <View style={styles.reformsGrid}>
+                  {availableReforms.map((def) => (
+                    <Pressable
+                      key={def.id}
+                      onPress={() => {
+                        const r = launchReform(def.id as ReformId);
+                        if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur");
+                        else setReformsExpanded(false);
+                      }}
+                      style={({ pressed }) => [styles.reformOption, { opacity: pressed ? 0.75 : 1, borderColor: CATEGORY_COLOR[def.category] + "44" }]}
+                    >
+                      <View style={styles.reformOptionHeader}>
+                        <MaterialCommunityIcons name={def.icon as any} size={14} color={CATEGORY_COLOR[def.category]} />
+                        <Text style={[styles.reformOptionName, { color: CATEGORY_COLOR[def.category] }]}>{def.name}</Text>
+                        <Text style={styles.reformDuration}>{def.durationDays}j</Text>
+                      </View>
+                      <Text style={styles.reformDesc} numberOfLines={2}>{def.description}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </Panel>
+          );
+        })()}
+
+        {/* CABINET STRATÉGIQUE */}
+        <Panel style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account-tie-outline" size={14} color={PALETTE.gold} />
+            <Text style={styles.sectionTitle}>CABINET STRATÉGIQUE</Text>
+          </View>
+          <View style={styles.cabinetGrid}>
+            {state.strategyMinisters.map((m) => {
+              const def = STRATEGY_MINISTERS[m.id as keyof typeof STRATEGY_MINISTERS];
+              if (!def) return null;
+              const loyaltyColor = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
+              return (
+                <View key={m.id} style={styles.ministerChip}>
+                  <Text style={[styles.ministerSpec, { color: def.specialtyColor }]}>{def.specialty[0]}</Text>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={styles.ministerName} numberOfLines={1}>{def.name.split(" ")[0]} {def.name.split(" ").slice(-1)}</Text>
+                    <View style={styles.ministerLoyaltyRow}>
+                      <View style={styles.ministerLoyaltyTrack}>
+                        <View style={[styles.ministerLoyaltyFill, { width: `${m.loyalty}%`, backgroundColor: loyaltyColor }]} />
+                      </View>
+                      <Text style={[styles.ministerLoyaltyVal, { color: loyaltyColor }]}>{m.loyalty}</Text>
+                    </View>
                   </View>
                 </View>
               );
@@ -356,4 +500,42 @@ const styles = StyleSheet.create({
   bilanBanner: { padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
   bilanTitle: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
   bilanSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, marginTop: 2 },
+
+  section: { padding: 12, gap: 8 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sectionTitle: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2, flex: 1 },
+  expandBtn: { padding: 4 },
+
+  doctrineRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  doctrineName: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  doctrineSlogan: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, fontStyle: "italic", marginTop: 2 },
+  doctrineAlt: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: PALETTE.panelEdge, paddingTop: 8, marginTop: 2 },
+  doctrineAltTitle: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2, marginBottom: 4 },
+  doctrineOption: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: RADIUS.sm, borderWidth: 1, backgroundColor: "rgba(255,255,255,0.03)" },
+  doctrineOptionName: { fontSize: 11, fontFamily: FONT.bold },
+  doctrineRisk: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1 },
+
+  reformBadge: { backgroundColor: PALETTE.gold + "33", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  reformBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold },
+  reformEmpty: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, textAlign: "center", paddingVertical: 4 },
+  reformActive: { flexDirection: "row", alignItems: "center", gap: 8 },
+  reformName: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh },
+  reformTrack: { height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  reformFill: { height: "100%", borderRadius: 2 },
+  reformEta: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold, width: 24, textAlign: "right" },
+  reformsGrid: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: PALETTE.panelEdge, paddingTop: 8 },
+  reformOption: { padding: 8, borderRadius: RADIUS.sm, borderWidth: 1, gap: 4, backgroundColor: "rgba(255,255,255,0.03)" },
+  reformOptionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  reformOptionName: { fontSize: 11, fontFamily: FONT.bold, flex: 1 },
+  reformDuration: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid },
+  reformDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13 },
+
+  cabinetGrid: { gap: 6 },
+  ministerChip: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  ministerSpec: { fontSize: 18, fontFamily: FONT.bold, width: 20, textAlign: "center" },
+  ministerName: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh },
+  ministerLoyaltyRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  ministerLoyaltyTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  ministerLoyaltyFill: { height: "100%", borderRadius: 2 },
+  ministerLoyaltyVal: { fontSize: 9, fontFamily: FONT.bold, width: 22, textAlign: "right" },
 });
