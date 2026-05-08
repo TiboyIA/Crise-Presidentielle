@@ -65,19 +65,26 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
   const { resources, ranking, stats, nationalIndicators: ind } = state;
   const playerRank = ranking.findIndex((r) => r.id === "player") + 1;
   const indicators = ind ?? { popularity: 60, economy: 55, security: 50, ecology: 45, cohesion: 60, publicBudget: 20 };
+  const hp = state.hiddenPolitics ?? { eliteTrust: 65, scandalRisk: 20, mediaMood: 55, popularFatigue: 15, regionalTension: 30, institutionalStability: 70 };
   return {
-    low_money:       resources.money < 500,
-    low_cyber:       resources.cyberDefense < 30,
-    low_military:    resources.military < 40,
-    high_power:      stats.globalPower >= 200,
-    rank_pressure:   playerRank > ranking.length * 0.4,
-    top5_rank:       playerRank <= 5,
-    low_popularity:  indicators.popularity < 30,
-    low_ind_economy: indicators.economy < 25,
-    low_security:    indicators.security < 25,
-    low_ecology:     indicators.ecology < 25,
-    low_cohesion:    indicators.cohesion < 25,
-    budget_crisis:   indicators.publicBudget < -80,
+    low_money:                resources.money < 500,
+    low_cyber:                resources.cyberDefense < 30,
+    low_military:             resources.military < 40,
+    high_power:               stats.globalPower >= 200,
+    rank_pressure:            playerRank > ranking.length * 0.4,
+    top5_rank:                playerRank <= 5,
+    low_popularity:           indicators.popularity < 30,
+    low_ind_economy:          indicators.economy < 25,
+    low_security:             indicators.security < 25,
+    low_ecology:              indicators.ecology < 25,
+    low_cohesion:             indicators.cohesion < 25,
+    budget_crisis:            indicators.publicBudget < -80,
+    low_elite_trust:          hp.eliteTrust < 35,
+    high_scandal_risk:        hp.scandalRisk > 65,
+    low_media_mood:           hp.mediaMood < 30,
+    high_popular_fatigue:     hp.popularFatigue > 65,
+    high_regional_tension:    hp.regionalTension > 65,
+    low_institutional_stability: hp.institutionalStability < 35,
   };
 }
 

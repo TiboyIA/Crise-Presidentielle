@@ -217,6 +217,36 @@ export type NewsType =
 
 export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
 
+export interface HiddenPolitics {
+  eliteTrust: number;              // 0-100 — confiance des élites / hauts fonctionnaires
+  scandalRisk: number;             // 0-100 — probabilité qu'un scandale éclate
+  mediaMood: number;               // 0-100 — humeur des médias (0=hostile, 100=favorable)
+  popularFatigue: number;          // 0-100 — lassitude de la population
+  regionalTension: number;         // 0-100 — tensions territoriales / collectivités
+  institutionalStability: number;  // 0-100 — stabilité de l'appareil d'État
+}
+
+export type PromiseDomain =
+  | "securite" | "economie" | "ecologie"
+  | "souverainete" | "pouvoir_achat" | "innovation" | "diplomatie";
+
+export type PromiseStatus = "tenue" | "partielle" | "trahie" | "en cours";
+
+export interface CampaignPromises {
+  selected: PromiseDomain[];
+  progress: Partial<Record<PromiseDomain, number>>;
+  status: Partial<Record<PromiseDomain, PromiseStatus>>;
+}
+
+export interface DelayedConsequence {
+  id: string;
+  source: string;
+  triggerAfterActions: number;
+  effectType: "news_event" | "indicator_effect" | "hidden_politics";
+  relatedNewsEventId?: string;
+  payload?: Partial<NationalIndicators> | Partial<HiddenPolitics>;
+}
+
 export interface NationalIndicators {
   popularity: number;    // 0-100
   economy: number;       // 0-100
@@ -234,6 +264,14 @@ export interface NewsChoice {
   rankingDelta?: number;
   relationDelta?: { countryId: CountryId; delta: number };
   indicatorEffects?: Partial<NationalIndicators>;
+  hiddenPoliticsEffects?: Partial<HiddenPolitics>;
+  queuesDelayedConsequence?: {
+    id: string;
+    delayActions: number;
+    effectType: "news_event" | "indicator_effect" | "hidden_politics";
+    relatedNewsEventId?: string;
+    payload?: Partial<NationalIndicators> | Partial<HiddenPolitics>;
+  };
 }
 
 export interface NewsEvent {
@@ -289,6 +327,9 @@ export interface StrategyGameState {
   startedAt: number;
   nationalIndicators: NationalIndicators;
   mandateDay: number;
-  lastPollShownAt: number;   // mandateDay value when last poll was shown
-  lastBilanShownAt: number;  // mandateDay value when last bilan was shown
+  lastPollShownAt: number;
+  lastBilanShownAt: number;
+  hiddenPolitics: HiddenPolitics;
+  delayedConsequences: DelayedConsequence[];
+  campaignPromises: CampaignPromises;
 }

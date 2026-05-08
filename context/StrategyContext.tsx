@@ -23,13 +23,39 @@ import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
 import type {
   BuildingId,
+  CampaignPromises,
   CountryId,
+  DelayedConsequence,
+  HiddenPolitics,
   NationalIndicators,
   OperationType,
   PlayerBuilding,
+  PromiseDomain,
   StrategyGameState,
   StrategyResources,
 } from "@/types/strategy";
+
+const INITIAL_HIDDEN_POLITICS: HiddenPolitics = {
+  eliteTrust: 65,
+  scandalRisk: 20,
+  mediaMood: 55,
+  popularFatigue: 15,
+  regionalTension: 30,
+  institutionalStability: 70,
+};
+
+const PROMISE_DOMAINS: PromiseDomain[] = [
+  "securite", "economie", "ecologie", "souverainete", "pouvoir_achat", "innovation", "diplomatie",
+];
+
+function buildInitialPromises(): CampaignPromises {
+  const selected: PromiseDomain[] = PROMISE_DOMAINS.slice(0, 3);
+  return {
+    selected,
+    progress: Object.fromEntries(selected.map((d) => [d, 0])) as CampaignPromises["progress"],
+    status: Object.fromEntries(selected.map((d) => [d, "en cours" as const])) as CampaignPromises["status"],
+  };
+}
 
 const INITIAL_INDICATORS: NationalIndicators = {
   popularity: 60,
@@ -89,6 +115,9 @@ function buildInitialState(playerName: string): StrategyGameState {
     mandateDay: 0,
     lastPollShownAt: 0,
     lastBilanShownAt: 0,
+    hiddenPolitics: { ...INITIAL_HIDDEN_POLITICS },
+    delayedConsequences: [],
+    campaignPromises: buildInitialPromises(),
   };
 }
 
@@ -126,6 +155,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           mandateDay: saved.mandateDay ?? 0,
           lastPollShownAt: saved.lastPollShownAt ?? 0,
           lastBilanShownAt: saved.lastBilanShownAt ?? 0,
+          hiddenPolitics: saved.hiddenPolitics ?? { ...INITIAL_HIDDEN_POLITICS },
+          delayedConsequences: saved.delayedConsequences ?? [],
+          campaignPromises: saved.campaignPromises ?? buildInitialPromises(),
         });
       }
       setLoaded(true);
@@ -177,6 +209,21 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         lastBotUpdate = now;
       }
 
+      // Process delayed consequences
+      const actionCount = prev.news.actionCount;
+      const triggered = prev.delayedConsequences.filter((c) => actionCount >= c.triggerAfterActions);
+      const remaining = prev.delayedConsequences.filter((c) => actionCount < c.triggerAfterActions);
+      let ds: StrategyGameState = { ...prev, delayedConsequences: remaining };
+      for (const c of triggered) {
+        if (c.effectType === "news_event" && c.relatedNewsEventId) {
+          ds = { ...ds, news: queueNews(ds.news, c.relatedNewsEventId) };
+        } else if (c.effectType === "indicator_effect" && c.payload) {
+          ds = { ...ds, nationalIndicators: applyIndicatorEffects(ds.nationalIndicators, c.payload as Partial<NationalIndicators>) };
+        } else if (c.effectType === "hidden_politics" && c.payload) {
+          ds = { ...ds, hiddenPolitics: applyHiddenPoliticsEffects(ds.hiddenPolitics, c.payload as Partial<HiddenPolitics>) };
+        }
+      }
+
       // Refresh missions if expired
       let missions = prev.missions;
       if (missionsExpired(missions)) {
@@ -187,7 +234,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       missions = checkMissionProgress(missions, resources, buildings, power);
 
       return {
-        ...prev,
+        ...ds,
         buildings,
         resources,
         stats: {
@@ -316,6 +363,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           ? applyIndicatorEffects(prev.nationalIndicators, choice.indicatorEffects)
           : prev.nationalIndicators;
 
+        const hiddenPolitics = choice?.hiddenPoliticsEffects
+          ? applyHiddenPoliticsEffects(prev.hiddenPolitics, choice.hiddenPoliticsEffects)
+          : prev.hiddenPolitics;
+
         const relations = choice?.relationDelta
           ? prev.relations.map((r) => {
               if (r.countryId !== choice.relationDelta!.countryId) return r;
@@ -324,7 +375,21 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             })
           : prev.relations;
 
-        return { ...prev, news, resources, nationalIndicators, relations, mandateDay: prev.mandateDay + 2 };
+        let delayedConsequences = prev.delayedConsequences;
+        if (choice?.queuesDelayedConsequence) {
+          const q = choice.queuesDelayedConsequence;
+          const newConsequence: DelayedConsequence = {
+            id: q.id,
+            source: event.id,
+            triggerAfterActions: prev.news.actionCount + q.delayActions,
+            effectType: q.effectType,
+            relatedNewsEventId: q.relatedNewsEventId,
+            payload: q.payload,
+          };
+          delayedConsequences = [...delayedConsequences, newConsequence];
+        }
+
+        return { ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, mandateDay: prev.mandateDay + 2 };
       });
     },
     [update],
@@ -445,6 +510,21 @@ function withNews(state: StrategyGameState): StrategyGameState {
   }
 
   return stateWithCount;
+}
+
+function applyHiddenPoliticsEffects(
+  hp: HiddenPolitics,
+  effects: Partial<HiddenPolitics>,
+): HiddenPolitics {
+  const clamp = (v: number) => Math.min(100, Math.max(0, Math.round(v)));
+  return {
+    eliteTrust:              clamp(hp.eliteTrust              + (effects.eliteTrust              ?? 0)),
+    scandalRisk:             clamp(hp.scandalRisk             + (effects.scandalRisk             ?? 0)),
+    mediaMood:               clamp(hp.mediaMood               + (effects.mediaMood               ?? 0)),
+    popularFatigue:          clamp(hp.popularFatigue          + (effects.popularFatigue          ?? 0)),
+    regionalTension:         clamp(hp.regionalTension         + (effects.regionalTension         ?? 0)),
+    institutionalStability:  clamp(hp.institutionalStability  + (effects.institutionalStability  ?? 0)),
+  };
 }
 
 function applyIndicatorEffects(

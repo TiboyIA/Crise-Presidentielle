@@ -8,9 +8,32 @@ import { useStrategy } from "@/context/StrategyContext";
 import { computeMandateScore } from "@/context/StrategyContext";
 import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import type { NationalIndicators } from "@/types/strategy";
+import type { HiddenPolitics, NationalIndicators, PromiseDomain, PromiseStatus } from "@/types/strategy";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+const HIDDEN_SIGNALS: { key: keyof HiddenPolitics; label: string; icon: McIconName; invertedAlert: boolean }[] = [
+  { key: "eliteTrust",  label: "Confiance des élites",  icon: "account-tie",       invertedAlert: false },
+  { key: "mediaMood",   label: "Climat médiatique",     icon: "newspaper-variant",  invertedAlert: false },
+  { key: "scandalRisk", label: "Risque de scandale",    icon: "alert-decagram",     invertedAlert: true },
+];
+
+const PROMISE_LABELS: Record<PromiseDomain, string> = {
+  securite:      "Sécurité",
+  economie:      "Économie",
+  ecologie:      "Écologie",
+  souverainete:  "Souveraineté",
+  pouvoir_achat: "Pouvoir d'achat",
+  innovation:    "Innovation",
+  diplomatie:    "Diplomatie",
+};
+
+const PROMISE_STATUS_COLOR: Record<PromiseStatus, string> = {
+  "tenue":    "#3fbe7a",
+  "partielle": "#FFB020",
+  "trahie":   "#FF3040",
+  "en cours": "#4a9fff",
+};
 
 const INDICATOR_META: { key: keyof NationalIndicators; label: string; icon: McIconName; color: string }[] = [
   { key: "popularity",   label: "Popularité",    icon: "account-group",        color: "#c9a84c" },
@@ -57,11 +80,14 @@ export default function BriefingScreen() {
   if (!state) return null;
 
   const ind = state.nationalIndicators;
+  const hp = state.hiddenPolitics;
+  const promises = state.campaignPromises;
   const score = computeMandateScore(ind);
   const approval = getApprovalLabel(score);
   const recommendation = getRecommendation(ind);
   const pendingNews = state.news.pendingIds.length > 0;
   const pollCycle = Math.floor(state.mandateDay / 10);
+  const hiddenAlert = hp.eliteTrust < 35 || hp.mediaMood < 30 || hp.scandalRisk > 65;
 
   const handleAcknowledgePoll = () => {
     acknowledgePoll();
@@ -146,6 +172,52 @@ export default function BriefingScreen() {
             );
           })}
         </Panel>
+
+        {/* SIGNAUX POLITIQUES CACHÉS */}
+        <Panel variant={hiddenAlert ? "danger" : undefined} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="eye-outline" size={14} color={hiddenAlert ? PALETTE.danger : "#a78bfa"} />
+            <Text style={[styles.sectionTitle, { color: hiddenAlert ? PALETTE.danger : "#a78bfa" }]}>SIGNAUX POLITIQUES</Text>
+          </View>
+          {HIDDEN_SIGNALS.map(({ key, label, icon, invertedAlert }) => {
+            const val = hp[key];
+            const isAlert = invertedAlert ? val > 65 : val < 35;
+            const fillColor = isAlert ? PALETTE.danger : "#a78bfa";
+            return (
+              <View key={key} style={styles.indicatorRow}>
+                <MaterialCommunityIcons name={icon} size={14} color={fillColor} style={{ width: 18 }} />
+                <Text style={styles.indicatorLabel}>{label}</Text>
+                <View style={styles.indicatorTrack}>
+                  <View style={[styles.indicatorFill, { width: `${val}%`, backgroundColor: fillColor }]} />
+                </View>
+                <Text style={[styles.indicatorVal, isAlert && { color: PALETTE.danger }]}>{val}</Text>
+              </View>
+            );
+          })}
+        </Panel>
+
+        {/* PROMESSES DE CAMPAGNE */}
+        {promises.selected.length > 0 && (
+          <Panel style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="flag-checkered" size={14} color={PALETTE.gold} />
+              <Text style={styles.sectionTitle}>PROMESSES DE CAMPAGNE</Text>
+            </View>
+            <View style={styles.promisesRow}>
+              {promises.selected.map((domain) => {
+                const status = promises.status[domain] ?? "en cours";
+                const progress = promises.progress[domain] ?? 0;
+                const color = PROMISE_STATUS_COLOR[status];
+                return (
+                  <View key={domain} style={[styles.promiseChip, { borderColor: color + "55", backgroundColor: color + "11" }]}>
+                    <Text style={[styles.promiseLabel, { color }]}>{PROMISE_LABELS[domain]}</Text>
+                    <Text style={[styles.promiseStatus, { color }]}>{progress}%</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </Panel>
+        )}
 
         {/* APPROBATION GLOBALE */}
         <Panel style={styles.section}>
@@ -283,4 +355,9 @@ const styles = StyleSheet.create({
   ctaText: { fontSize: 12, fontFamily: FONT.bold, color: "#fff", letterSpacing: 2 },
   dismissBtn: { alignItems: "center", paddingVertical: 10 },
   dismissText: { fontSize: 12, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5 },
+
+  promisesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  promiseChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1 },
+  promiseLabel: { fontSize: 10, fontFamily: FONT.semi, letterSpacing: 0.3 },
+  promiseStatus: { fontSize: 10, fontFamily: FONT.bold },
 });

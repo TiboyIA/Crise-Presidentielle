@@ -18,6 +18,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -61,6 +62,7 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const [appReady, setAppReady] = React.useState(false);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -69,6 +71,15 @@ export default function RootLayout() {
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) return null;
+
+  if (!appReady) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <LoadingScreen onComplete={() => setAppReady(true)} />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>

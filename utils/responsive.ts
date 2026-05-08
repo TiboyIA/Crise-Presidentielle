@@ -33,6 +33,8 @@ export interface ScreenInfo {
   navCols: number;
   /** Columns for the resource grid */
   resourceCols: number;
+  /** Columns for general content sections (2 in landscape/tablet, 1 in portrait) */
+  contentCols: number;
   /** Max content width (centered) for tablet/desktop, undefined on phones */
   maxContentWidth: number | undefined;
   /** Scale a font size relative to 375px baseline */
@@ -59,8 +61,9 @@ export function useResponsive(): ScreenInfo {
     isTabletOrLarger,
     isLandscape,
     hPad,
-    navCols: isTabletOrLarger ? 3 : 2,
+    navCols: isTabletOrLarger || isLandscape ? 3 : 2,
     resourceCols: isSmall ? 2 : isTabletOrLarger ? 4 : 3,
+    contentCols: isTabletOrLarger || isLandscape ? 2 : 1,
     maxContentWidth: isTabletOrLarger ? 680 : undefined,
     sf: (v) => Math.round(v * wScale),
     sp: (v) => Math.round(v * (isSmall ? 0.85 : isTabletOrLarger ? 1.1 : 1)),
