@@ -240,8 +240,23 @@ export interface PlayerReform {
   applied: boolean;
 }
 
+export type AchievementId =
+  | "premier_serment"
+  | "premiere_reforme"
+  | "top3_mondial"
+  | "economie_forte"
+  | "securite_max"
+  | "cyberbouclier"
+  | "diplomate_etoile"
+  | "bilan_excellent"
+  | "reformateur_senior"
+  | "endurance"
+  | "grande_puissance"
+  | "populaire";
+
 export interface StrategyMinister {
   id: string;          // matches StrategyMinisterId
+  name?: string;       // overrides def.name when replaced from pool
   loyalty: number;     // 0-100, can drift
   competence: number;  // 0-100
   scandalRisk: number; // 0-100, can increase
@@ -365,4 +380,6 @@ export interface StrategyGameState {
   governanceDoctrine: GovernanceDoctrine;
   reforms: PlayerReform[];
   strategyMinisters: StrategyMinister[];
+  nationalDebt: number;       // 0-500, sovereign debt level
+  achievements: AchievementId[];
 }

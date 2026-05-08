@@ -7,6 +7,51 @@ export type StrategyMinisterId =
   | "affaires_etrangeres"
   | "ecologie";
 
+// Which national indicator drives loyalty drift for this minister
+export const MINISTER_INDICATOR: Record<StrategyMinisterId, keyof NationalIndicators> = {
+  pm:                "popularity",
+  economie:          "economy",
+  defense:           "security",
+  affaires_etrangeres: "cohesion",
+  ecologie:          "ecology",
+};
+
+// Pool of replacements (2-3 per position) drawn when a minister is fired
+export interface MinisterPoolEntry {
+  name: string;
+  loyalty: number;
+  competence: number;
+  scandalRisk: number;
+}
+
+export const MINISTER_POOL: Record<StrategyMinisterId, MinisterPoolEntry[]> = {
+  pm: [
+    { name: "Claire Dumont",   loyalty: 70, competence: 65, scandalRisk: 20 },
+    { name: "Marc Lefebvre",   loyalty: 65, competence: 70, scandalRisk: 25 },
+    { name: "Sophie Arnaud",   loyalty: 80, competence: 60, scandalRisk: 12 },
+  ],
+  economie: [
+    { name: "Paul Bernard",    loyalty: 68, competence: 75, scandalRisk: 22 },
+    { name: "Hélène Girard",   loyalty: 72, competence: 80, scandalRisk: 15 },
+    { name: "Denis Moreau",    loyalty: 60, competence: 82, scandalRisk: 28 },
+  ],
+  defense: [
+    { name: "Jean Perrin",     loyalty: 75, competence: 70, scandalRisk: 8  },
+    { name: "Lucie Mercier",   loyalty: 68, competence: 78, scandalRisk: 14 },
+    { name: "Robert Faure",    loyalty: 82, competence: 65, scandalRisk: 10 },
+  ],
+  affaires_etrangeres: [
+    { name: "Anne Dupuis",     loyalty: 65, competence: 78, scandalRisk: 18 },
+    { name: "Laurent Blanc",   loyalty: 70, competence: 74, scandalRisk: 16 },
+    { name: "Marie Collet",    loyalty: 60, competence: 85, scandalRisk: 20 },
+  ],
+  ecologie: [
+    { name: "Pierre Vidal",    loyalty: 58, competence: 68, scandalRisk: 16 },
+    { name: "Nathalie Simon",  loyalty: 65, competence: 72, scandalRisk: 12 },
+    { name: "Julien Roux",     loyalty: 70, competence: 65, scandalRisk: 18 },
+  ],
+};
+
 export interface StrategyMinisterDef {
   id: StrategyMinisterId;
   title: string;

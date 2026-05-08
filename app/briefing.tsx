@@ -18,6 +18,28 @@ const HIDDEN_SIGNALS: { key: keyof HiddenPolitics; label: string; icon: McIconNa
   { key: "scandalRisk", label: "Risque de scandale",    icon: "alert-decagram",     invertedAlert: true },
 ];
 
+type MediaMood = "hostile" | "critique" | "neutre" | "favorable";
+interface MediaOutlet { name: string; icon: McIconName; threshold: number }
+const MEDIA_OUTLETS: MediaOutlet[] = [
+  { name: "Le Monde Libre",    icon: "newspaper-variant-outline",  threshold: 25 },
+  { name: "Télé Nationale",    icon: "television-play",             threshold: 45 },
+  { name: "Radio Hexagone",    icon: "radio",                       threshold: 60 },
+  { name: "L'Express Populaire", icon: "newspaper",                 threshold: 75 },
+];
+const MEDIA_MOOD_COLOR: Record<MediaMood, string> = {
+  hostile:   "#FF3040",
+  critique:  "#FF8040",
+  neutre:    "#FFB020",
+  favorable: "#3fbe7a",
+};
+function getOutletMood(mediaMood: number, threshold: number): MediaMood {
+  const effective = mediaMood - (threshold - 50) * 0.3;
+  if (effective < 25) return "hostile";
+  if (effective < 45) return "critique";
+  if (effective < 65) return "neutre";
+  return "favorable";
+}
+
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite:      "Sécurité",
   economie:      "Économie",
@@ -196,6 +218,28 @@ export default function BriefingScreen() {
           })}
         </Panel>
 
+        {/* HUMEUR DES MÉDIAS */}
+        <Panel style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="broadcast" size={14} color="#4a9fff" />
+            <Text style={[styles.sectionTitle, { color: "#4a9fff" }]}>PAYSAGE MÉDIATIQUE</Text>
+          </View>
+          {MEDIA_OUTLETS.map((outlet) => {
+            const mood = getOutletMood(hp.mediaMood, outlet.threshold);
+            const moodColor = MEDIA_MOOD_COLOR[mood];
+            const moodLabel = mood.charAt(0).toUpperCase() + mood.slice(1);
+            return (
+              <View key={outlet.name} style={styles.mediaRow}>
+                <MaterialCommunityIcons name={outlet.icon} size={14} color={moodColor} style={{ width: 18 }} />
+                <Text style={styles.mediaName}>{outlet.name}</Text>
+                <View style={[styles.mediaMoodChip, { borderColor: moodColor + "55", backgroundColor: moodColor + "18" }]}>
+                  <Text style={[styles.mediaMoodText, { color: moodColor }]}>{moodLabel}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </Panel>
+
         {/* PROMESSES DE CAMPAGNE */}
         {promises.selected.length > 0 && (
           <Panel style={styles.section}>
@@ -355,6 +399,11 @@ const styles = StyleSheet.create({
   ctaText: { fontSize: 12, fontFamily: FONT.bold, color: "#fff", letterSpacing: 2 },
   dismissBtn: { alignItems: "center", paddingVertical: 10 },
   dismissText: { fontSize: 12, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5 },
+
+  mediaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  mediaName: { flex: 1, fontSize: 11, fontFamily: FONT.med, color: PALETTE.textMid },
+  mediaMoodChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.xs, borderWidth: 1 },
+  mediaMoodText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.8 },
 
   promisesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   promiseChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1 },

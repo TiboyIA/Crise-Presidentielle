@@ -9,6 +9,7 @@ import { computeMandateScore } from "@/context/StrategyContext";
 import { getPlayerRank } from "@/logic/botEngine";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
+import { ACHIEVEMENTS } from "@/data/achievements";
 import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { NationalIndicators, PromiseDomain } from "@/types/strategy";
@@ -214,6 +215,32 @@ export default function MandateReviewScreen() {
             </Panel>
           );
         })()}
+
+        {/* ACHIEVEMENTS */}
+        {state.achievements.length > 0 && (
+          <Panel style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="medal-outline" size={14} color={PALETTE.gold} />
+              <Text style={styles.sectionTitle}>DISTINCTIONS OBTENUES</Text>
+              <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid }}>{state.achievements.length}</Text>
+            </View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {state.achievements.map((id) => {
+                const def = ACHIEVEMENTS[id];
+                if (!def) return null;
+                return (
+                  <View
+                    key={id}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: RADIUS.xs, backgroundColor: "rgba(201,168,76,0.1)", borderWidth: 1, borderColor: PALETTE.gold + "44" }}
+                  >
+                    <Text style={{ fontSize: 12 }}>{def.icon}</Text>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: PALETTE.gold }}>{def.title}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </Panel>
+        )}
 
         {/* RÉCOMPENSES */}
         {(reward.money > 0 || reward.influence > 0 || reward.points > 0) && (

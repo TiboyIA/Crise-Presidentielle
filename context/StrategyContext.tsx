@@ -23,10 +23,12 @@ import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
-import { STRATEGY_MINISTERS, MINISTER_LIST } from "@/data/strategyMinisters";
+import { STRATEGY_MINISTERS, MINISTER_LIST, MINISTER_POOL, MINISTER_INDICATOR } from "@/data/strategyMinisters";
 import type { StrategyMinisterId } from "@/data/strategyMinisters";
+import { ACHIEVEMENTS } from "@/data/achievements";
 import { COUNTRIES } from "@/data/countries";
 import type {
+  AchievementId,
   BuildingId,
   CampaignPromises,
   CountryId,
@@ -139,6 +141,8 @@ function buildInitialState(playerName: string): StrategyGameState {
     governanceDoctrine: "democratique",
     reforms: [],
     strategyMinisters: buildInitialMinisters(),
+    nationalDebt: 30,
+    achievements: [],
   };
 }
 
@@ -158,6 +162,7 @@ interface StrategyContextValue {
   startNewMandate: () => void;
   adoptDoctrine: (id: GovernanceDoctrine) => { success: boolean; reason?: string };
   launchReform: (id: ReformId) => { success: boolean; reason?: string };
+  fireMinister: (id: string) => void;
   tick: () => void;
 }
 
@@ -184,6 +189,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           governanceDoctrine: saved.governanceDoctrine ?? "democratique",
           reforms: saved.reforms ?? [],
           strategyMinisters: saved.strategyMinisters ?? buildInitialMinisters(),
+          nationalDebt: saved.nationalDebt ?? 30,
+          achievements: saved.achievements ?? [],
         });
       }
       setLoaded(true);
@@ -508,6 +515,25 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const fireMinister = useCallback(
+    (id: string) => {
+      update((prev) => {
+        const pool = MINISTER_POOL[id as StrategyMinisterId];
+        if (!pool) return prev;
+        const replacement = pool[Math.floor(Math.random() * pool.length)];
+        const strategyMinisters = prev.strategyMinisters.map((m) =>
+          m.id === id
+            ? { id, name: replacement.name, loyalty: replacement.loyalty, competence: replacement.competence, scandalRisk: replacement.scandalRisk }
+            : m,
+        );
+        const hiddenPolitics = applyHiddenPoliticsEffects(prev.hiddenPolitics, { eliteTrust: -5 });
+        const nationalIndicators = applyIndicatorEffects(prev.nationalIndicators, { popularity: -3 });
+        return advanceMandateDay({ ...prev, strategyMinisters, hiddenPolitics, nationalIndicators }, 1);
+      });
+    },
+    [update],
+  );
+
   const startNewMandate = useCallback(() => {
     update((prev) => {
       const score = computeMandateScore(prev.nationalIndicators);
@@ -545,12 +571,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       state, loaded, shouldShowPoll, shouldShowBilan,
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, tick,
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister, tick,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, tick],
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister, tick],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;
@@ -581,7 +607,33 @@ function processReformCompletions(state: StrategyGameState): StrategyGameState {
 function applyMinisterBonuses(state: StrategyGameState): StrategyGameState {
   let ind = state.nationalIndicators;
   let res = state.resources;
-  for (const minister of state.strategyMinisters) {
+  let hp = state.hiddenPolitics;
+  let ministers = state.strategyMinisters;
+  let newsState = state.news;
+
+  ministers = ministers.map((minister) => {
+    const def = STRATEGY_MINISTERS[minister.id as StrategyMinisterId];
+    if (!def) return minister;
+
+    // Loyalty drift: linked indicator drives loyalty
+    const linkedKey = MINISTER_INDICATOR[minister.id as StrategyMinisterId];
+    const indicatorVal = ind[linkedKey] ?? 50;
+    const loyaltyDrift = indicatorVal >= 60 ? 1 : indicatorVal <= 30 ? -2 : -1;
+    const newLoyalty = Math.min(100, Math.max(0, minister.loyalty + loyaltyDrift));
+
+    // Scandal risk escalates slowly for disloyal ministers
+    const scandalRiskDelta = newLoyalty < 40 ? 2 : newLoyalty < 60 ? 1 : -1;
+    const newScandalRisk = Math.min(100, Math.max(0, minister.scandalRisk + scandalRiskDelta));
+
+    // Queue scandal event if risk crosses 85
+    if (newScandalRisk >= 85 && minister.scandalRisk < 85) {
+      newsState = queueNews(newsState, "minister_scandal");
+    }
+
+    return { ...minister, loyalty: newLoyalty, scandalRisk: newScandalRisk };
+  });
+
+  for (const minister of ministers) {
     const def = STRATEGY_MINISTERS[minister.id as StrategyMinisterId];
     if (!def) continue;
     const scale = minister.competence / 100;
@@ -596,7 +648,8 @@ function applyMinisterBonuses(state: StrategyGameState): StrategyGameState {
     ind = applyIndicatorEffects(ind, scaledInd);
     res = applyRewards(res, scaledRes);
   }
-  return { ...state, nationalIndicators: ind, resources: res };
+
+  return { ...state, nationalIndicators: ind, resources: res, hiddenPolitics: hp, strategyMinisters: ministers, news: newsState };
 }
 
 function advanceMandateDay(state: StrategyGameState, days: number): StrategyGameState {
@@ -608,7 +661,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
   // Check reform completions
   s = processReformCompletions(s);
 
-  // Apply doctrine drift + minister bonuses every 10 days
+  // Apply doctrine drift + minister bonuses + debt update every 10 days
   if (Math.floor(newDay / 10) > Math.floor(prevDay / 10)) {
     const doctrineDef = DOCTRINES[s.governanceDoctrine];
     s = {
@@ -618,9 +671,51 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       resources: applyRewards(s.resources, doctrineDef.resourceBonus),
     };
     s = applyMinisterBonuses(s);
+
+    // Debt: rises if budget is negative, falls if positive
+    const budgetEffect = s.nationalIndicators.publicBudget;
+    const debtDelta = budgetEffect < 0 ? Math.ceil(-budgetEffect / 10) : budgetEffect > 50 ? -2 : -1;
+    s = { ...s, nationalDebt: Math.min(500, Math.max(0, s.nationalDebt + debtDelta)) };
+
+    // Queue debt escalation event if high
+    if (s.nationalDebt > 350 && state.nationalDebt <= 350) {
+      s = { ...s, news: queueNews(s.news, "debt_escalation") };
+    }
   }
 
+  // Check achievements
+  s = withAchievements(s);
+
   return s;
+}
+
+function withAchievements(state: StrategyGameState): StrategyGameState {
+  const already = new Set(state.achievements);
+  const gained: AchievementId[] = [];
+
+  const check = (id: AchievementId, cond: boolean) => {
+    if (!already.has(id) && cond) gained.push(id);
+  };
+
+  const ind = state.nationalIndicators;
+  const playerRank = state.ranking.findIndex((r) => r.id === "player") + 1;
+  const alliedCount = state.relations.filter((r) => r.status === "allied").length;
+  const completedReforms = state.reforms.filter((r) => r.applied).length;
+
+  check("premier_serment",   state.mandateDay >= 1);
+  check("premiere_reforme",  completedReforms >= 1);
+  check("top3_mondial",      playerRank >= 1 && playerRank <= 3);
+  check("economie_forte",    ind.economy >= 80);
+  check("securite_max",      ind.security >= 80);
+  check("cyberbouclier",     state.resources.cyberDefense >= 80);
+  check("diplomate_etoile",  alliedCount >= 3);
+  check("reformateur_senior", completedReforms >= 4);
+  check("endurance",         state.mandateDay >= 200);
+  check("grande_puissance",  state.stats.globalPower >= 300);
+  check("populaire",         ind.popularity >= 85);
+
+  if (gained.length === 0) return state;
+  return { ...state, achievements: [...state.achievements, ...gained] };
 }
 
 function withNews(state: StrategyGameState): StrategyGameState {

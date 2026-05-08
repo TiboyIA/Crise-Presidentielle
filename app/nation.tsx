@@ -56,7 +56,7 @@ const INDICATOR_COLORS: Record<string, string> = {
 export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform } = useStrategy();
+  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister } = useStrategy();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
   const [reformsExpanded, setReformsExpanded] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
@@ -293,16 +293,34 @@ export default function NationScreen() {
             <MaterialCommunityIcons name="account-tie-outline" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>CABINET STRATÉGIQUE</Text>
           </View>
+          {/* Debt indicator */}
+          {(() => {
+            const debt = state.nationalDebt ?? 0;
+            const debtColor = debt > 400 ? PALETTE.danger : debt > 250 ? PALETTE.warning : "#52c97a";
+            const debtPct = Math.min(100, (debt / 500) * 100);
+            return (
+              <View style={styles.debtRow}>
+                <MaterialCommunityIcons name="bank-outline" size={12} color={debtColor} />
+                <Text style={[styles.debtLabel, { color: debtColor }]}>DETTE SOUVERAINE</Text>
+                <View style={styles.debtTrack}>
+                  <View style={[styles.debtFill, { width: `${debtPct}%`, backgroundColor: debtColor }]} />
+                </View>
+                <Text style={[styles.debtVal, { color: debtColor }]}>{debt}</Text>
+              </View>
+            );
+          })()}
           <View style={styles.cabinetGrid}>
             {state.strategyMinisters.map((m) => {
               const def = STRATEGY_MINISTERS[m.id as keyof typeof STRATEGY_MINISTERS];
               if (!def) return null;
+              const displayName = m.name ?? def.name;
               const loyaltyColor = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
+              const canFire = m.loyalty < 40;
               return (
                 <View key={m.id} style={styles.ministerChip}>
                   <Text style={[styles.ministerSpec, { color: def.specialtyColor }]}>{def.specialty[0]}</Text>
                   <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={styles.ministerName} numberOfLines={1}>{def.name.split(" ")[0]} {def.name.split(" ").slice(-1)}</Text>
+                    <Text style={styles.ministerName} numberOfLines={1}>{displayName.split(" ")[0]} {displayName.split(" ").slice(-1)}</Text>
                     <View style={styles.ministerLoyaltyRow}>
                       <View style={styles.ministerLoyaltyTrack}>
                         <View style={[styles.ministerLoyaltyFill, { width: `${m.loyalty}%`, backgroundColor: loyaltyColor }]} />
@@ -310,6 +328,21 @@ export default function NationScreen() {
                       <Text style={[styles.ministerLoyaltyVal, { color: loyaltyColor }]}>{m.loyalty}</Text>
                     </View>
                   </View>
+                  {canFire && (
+                    <Pressable
+                      onPress={() => Alert.alert(
+                        "Limoger le ministre",
+                        `Remplacer ${displayName} ? (-5 confiance élites, -3 popularité)`,
+                        [
+                          { text: "Annuler", style: "cancel" },
+                          { text: "Limoger", style: "destructive", onPress: () => fireMinister(m.id) },
+                        ],
+                      )}
+                      style={({ pressed }) => [styles.fireBtn, { opacity: pressed ? 0.7 : 1 }]}
+                    >
+                      <MaterialCommunityIcons name="account-remove-outline" size={14} color={PALETTE.danger} />
+                    </Pressable>
+                  )}
                 </View>
               );
             })}
@@ -530,6 +563,12 @@ const styles = StyleSheet.create({
   reformDuration: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid },
   reformDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13 },
 
+  debtRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  debtLabel: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1.5 },
+  debtTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  debtFill: { height: "100%", borderRadius: 2 },
+  debtVal: { fontSize: 9, fontFamily: FONT.bold, width: 28, textAlign: "right" },
+
   cabinetGrid: { gap: 6 },
   ministerChip: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
   ministerSpec: { fontSize: 18, fontFamily: FONT.bold, width: 20, textAlign: "center" },
@@ -538,4 +577,5 @@ const styles = StyleSheet.create({
   ministerLoyaltyTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
   ministerLoyaltyFill: { height: "100%", borderRadius: 2 },
   ministerLoyaltyVal: { fontSize: 9, fontFamily: FONT.bold, width: 22, textAlign: "right" },
+  fireBtn: { padding: 6, borderRadius: RADIUS.xs, backgroundColor: PALETTE.danger + "22", borderWidth: 1, borderColor: PALETTE.danger + "44" },
 });

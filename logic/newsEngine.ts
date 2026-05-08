@@ -85,6 +85,8 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     high_popular_fatigue:     hp.popularFatigue > 65,
     high_regional_tension:    hp.regionalTension > 65,
     low_institutional_stability: hp.institutionalStability < 35,
+    high_debt:                   (state.nationalDebt ?? 0) > 350,
+    minister_scandal_risk:       state.strategyMinisters?.some((m) => m.scandalRisk > 70) ?? false,
   };
 }
 
