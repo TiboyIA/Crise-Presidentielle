@@ -25,12 +25,13 @@ import type { ResourceKey } from "@/types/strategy";
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 const NAV_ITEMS: { mcIcon: McIconName; label: string; route: string; tint?: string }[] = [
-  { mcIcon: "city-variant-outline",        label: "Bâtiments",        route: "/buildings",      tint: PALETTE.gold },
-  { mcIcon: "earth",                       label: "Salle de crise",   route: "/worldmap",       tint: PALETTE.crimson },
-  { mcIcon: "sword-cross",                 label: "Opérations",       route: "/operations",     tint: PALETTE.danger },
-  { mcIcon: "trophy-outline",              label: "Classement",       route: "/ranking",        tint: PALETTE.gold },
-  { mcIcon: "clipboard-list-outline",      label: "Missions",         route: "/missions",       tint: PALETTE.info },
-  { mcIcon: "newspaper-variant-outline",   label: "Journal de Crise", route: "/journal-crise",  tint: PALETTE.crimson },
+  { mcIcon: "city-variant-outline",        label: "Bâtiments",        route: "/buildings",       tint: PALETTE.gold },
+  { mcIcon: "earth",                       label: "Salle de crise",   route: "/worldmap",        tint: PALETTE.crimson },
+  { mcIcon: "sword-cross",                 label: "Opérations",       route: "/operations",      tint: PALETTE.danger },
+  { mcIcon: "tank",                        label: "Forces Armées",    route: "/forces-armees",   tint: "#e54848" },
+  { mcIcon: "trophy-outline",              label: "Classement",       route: "/ranking",         tint: PALETTE.gold },
+  { mcIcon: "clipboard-list-outline",      label: "Missions",         route: "/missions",        tint: PALETTE.info },
+  { mcIcon: "newspaper-variant-outline",   label: "Journal de Crise", route: "/journal-crise",   tint: PALETTE.crimson },
 ];
 
 const RESOURCE_ORDER: ResourceKey[] = ["money", "influence", "energy", "intelligence", "technology", "military", "cyberDefense"];

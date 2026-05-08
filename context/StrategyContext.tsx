@@ -26,6 +26,10 @@ import { REFORMS } from "@/data/reforms";
 import { STRATEGY_MINISTERS, MINISTER_LIST, MINISTER_POOL, MINISTER_INDICATOR } from "@/data/strategyMinisters";
 import type { StrategyMinisterId } from "@/data/strategyMinisters";
 import { ACHIEVEMENTS } from "@/data/achievements";
+import { UNITS } from "@/data/units";
+import { MILITARY_DOCTRINES } from "@/data/militaryDoctrines";
+import { calculateMilitaryPower, getOperationUnitBonus, calculateDailyUpkeep } from "@/logic/militaryEngine";
+import type { MilitaryDoctrineId, PlayerUnit, TrainingQueueEntry, UnitId } from "@/types/units";
 import { COUNTRIES } from "@/data/countries";
 import type {
   AchievementId,
@@ -143,6 +147,10 @@ function buildInitialState(playerName: string): StrategyGameState {
     strategyMinisters: buildInitialMinisters(),
     nationalDebt: 30,
     achievements: [],
+    playerUnits: [],
+    trainingQueue: [],
+    militaryDoctrine: "defensive",
+    premiumGold: 0,
   };
 }
 
@@ -163,6 +171,9 @@ interface StrategyContextValue {
   adoptDoctrine: (id: GovernanceDoctrine) => { success: boolean; reason?: string };
   launchReform: (id: ReformId) => { success: boolean; reason?: string };
   fireMinister: (id: string) => void;
+  trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
+  collectTraining: () => void;
+  setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
   tick: () => void;
 }
 
@@ -191,6 +202,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           strategyMinisters: saved.strategyMinisters ?? buildInitialMinisters(),
           nationalDebt: saved.nationalDebt ?? 30,
           achievements: saved.achievements ?? [],
+          playerUnits: saved.playerUnits ?? [],
+          trainingQueue: saved.trainingQueue ?? [],
+          militaryDoctrine: saved.militaryDoctrine ?? "defensive",
+          premiumGold: saved.premiumGold ?? 0,
         });
       }
       setLoaded(true);
@@ -266,8 +281,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       // Check resource-based mission progress
       missions = checkMissionProgress(missions, resources, buildings, power);
 
+      // Mark completed training queue entries
+      const trainingQueue = prev.trainingQueue.map((entry) =>
+        entry.status === "training" && now >= entry.endsAt
+          ? { ...entry, status: "completed" as const }
+          : entry,
+      );
+
       return {
         ...ds,
+        trainingQueue,
         buildings,
         resources,
         stats: {
@@ -334,7 +357,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       if (!check.allowed) return { success: false, message: check.reason ?? "Impossible" };
 
       const op = OPERATIONS[type];
-      const result = resolveOperation(type, relation, state.buildings);
+      const unitBonus = getOperationUnitBonus(type, state.playerUnits ?? [], state.militaryDoctrine ?? "defensive");
+      // Unit bonus gives a second chance on failed ops
+      const baseResult = resolveOperation(type, relation, state.buildings);
+      const result = (!baseResult.success && unitBonus > 0 && Math.random() < unitBonus)
+        ? { ...baseResult, success: true, message: baseResult.message + " (unités mobilisées)" }
+        : baseResult;
 
       update((prev) => {
         const resources = deductCost(op.cost, prev.resources);
@@ -515,6 +543,69 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const trainUnit = useCallback(
+    (unitId: UnitId, quantity: number): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      const def = UNITS[unitId];
+      if (!def) return { success: false, reason: "Unité introuvable" };
+      const totalCost: Partial<StrategyResources> = {};
+      for (const [k, v] of Object.entries(def.baseCost) as [keyof StrategyResources, number][]) {
+        totalCost[k] = (totalCost[k] ?? 0) + v * quantity;
+      }
+      if (!canAfford(totalCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      update((prev) => {
+        const resources = deductCost(totalCost, prev.resources);
+        const now = Date.now();
+        const totalTimeSec = def.trainingTimeSec * quantity;
+        const entry: TrainingQueueEntry = {
+          id: `${unitId}_${now}`,
+          unitId,
+          quantity,
+          startedAt: now,
+          endsAt: now + totalTimeSec * 1000,
+          status: "training",
+        };
+        return withNews({ ...prev, resources, trainingQueue: [...prev.trainingQueue, entry] });
+      });
+      return { success: true };
+    },
+    [state, update],
+  );
+
+  const collectTraining = useCallback(() => {
+    update((prev) => {
+      const completed = prev.trainingQueue.filter((e) => e.status === "completed");
+      if (completed.length === 0) return prev;
+      const remaining = prev.trainingQueue.filter((e) => e.status !== "completed");
+      let units = [...prev.playerUnits];
+      for (const entry of completed) {
+        const existing = units.find((u) => u.unitId === entry.unitId);
+        if (existing) {
+          units = units.map((u) => u.unitId === entry.unitId ? { ...u, quantity: u.quantity + entry.quantity } : u);
+        } else {
+          units = [...units, { unitId: entry.unitId, level: 1, quantity: entry.quantity }];
+        }
+      }
+      return withNews(advanceMandateDay({ ...prev, trainingQueue: remaining, playerUnits: units }, 1));
+    });
+  }, [update]);
+
+  const setMilitaryDoctrine = useCallback(
+    (id: MilitaryDoctrineId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      if (state.militaryDoctrine === id) return { success: false, reason: "Doctrine déjà active" };
+      const def = MILITARY_DOCTRINES[id];
+      if (!canAfford(def.switchCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      update((prev) => {
+        const resources = deductCost(def.switchCost, prev.resources);
+        const hiddenPolitics = applyHiddenPoliticsEffects(prev.hiddenPolitics, { scandalRisk: def.scandalRiskDelta });
+        return withNews(advanceMandateDay({ ...prev, resources, militaryDoctrine: id, hiddenPolitics }, 1));
+      });
+      return { success: true };
+    },
+    [state, update],
+  );
+
   const fireMinister = useCallback(
     (id: string) => {
       update((prev) => {
@@ -571,12 +662,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       state, loaded, shouldShowPoll, shouldShowBilan,
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister, tick,
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
+      trainUnit, collectTraining, setMilitaryDoctrine, tick,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister, tick],
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
+      trainUnit, collectTraining, setMilitaryDoctrine, tick],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;

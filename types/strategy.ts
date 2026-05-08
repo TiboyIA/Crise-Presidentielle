@@ -380,6 +380,11 @@ export interface StrategyGameState {
   governanceDoctrine: GovernanceDoctrine;
   reforms: PlayerReform[];
   strategyMinisters: StrategyMinister[];
-  nationalDebt: number;       // 0-500, sovereign debt level
+  nationalDebt: number;
   achievements: AchievementId[];
+  // Military units system
+  playerUnits: import("@/types/units").PlayerUnit[];
+  trainingQueue: import("@/types/units").TrainingQueueEntry[];
+  militaryDoctrine: import("@/types/units").MilitaryDoctrineId;
+  premiumGold: number;
 }

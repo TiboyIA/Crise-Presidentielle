@@ -46,6 +46,20 @@ export const NEWS_IMG: Record<string, any> = {
   classement:     require("../assets/images/home/mandate_seal.png"),
 };
 
+// Unit images — reuse existing themed assets as premium placeholders
+export const UNIT_IMG: Record<string, any> = {
+  infantry_mechanized:    require("../assets/images/countermeasures/military.png"),
+  special_forces:         require("../assets/images/hybrid/vector_espionage.png"),
+  battle_tank:            require("../assets/images/hybrid/hybrid_warfare.png"),
+  long_range_artillery:   require("../assets/images/events/event_security.png"),
+  military_drone:         require("../assets/images/hybrid/vector_cyber.png"),
+  multirole_fighter:      require("../assets/images/screens/front_header.png"),
+  attack_helicopter:      require("../assets/images/hybrid/vector_infrastructure_attack.png"),
+  frigate:                require("../assets/images/events/event_diplomacy.png"),
+  submarine:              require("../assets/images/hybrid/state_of_war.png"),
+  cyber_unit:             require("../assets/images/research/cyber_security.png"),
+};
+
 export const OPERATION_IMG: Record<string, any> = {
   espionage:           require("../assets/images/hybrid/vector_espionage.png"),
   steal_intel:         require("../assets/images/hybrid/vector_document_leak.png"),
