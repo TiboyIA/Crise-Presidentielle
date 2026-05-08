@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { useResponsive } from "@/utils/responsive";
 import { RankingRow } from "@/components/RankingRow";
 import { PowerBadge } from "@/components/PowerBadge";
 import { getPlayerRank, getRankTitle, getTitleIcon } from "@/logic/botEngine";
@@ -17,6 +18,8 @@ export default function RankingScreen() {
   const insets = useSafeAreaInsets();
   const { state } = useStrategy();
 
+  const { hPad } = useResponsive();
+
   if (!state) return null;
 
   const rank = getPlayerRank(state.ranking);
@@ -27,7 +30,7 @@ export default function RankingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
         </Pressable>
@@ -36,7 +39,7 @@ export default function RankingScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Player summary */}
@@ -112,13 +115,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
   back: { fontSize: 14, fontFamily: "Inter_600SemiBold", width: 60 },
   title: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  content: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
+  content: { paddingTop: 12, gap: 10 },
   playerCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 12, borderWidth: 2, padding: 16 },
   playerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   playerRank: { fontSize: 28, fontFamily: "Inter_700Bold" },

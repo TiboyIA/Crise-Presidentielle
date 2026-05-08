@@ -204,6 +204,65 @@ export interface NationalStats {
   seasonStartTime: number;
 }
 
+// ── Journal de Crise ──────────────────────────────────────────
+export type NewsType =
+  | "national"
+  | "economie"
+  | "social"
+  | "cyber"
+  | "diplomatie"
+  | "guerre_hybride"
+  | "monde"
+  | "classement";
+
+export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
+
+export interface NewsChoice {
+  id: string;
+  label: string;
+  consequence: string;
+  effects: Partial<StrategyResources>;
+  rankingDelta?: number;
+  relationDelta?: { countryId: CountryId; delta: number };
+}
+
+export interface NewsEvent {
+  id: string;
+  title: string;
+  source: string;
+  type: NewsType;
+  urgency: NewsUrgency;
+  description: string;
+  isInteractive: boolean;
+  choices?: NewsChoice[];
+  autoEffects?: Partial<StrategyResources>; // applied for non-interactive
+  conditionKey?: string; // evaluated by newsEngine
+  minActionsGap?: number; // min actions since last news
+}
+
+export interface NewsLogEntry {
+  eventId: string;
+  title: string;
+  source: string;
+  type: NewsType;
+  urgency: NewsUrgency;
+  timestamp: number;
+  choiceId?: string;
+  choiceLabel?: string;
+  consequence?: string;
+  effects: Partial<StrategyResources>;
+}
+
+export interface NewsState {
+  log: NewsLogEntry[];
+  seenIds: string[];
+  pendingIds: string[];
+  actionCount: number;
+  lastNewsAction: number;
+  unreadCount: number;
+}
+
+// ── Main state ────────────────────────────────────────────────
 export interface StrategyGameState {
   version: number;
   playerName: string;
@@ -213,8 +272,9 @@ export interface StrategyGameState {
   stats: NationalStats;
   relations: CountryRelation[];
   missions: PlayerMission[];
-  lastResourceTick: number; // timestamp
-  lastBotUpdate: number; // timestamp
+  news: NewsState;
+  lastResourceTick: number;
+  lastBotUpdate: number;
   ranking: RankEntry[];
   startedAt: number;
 }

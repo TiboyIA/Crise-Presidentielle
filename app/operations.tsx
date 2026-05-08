@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { useResponsive } from "@/utils/responsive";
 import { CountryCard } from "@/components/CountryCard";
 import { COUNTRIES, COUNTRY_LIST } from "@/data/countries";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
@@ -17,6 +18,7 @@ export default function OperationsScreen() {
   const params = useLocalSearchParams<{ countryId?: CountryId }>();
   const { state, launchOperation } = useStrategy();
 
+  const { hPad } = useResponsive();
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId | null>(params.countryId ?? null);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [loading, setLoading] = useState<OperationType | null>(null);
@@ -39,7 +41,7 @@ export default function OperationsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
         </Pressable>
@@ -56,7 +58,7 @@ export default function OperationsScreen() {
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Target selection */}
@@ -166,7 +168,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontFamily: "Inter_700Bold" },
   resultBanner: { marginHorizontal: 16, marginTop: 8, borderRadius: 8, borderWidth: 1, padding: 12 },
   resultText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  content: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
+  content: { paddingTop: 12, gap: 10 },
   sectionLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2, marginTop: 4 },
   info: { fontSize: 12, fontFamily: "Inter_500Medium" },
   countryList: { gap: 8 },

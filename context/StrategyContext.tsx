@@ -8,14 +8,24 @@ import { calculateGlobalPower, calculatePresidentXP, xpToLevel } from "@/logic/p
 import { updateBotRanking } from "@/logic/botEngine";
 import { checkMissionProgress, generateDailyMissions, getCurrentDayIndex, missionsExpired } from "@/logic/missionEngine";
 import { getMissionDef } from "@/logic/missionEngine";
+import {
+  DEFAULT_NEWS_STATE,
+  applyAutoNews,
+  applyInteractiveNews,
+  dismissPendingNews,
+  markAllRead,
+  queueNews,
+  selectNextNews,
+  shouldTriggerInteractiveNews,
+  shouldTriggerNews,
+} from "@/logic/newsEngine";
+import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
 import type {
   BuildingId,
   CountryId,
-  CountryRelation,
   OperationType,
   PlayerBuilding,
-  RankEntry,
   StrategyGameState,
   StrategyResources,
 } from "@/types/strategy";
@@ -60,6 +70,7 @@ function buildInitialState(playerName: string): StrategyGameState {
     },
     relations: getInitialRelations("france"),
     missions: generateDailyMissions(getCurrentDayIndex()),
+    news: { ...DEFAULT_NEWS_STATE },
     lastResourceTick: now,
     lastBotUpdate: now,
     ranking: getInitialRanking(power),
@@ -74,6 +85,9 @@ interface StrategyContextValue {
   upgradeBuilding: (id: BuildingId) => { success: boolean; reason?: string };
   launchOperation: (type: OperationType, targetCountryId: CountryId) => { success: boolean; message: string };
   collectMissionReward: (defId: string) => void;
+  resolveInteractiveNews: (eventId: string, choiceId: string) => void;
+  dismissNews: (eventId: string) => void;
+  markNewsRead: () => void;
   tick: () => void;
 }
 
@@ -86,7 +100,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStrategy().then((saved) => {
-      if (saved) setState(saved);
+      if (saved) setState({ ...saved, news: saved.news ?? { ...DEFAULT_NEWS_STATE } });
       setLoaded(true);
     });
   }, []);
@@ -194,16 +208,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           type: "upgrade_building",
           buildingId: id,
         });
-        return {
-          ...prev,
-          resources,
-          buildings,
-          missions,
-          stats: {
-            ...prev.stats,
-            buildingsUpgraded: (prev.stats as any).buildingsUpgraded ?? 0 + 1,
-          },
-        };
+        return withNews({ ...prev, resources, buildings, missions });
       });
 
       return { success: true };
@@ -248,7 +253,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           ? checkMissionProgress(missions, rewardedResources, prev.buildings, power, { type: "spy_country" })
           : missions;
 
-        return {
+        return withNews({
           ...prev,
           resources: rewardedResources,
           relations,
@@ -262,13 +267,36 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             operationsWon: prev.stats.operationsWon + (result.success ? 1 : 0),
           },
           missions: spyMissions,
-        };
+        });
       });
 
       return { success: result.success, message: result.message };
     },
     [state, update],
   );
+
+  const resolveInteractiveNews = useCallback(
+    (eventId: string, choiceId: string) => {
+      update((prev) => {
+        const event = NEWS_EVENT_MAP[eventId];
+        if (!event) return prev;
+        const { news, resources } = applyInteractiveNews(prev, event, choiceId);
+        return { ...prev, news, resources };
+      });
+    },
+    [update],
+  );
+
+  const dismissNews = useCallback(
+    (eventId: string) => {
+      update((prev) => ({ ...prev, news: dismissPendingNews(prev.news, eventId) }));
+    },
+    [update],
+  );
+
+  const markNewsRead = useCallback(() => {
+    update((prev) => ({ ...prev, news: markAllRead(prev.news) }));
+  }, [update]);
 
   const collectMissionReward = useCallback(
     (defId: string) => {
@@ -297,8 +325,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<StrategyContextValue>(
-    () => ({ state, loaded, startNewGame, upgradeBuilding, launchOperation, collectMissionReward, tick }),
-    [state, loaded, startNewGame, upgradeBuilding, launchOperation, collectMissionReward, tick],
+    () => ({
+      state, loaded, startNewGame, upgradeBuilding, launchOperation,
+      collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead, tick,
+    }),
+    [state, loaded, startNewGame, upgradeBuilding, launchOperation,
+      collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead, tick],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;
@@ -308,6 +340,27 @@ export function useStrategy(): StrategyContextValue {
   const ctx = useContext(StrategyContext);
   if (!ctx) throw new Error("useStrategy must be used within StrategyProvider");
   return ctx;
+}
+
+function withNews(state: StrategyGameState): StrategyGameState {
+  const newCount = state.news.actionCount + 1;
+  const newsState = { ...state.news, actionCount: newCount };
+  const stateWithCount = { ...state, news: newsState };
+
+  if (shouldTriggerInteractiveNews(newsState, newCount)) {
+    const event = selectNextNews(stateWithCount, true);
+    if (event) return { ...stateWithCount, news: queueNews(newsState, event.id) };
+  }
+
+  if (shouldTriggerNews(newsState, newCount)) {
+    const event = selectNextNews(stateWithCount, false);
+    if (event) {
+      const { news, resources } = applyAutoNews(stateWithCount, event);
+      return { ...stateWithCount, news, resources };
+    }
+  }
+
+  return stateWithCount;
 }
 
 function applyRewards(resources: StrategyResources, rewards: Partial<StrategyResources>): StrategyResources {

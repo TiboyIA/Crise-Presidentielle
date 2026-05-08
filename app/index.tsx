@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -33,84 +33,91 @@ export default function StartScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.emoji}>🌍</Text>
-        <Text style={[styles.title, { color: colors.foreground }]}>Président</Text>
-        <Text style={[styles.subtitle, { color: colors.primary }]}>Nation en Crise</Text>
-        <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-          Dirigez une nation.{"\n"}Dominez le monde.
-        </Text>
-      </View>
-
-      {/* Features */}
-      <View style={styles.features}>
-        {[
-          { icon: "🏛️", label: "Construisez et améliorez vos ministères" },
-          { icon: "🌍", label: "Explorez la carte mondiale stratégique" },
-          { icon: "⚔️", label: "Lancez des opérations géopolitiques" },
-          { icon: "🏆", label: "Grimpez dans le classement mondial" },
-        ].map(({ icon, label }) => (
-          <View key={label} style={styles.featureRow}>
-            <Text style={styles.featureIcon}>{icon}</Text>
-            <Text style={[styles.featureText, { color: colors.foreground }]}>{label}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Name input */}
-      {showNameInput && (
-        <View style={styles.inputSection}>
-          <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>
-            Votre nom de président·e :
+    <View style={[styles.outer, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.emoji}>🌍</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>Président</Text>
+          <Text style={[styles.subtitle, { color: colors.primary }]}>Nation en Crise</Text>
+          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
+            Dirigez une nation.{"\n"}Dominez le monde.
           </Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-            placeholder="Ex : Emmanuel Martin"
-            placeholderTextColor={colors.mutedForeground}
-            value={playerName}
-            onChangeText={setPlayerName}
-            maxLength={30}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={handleStart}
-          />
         </View>
-      )}
 
-      {/* CTA */}
-      <View style={styles.actions}>
-        <Pressable
-          onPress={handleStart}
-          disabled={showNameInput && playerName.trim().length < 2}
-          style={({ pressed }) => [
-            styles.mainBtn,
-            {
-              backgroundColor: showNameInput && playerName.trim().length < 2 ? colors.muted : colors.primary,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <Text style={styles.mainBtnText}>
-            {showNameInput ? "🚀 Commencer la partie" : "🎮 Nouvelle partie"}
-          </Text>
-        </Pressable>
+        {/* Features */}
+        <View style={styles.features}>
+          {[
+            { icon: "🏛️", label: "Construisez et améliorez vos ministères" },
+            { icon: "🌍", label: "Explorez la carte mondiale stratégique" },
+            { icon: "⚔️", label: "Lancez des opérations géopolitiques" },
+            { icon: "🏆", label: "Grimpez dans le classement mondial" },
+          ].map(({ icon, label }) => (
+            <View key={label} style={styles.featureRow}>
+              <Text style={styles.featureIcon}>{icon}</Text>
+              <Text style={[styles.featureText, { color: colors.foreground }]}>{label}</Text>
+            </View>
+          ))}
+        </View>
 
+        {/* Name input */}
         {showNameInput && (
-          <Pressable onPress={() => setShowNameInput(false)} style={styles.cancelBtn}>
-            <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Annuler</Text>
-          </Pressable>
+          <View style={styles.inputSection}>
+            <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>
+              Votre nom de président·e :
+            </Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+              placeholder="Ex : Emmanuel Martin"
+              placeholderTextColor={colors.mutedForeground}
+              value={playerName}
+              onChangeText={setPlayerName}
+              maxLength={30}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleStart}
+            />
+          </View>
         )}
-      </View>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>v1.0.0 · Président : Nation en Crise</Text>
+        {/* CTA */}
+        <View style={styles.actions}>
+          <Pressable
+            onPress={handleStart}
+            disabled={showNameInput && playerName.trim().length < 2}
+            style={({ pressed }) => [
+              styles.mainBtn,
+              {
+                backgroundColor: showNameInput && playerName.trim().length < 2 ? colors.muted : colors.primary,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={styles.mainBtnText}>
+              {showNameInput ? "🚀 Commencer la partie" : "🎮 Nouvelle partie"}
+            </Text>
+          </Pressable>
+
+          {showNameInput && (
+            <Pressable onPress={() => setShowNameInput(false)} style={styles.cancelBtn}>
+              <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Annuler</Text>
+            </Pressable>
+          )}
+        </View>
+
+        <Text style={[styles.version, { color: colors.mutedForeground }]}>v1.0.0 · Président : Nation en Crise</Text>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24, justifyContent: "space-between", paddingVertical: 32 },
+  outer: { flex: 1 },
+  container: { paddingHorizontal: 24, gap: 32 },
   header: { alignItems: "center", gap: 8 },
   emoji: { fontSize: 64 },
   title: { fontSize: 32, fontFamily: "Inter_700Bold", letterSpacing: -1 },

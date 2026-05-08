@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { useResponsive } from "@/utils/responsive";
 import { PowerBadge } from "@/components/PowerBadge";
 import { MissionCard } from "@/components/MissionCard";
 import { BUILDINGS } from "@/data/buildings";
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { icon: "⚔️", label: "Opérations", route: "/operations" },
   { icon: "🏆", label: "Classement", route: "/ranking" },
   { icon: "📋", label: "Missions", route: "/missions" },
+  { icon: "📰", label: "Journal de Crise", route: "/journal-crise" },
 ] as const;
 
 export default function NationScreen() {
@@ -26,6 +28,7 @@ export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, collectMissionReward } = useStrategy();
+  const { hPad, resourceCols, navCols, maxContentWidth, isTabletOrLarger } = useResponsive();
 
   if (!state) return null;
 
@@ -46,10 +49,16 @@ export default function NationScreen() {
     value: Math.floor(state.resources[key]),
   }));
 
+  const contentStyle = [
+    styles.content,
+    { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24, paddingHorizontal: hPad },
+    maxContentWidth ? { maxWidth: maxContentWidth, alignSelf: "center" as const, width: "100%" as const } : null,
+  ];
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={contentStyle}
       showsVerticalScrollIndicator={false}
     >
       {/* Hero */}
@@ -81,7 +90,7 @@ export default function NationScreen() {
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>RESSOURCES NATIONALES</Text>
         <View style={styles.resourceGrid}>
           {resourceEntries.map(({ key, label, icon, value }) => (
-            <View key={key} style={[styles.resourceCell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View key={key} style={[styles.resourceCell, { backgroundColor: colors.card, borderColor: colors.border, width: `${Math.floor(100 / resourceCols) - 1}%` }]}>
               <Text style={styles.resourceIcon}>{icon}</Text>
               <Text style={[styles.resourceValue, { color: colors.foreground }]}>
                 {value >= 10000 ? `${(value / 1000).toFixed(1)}k` : value}
@@ -107,19 +116,34 @@ export default function NationScreen() {
       {/* Nav grid */}
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACTIONS</Text>
       <View style={styles.navGrid}>
-        {NAV_ITEMS.map((item) => (
-          <Pressable
-            key={item.route}
-            onPress={() => router.push(item.route)}
-            style={({ pressed }) => [
-              styles.navCard,
-              { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
-            ]}
-          >
-            <Text style={styles.navIcon}>{item.icon}</Text>
-            <Text style={[styles.navLabel, { color: colors.foreground }]}>{item.label}</Text>
-          </Pressable>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const unread = item.route === "/journal-crise" ? (state.news?.unreadCount ?? 0) : 0;
+          return (
+            <Pressable
+              key={item.route}
+              onPress={() => router.push(item.route)}
+              style={({ pressed }) => [
+                styles.navCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.8 : 1,
+                  width: `${Math.floor(100 / navCols) - 1}%`,
+                },
+              ]}
+            >
+              <View>
+                <Text style={styles.navIcon}>{item.icon}</Text>
+                {unread > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.navLabel, { color: colors.foreground }]}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Pending mission rewards */}
@@ -153,7 +177,7 @@ export default function NationScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { paddingHorizontal: 16, gap: 12 },
+  content: { gap: 12 },
   hero: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 12, borderWidth: 1, padding: 16 },
   heroLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   flag: { fontSize: 40 },
@@ -168,7 +192,7 @@ const styles = StyleSheet.create({
   section: { gap: 8 },
   sectionLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2, marginTop: 4 },
   resourceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  resourceCell: { width: "30%", flexGrow: 1, borderRadius: 8, borderWidth: 1, padding: 10, alignItems: "center", gap: 3 },
+  resourceCell: { flexGrow: 1, borderRadius: 8, borderWidth: 1, padding: 10, alignItems: "center", gap: 3 },
   resourceIcon: { fontSize: 20 },
   resourceValue: { fontSize: 15, fontFamily: "Inter_700Bold" },
   resourceLabel: { fontSize: 9, fontFamily: "Inter_500Medium", letterSpacing: 0.5, textAlign: "center" },
@@ -176,9 +200,11 @@ const styles = StyleSheet.create({
   alertTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
   alertLine: { fontSize: 11, fontFamily: "Inter_500Medium" },
   navGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  navCard: { width: "46%", flexGrow: 1, borderRadius: 10, borderWidth: 1, padding: 16, alignItems: "center", gap: 6 },
+  navCard: { flexGrow: 1, borderRadius: 10, borderWidth: 1, padding: 16, alignItems: "center", gap: 6 },
   navIcon: { fontSize: 30 },
   navLabel: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  badge: { position: "absolute", top: -4, right: -6, backgroundColor: "#FF3040", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  badgeText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff" },
   missionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });

@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { useResponsive } from "@/utils/responsive";
 import { CountryCard } from "@/components/CountryCard";
 import { COUNTRIES, COUNTRY_LIST } from "@/data/countries";
 import type { CountryId, CountryRelation } from "@/types/strategy";
@@ -14,7 +15,9 @@ export default function WorldMapScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const { state } = useStrategy();
+  const { hPad } = useResponsive();
   const [selected, setSelected] = useState<CountryId | null>(null);
   const [activeRegion, setActiveRegion] = useState<string | null>(null);
 
@@ -36,7 +39,7 @@ export default function WorldMapScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
         </Pressable>
@@ -68,7 +71,7 @@ export default function WorldMapScreen() {
       </ScrollView>
 
       <ScrollView
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
         {filteredRegions.map(({ region, countries }) =>
@@ -96,7 +99,11 @@ export default function WorldMapScreen() {
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
         <Pressable style={styles.overlay} onPress={() => setSelected(null)} />
         {selectedCountry && selectedRelation && (
-          <View style={[styles.sheet, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
+          <ScrollView
+            style={[styles.sheet, { backgroundColor: colors.card, borderTopColor: colors.border, maxHeight: height * 0.72 }]}
+            contentContainerStyle={{ gap: 12, padding: 20, paddingBottom: insets.bottom + 16 }}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetFlag}>{selectedCountry.flag}</Text>
@@ -136,7 +143,7 @@ export default function WorldMapScreen() {
                 <Text style={styles.actionBtnText}>⚔️ Lancer une opération</Text>
               </Pressable>
             </View>
-          </View>
+          </ScrollView>
         )}
       </Modal>
     </View>
@@ -149,7 +156,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
@@ -158,7 +164,7 @@ const styles = StyleSheet.create({
   regionTabs: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   regionTab: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   regionTabText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  list: { paddingHorizontal: 16, paddingTop: 4, gap: 4 },
+  list: { paddingTop: 4, gap: 4 },
   regionSection: { gap: 8, marginTop: 8 },
   regionTitle: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
@@ -166,8 +172,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderTopWidth: 1,
-    padding: 20,
-    gap: 12,
   },
   sheetHandle: { width: 40, height: 4, backgroundColor: "#555", borderRadius: 2, alignSelf: "center", marginBottom: 4 },
   sheetHeader: { flexDirection: "row", alignItems: "center", gap: 12 },

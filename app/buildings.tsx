@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { useResponsive } from "@/utils/responsive";
 import { BuildingCard } from "@/components/BuildingCard";
 import { BUILDINGS, BUILDING_LIST } from "@/data/buildings";
 import { canAfford, isUnlocked } from "@/logic/buildingEngine";
@@ -14,6 +15,7 @@ export default function BuildingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, upgradeBuilding } = useStrategy();
+  const { hPad } = useResponsive();
   const [lastResult, setLastResult] = useState<string | null>(null);
 
   if (!state) return null;
@@ -30,7 +32,7 @@ export default function BuildingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
         </Pressable>
@@ -45,7 +47,7 @@ export default function BuildingsScreen() {
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.info, { color: colors.mutedForeground }]}>
@@ -79,14 +81,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
   back: { fontSize: 14, fontFamily: "Inter_600SemiBold", width: 60 },
   title: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  toast: { marginHorizontal: 16, marginTop: 8, borderRadius: 8, padding: 10 },
+  toast: { marginTop: 8, borderRadius: 8, padding: 10, marginHorizontal: 12 },
   toastText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "center" },
-  list: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
+  list: { paddingTop: 12, gap: 12 },
   info: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
 });

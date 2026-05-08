@@ -40,6 +40,7 @@ function RootLayoutNav() {
       <Stack.Screen name="operations" />
       <Stack.Screen name="ranking" />
       <Stack.Screen name="missions" />
+      <Stack.Screen name="journal-crise" />
       {/* Classic game screens */}
       <Stack.Screen name="tutorial" />
       <Stack.Screen name="create" />

@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { useResponsive } from "@/utils/responsive";
 import { MissionCard } from "@/components/MissionCard";
 import { formatDuration } from "@/logic/buildingEngine";
 import { timeUntilReset } from "@/logic/missionEngine";
@@ -14,6 +15,8 @@ export default function MissionsScreen() {
   const insets = useSafeAreaInsets();
   const { state, collectMissionReward } = useStrategy();
 
+  const { hPad } = useResponsive();
+
   if (!state) return null;
 
   const completed = state.missions.filter((m) => m.completed);
@@ -23,7 +26,7 @@ export default function MissionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
         </Pressable>
@@ -32,7 +35,7 @@ export default function MissionsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Reset timer */}
@@ -92,13 +95,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
   back: { fontSize: 14, fontFamily: "Inter_600SemiBold", width: 60 },
   title: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  content: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
+  content: { paddingTop: 12, gap: 12 },
   resetCard: { borderRadius: 10, borderWidth: 1, padding: 14, gap: 6 },
   resetTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   resetTime: { fontSize: 22, fontFamily: "Inter_700Bold" },
