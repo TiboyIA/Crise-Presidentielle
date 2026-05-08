@@ -1,9 +1,10 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { BUILDINGS } from "@/data/buildings";
 import { formatDuration, getUpgradeProgress, timeRemaining } from "@/logic/buildingEngine";
-import type { BuildingId, PlayerBuilding } from "@/types/strategy";
+import { BUILDING_IMG } from "@/constants/assets";
+import type { PlayerBuilding } from "@/types/strategy";
 
 interface Props {
   building: PlayerBuilding;
@@ -20,15 +21,16 @@ export function BuildingCard({ building, isUnlocked, canAfford, onUpgrade, compa
   const progress = isUpgrading ? getUpgradeProgress(building) : 0;
   const remaining = isUpgrading ? timeRemaining(building) : 0;
   const isMaxed = building.level >= def.maxLevel;
-  const isLocked = !isUnlocked || building.level === 0 && !isUnlocked;
+  const isLocked = !isUnlocked || (building.level === 0 && !isUnlocked);
 
   const nextLevelData = building.level < def.maxLevel ? def.levels[building.level] : null;
-
   const btnDisabled = isLocked || isUpgrading || isMaxed || !canAfford;
 
   const prodEntries = nextLevelData
     ? Object.entries(nextLevelData.production).filter(([, v]) => v > 0)
     : [];
+
+  const bannerImg = BUILDING_IMG[building.id];
 
   if (compact) {
     return (
@@ -39,7 +41,9 @@ export function BuildingCard({ building, isUnlocked, canAfford, onUpgrade, compa
           { backgroundColor: colors.card, borderColor: isUpgrading ? colors.primary : colors.border, opacity: pressed ? 0.85 : 1 },
         ]}
       >
-        <Text style={styles.icon}>{def.icon}</Text>
+        {bannerImg && (
+          <Image source={bannerImg} style={styles.compactImg} resizeMode="cover" />
+        )}
         <View style={styles.compactInfo}>
           <Text style={[styles.compactName, { color: colors.foreground }]} numberOfLines={1}>{def.name}</Text>
           <Text style={[styles.levelLabel, { color: colors.mutedForeground }]}>Niv. {building.level}</Text>
@@ -61,87 +65,108 @@ export function BuildingCard({ building, isUnlocked, canAfford, onUpgrade, compa
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: isUpgrading ? colors.primary : colors.border }]}>
-      <View style={styles.header}>
-        <Text style={styles.icon}>{def.icon}</Text>
-        <View style={styles.headerText}>
-          <Text style={[styles.name, { color: colors.foreground }]}>{def.name}</Text>
-          <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={2}>{def.description}</Text>
-        </View>
-        <View style={[styles.levelBadge, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
-          <Text style={[styles.levelNum, { color: colors.primary }]}>{building.level}</Text>
-          <Text style={[styles.levelMax, { color: colors.mutedForeground }]}>/{def.maxLevel}</Text>
-        </View>
-      </View>
-
-      {isLocked && (
-        <View style={[styles.locked, { backgroundColor: colors.muted }]}>
-          <Text style={[styles.lockedText, { color: colors.mutedForeground }]}>
-            🔒 {def.unlockRequirement
-              ? `Débloqué au niveau ${def.unlockRequirement.level} de ${BUILDINGS[def.unlockRequirement.buildingId].name}`
-              : "Verrouillé"}
-          </Text>
-        </View>
-      )}
-
-      {!isLocked && nextLevelData && prodEntries.length > 0 && (
-        <View style={styles.production}>
-          <Text style={[styles.prodLabel, { color: colors.mutedForeground }]}>Production/min :</Text>
-          <View style={styles.prodRow}>
-            {prodEntries.map(([key, val]) => (
-              <View key={key} style={[styles.prodChip, { backgroundColor: colors.muted }]}>
-                <Text style={[styles.prodText, { color: colors.foreground }]}>+{val} {key}</Text>
-              </View>
-            ))}
+      {/* Image banner */}
+      {bannerImg && (
+        <View style={styles.bannerWrap}>
+          <Image source={bannerImg} style={styles.banner} resizeMode="cover" />
+          <View style={[styles.bannerOverlay, { backgroundColor: "rgba(6,8,18,0.55)" }]} />
+          <View style={styles.bannerLevel}>
+            <Text style={[styles.levelNum, { color: colors.primary }]}>{building.level}</Text>
+            <Text style={[styles.levelMax, { color: "rgba(255,255,255,0.5)" }]}>/{def.maxLevel}</Text>
           </View>
         </View>
       )}
 
-      {isUpgrading && (
-        <View style={styles.upgradeSection}>
-          <View style={[styles.progressBar, { backgroundColor: colors.muted }]}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: colors.primary }]} />
+      <View style={styles.body}>
+        <View style={styles.header}>
+          {!bannerImg && <Text style={styles.icon}>{def.icon}</Text>}
+          <View style={styles.headerText}>
+            <Text style={[styles.name, { color: colors.foreground }]}>{def.name}</Text>
+            <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={2}>{def.description}</Text>
           </View>
-          <Text style={[styles.progressTime, { color: colors.primary }]}>
-            Amélioration : {formatDuration(remaining)}
-          </Text>
+          {!bannerImg && (
+            <View style={[styles.levelBadge, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
+              <Text style={[styles.levelNum, { color: colors.primary }]}>{building.level}</Text>
+              <Text style={[styles.levelMax, { color: colors.mutedForeground }]}>/{def.maxLevel}</Text>
+            </View>
+          )}
         </View>
-      )}
 
-      {!isLocked && !isUpgrading && !isMaxed && nextLevelData && (
-        <View style={styles.footer}>
-          <View style={styles.costs}>
-            {Object.entries(nextLevelData.cost).map(([key, val]) => (
-              <View key={key} style={[styles.costChip, { backgroundColor: colors.muted }]}>
-                <Text style={[styles.costText, { color: colors.foreground }]}>{val} {key}</Text>
-              </View>
-            ))}
-          </View>
-          <Pressable
-            onPress={onUpgrade}
-            disabled={!canAfford}
-            style={({ pressed }) => [
-              styles.upgradeBtn,
-              { backgroundColor: canAfford ? colors.primary : colors.muted, opacity: pressed ? 0.8 : 1 },
-            ]}
-          >
-            <Text style={[styles.upgradeText, { color: canAfford ? "#fff" : colors.mutedForeground }]}>
-              Améliorer →{" "}Niv.{building.level + 1}
+        {isLocked && (
+          <View style={[styles.locked, { backgroundColor: colors.muted }]}>
+            <Text style={[styles.lockedText, { color: colors.mutedForeground }]}>
+              {def.unlockRequirement
+                ? `Débloqué au niveau ${def.unlockRequirement.level} de ${BUILDINGS[def.unlockRequirement.buildingId].name}`
+                : "Verrouillé"}
             </Text>
-          </Pressable>
-        </View>
-      )}
+          </View>
+        )}
 
-      {isMaxed && (
-        <View style={[styles.maxed, { borderColor: "#FFD700" }]}>
-          <Text style={[styles.maxedText, { color: "#FFD700" }]}>⭐ Niveau maximum atteint</Text>
-        </View>
-      )}
+        {!isLocked && nextLevelData && prodEntries.length > 0 && (
+          <View style={styles.production}>
+            <Text style={[styles.prodLabel, { color: colors.mutedForeground }]}>Production/min :</Text>
+            <View style={styles.prodRow}>
+              {prodEntries.map(([key, val]) => (
+                <View key={key} style={[styles.prodChip, { backgroundColor: colors.muted }]}>
+                  <Text style={[styles.prodText, { color: colors.foreground }]}>+{val} {key}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {isUpgrading && (
+          <View style={styles.upgradeSection}>
+            <View style={[styles.progressBar, { backgroundColor: colors.muted }]}>
+              <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: colors.primary }]} />
+            </View>
+            <Text style={[styles.progressTime, { color: colors.primary }]}>
+              Amélioration : {formatDuration(remaining)}
+            </Text>
+          </View>
+        )}
+
+        {!isLocked && !isUpgrading && !isMaxed && nextLevelData && (
+          <View style={styles.footer}>
+            <View style={styles.costs}>
+              {Object.entries(nextLevelData.cost).map(([key, val]) => (
+                <View key={key} style={[styles.costChip, { backgroundColor: colors.muted }]}>
+                  <Text style={[styles.costText, { color: colors.foreground }]}>{val} {key}</Text>
+                </View>
+              ))}
+            </View>
+            <Pressable
+              onPress={onUpgrade}
+              disabled={!canAfford}
+              style={({ pressed }) => [
+                styles.upgradeBtn,
+                { backgroundColor: canAfford ? colors.primary : colors.muted, opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Text style={[styles.upgradeText, { color: canAfford ? "#fff" : colors.mutedForeground }]}>
+                Améliorer → Niv.{building.level + 1}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {isMaxed && (
+          <View style={[styles.maxed, { borderColor: "#FFD700" }]}>
+            <Text style={[styles.maxedText, { color: "#FFD700" }]}>Niveau maximum atteint</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 10, borderWidth: 1, padding: 14, gap: 10 },
+  card: { borderRadius: 10, borderWidth: 1, overflow: "hidden" },
+  bannerWrap: { height: 72, position: "relative" },
+  banner: { width: "100%", height: "100%" },
+  bannerOverlay: { ...StyleSheet.absoluteFillObject },
+  bannerLevel: { position: "absolute", bottom: 8, right: 10, flexDirection: "row", alignItems: "baseline" },
+  body: { padding: 14, gap: 10 },
   header: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   icon: { fontSize: 28, width: 36, textAlign: "center" },
   headerText: { flex: 1, gap: 2 },
@@ -170,12 +195,13 @@ const styles = StyleSheet.create({
   maxed: { borderRadius: 6, borderWidth: 1, padding: 8, alignItems: "center" },
   maxedText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   // compact
-  compact: { flexDirection: "row", alignItems: "center", borderRadius: 8, borderWidth: 1, padding: 10, gap: 8 },
-  compactInfo: { flex: 1, gap: 2 },
+  compact: { flexDirection: "row", alignItems: "center", borderRadius: 8, borderWidth: 1, overflow: "hidden" },
+  compactImg: { width: 48, height: 48, resizeMode: "cover" },
+  compactInfo: { flex: 1, gap: 2, paddingHorizontal: 10, paddingVertical: 10 },
   compactName: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   levelLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  progressPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  progressPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 10 },
   progressText: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  upgBtn: { width: 32, height: 32, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  upgBtn: { width: 32, height: 32, borderRadius: 6, alignItems: "center", justifyContent: "center", marginRight: 10 },
   upgBtnText: { fontSize: 12, fontFamily: "Inter_700Bold" },
 });

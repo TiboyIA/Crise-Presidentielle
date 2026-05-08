@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ImageBackground, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
+import { BG } from "@/constants/assets";
 
 export default function StartScreen() {
-  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, loaded, startNewGame } = useStrategy();
@@ -32,48 +32,32 @@ export default function StartScreen() {
     }
   };
 
+  const canConfirm = !showNameInput || playerName.trim().length >= 2;
+
   return (
-    <View style={[styles.outer, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <ImageBackground source={BG.investiture} style={styles.bg} resizeMode="cover">
+      <LinearGradient
+        colors={["rgba(6,8,16,0.2)", "rgba(6,8,16,0.72)", "#060810"]}
+        locations={[0, 0.52, 1]}
+        style={[styles.overlay, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 36 }]}
       >
-        {/* Header */}
+        {/* Emblem + Title */}
         <View style={styles.header}>
-          <Text style={styles.emoji}>🌍</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>Président</Text>
-          <Text style={[styles.subtitle, { color: colors.primary }]}>Nation en Crise</Text>
-          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-            Dirigez une nation.{"\n"}Dominez le monde.
-          </Text>
+          <Text style={styles.emblem}>⚜</Text>
+          <Text style={styles.republic}>PRÉSIDENCE DE LA RÉPUBLIQUE</Text>
+          <Text style={styles.title}>PRÉSIDENT</Text>
+          <View style={styles.rule} />
+          <Text style={styles.crisis}>NATION EN CRISE</Text>
         </View>
 
-        {/* Features */}
-        <View style={styles.features}>
-          {[
-            { icon: "🏛️", label: "Construisez et améliorez vos ministères" },
-            { icon: "🌍", label: "Explorez la carte mondiale stratégique" },
-            { icon: "⚔️", label: "Lancez des opérations géopolitiques" },
-            { icon: "🏆", label: "Grimpez dans le classement mondial" },
-          ].map(({ icon, label }) => (
-            <View key={label} style={styles.featureRow}>
-              <Text style={styles.featureIcon}>{icon}</Text>
-              <Text style={[styles.featureText, { color: colors.foreground }]}>{label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Name input */}
-        {showNameInput && (
+        {/* Feature list OR name input */}
+        {showNameInput ? (
           <View style={styles.inputSection}>
-            <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>
-              Votre nom de président·e :
-            </Text>
+            <Text style={styles.inputLabel}>VOTRE NOM DE PRÉSIDENT</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+              style={styles.input}
               placeholder="Ex : Emmanuel Martin"
-              placeholderTextColor={colors.mutedForeground}
+              placeholderTextColor="rgba(255,255,255,0.3)"
               value={playerName}
               onChangeText={setPlayerName}
               maxLength={30}
@@ -82,65 +66,81 @@ export default function StartScreen() {
               onSubmitEditing={handleStart}
             />
           </View>
+        ) : (
+          <View style={styles.features}>
+            {[
+              "Construisez et améliorez vos ministères",
+              "Maîtrisez la carte mondiale stratégique",
+              "Lancez des opérations secrètes",
+              "Dominez le classement mondial",
+            ].map((label) => (
+              <Text key={label} style={styles.featureItem}>· {label}</Text>
+            ))}
+          </View>
         )}
 
         {/* CTA */}
         <View style={styles.actions}>
           <Pressable
             onPress={handleStart}
-            disabled={showNameInput && playerName.trim().length < 2}
-            style={({ pressed }) => [
-              styles.mainBtn,
-              {
-                backgroundColor: showNameInput && playerName.trim().length < 2 ? colors.muted : colors.primary,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
+            disabled={!canConfirm}
+            style={({ pressed }) => [styles.btnWrap, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={styles.mainBtnText}>
-              {showNameInput ? "🚀 Commencer la partie" : "🎮 Nouvelle partie"}
-            </Text>
+            <LinearGradient
+              colors={canConfirm ? ["#c0392b", "#7b0000"] : ["#2a2a2a", "#1a1a1a"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.mainBtn}
+            >
+              <Text style={styles.mainBtnText}>
+                {showNameInput ? "PRÊTER SERMENT" : "ENTRER EN FONCTION"}
+              </Text>
+            </LinearGradient>
           </Pressable>
 
           {showNameInput && (
             <Pressable onPress={() => setShowNameInput(false)} style={styles.cancelBtn}>
-              <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Annuler</Text>
+              <Text style={styles.cancelText}>Annuler</Text>
             </Pressable>
           )}
         </View>
 
-        <Text style={[styles.version, { color: colors.mutedForeground }]}>v1.0.0 · Président : Nation en Crise</Text>
-      </ScrollView>
-    </View>
+        <Text style={styles.version}>v1.0.0 · Président : Nation en Crise</Text>
+      </LinearGradient>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  outer: { flex: 1 },
-  container: { paddingHorizontal: 24, gap: 32 },
-  header: { alignItems: "center", gap: 8 },
-  emoji: { fontSize: 64 },
-  title: { fontSize: 32, fontFamily: "Inter_700Bold", letterSpacing: -1 },
-  subtitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", letterSpacing: 2 },
-  tagline: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22, marginTop: 8 },
-  features: { gap: 12, paddingVertical: 8 },
-  featureRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  featureIcon: { fontSize: 22, width: 30, textAlign: "center" },
-  featureText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
-  inputSection: { gap: 8 },
-  inputLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  bg: { flex: 1 },
+  overlay: { flex: 1, paddingHorizontal: 28, justifyContent: "space-between" },
+  header: { alignItems: "center", gap: 6 },
+  emblem: { fontSize: 38, color: "#C9A84C", marginBottom: 6 },
+  republic: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 4, color: "rgba(201,168,76,0.75)" },
+  title: { fontSize: 52, fontFamily: "Inter_700Bold", letterSpacing: 10, color: "#FFFFFF", marginTop: 8 },
+  rule: { width: 56, height: 1.5, backgroundColor: "#c0392b", marginVertical: 10 },
+  crisis: { fontSize: 13, fontFamily: "Inter_600SemiBold", letterSpacing: 5, color: "#c0392b" },
+  features: { gap: 11, paddingHorizontal: 4 },
+  featureItem: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.65)", letterSpacing: 0.3, lineHeight: 20 },
+  inputSection: { gap: 12 },
+  inputLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 3, color: "rgba(201,168,76,0.85)", textAlign: "center" },
   input: {
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: "rgba(201,168,76,0.35)",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     fontFamily: "Inter_400Regular",
+    color: "#fff",
+    textAlign: "center",
   },
-  actions: { gap: 10 },
-  mainBtn: { borderRadius: 12, paddingVertical: 16, alignItems: "center" },
-  mainBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
+  actions: { gap: 12 },
+  btnWrap: {},
+  mainBtn: { borderRadius: 10, paddingVertical: 16, alignItems: "center" },
+  mainBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 3 },
   cancelBtn: { paddingVertical: 8, alignItems: "center" },
-  cancelText: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  version: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
+  cancelText: { fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.45)" },
+  version: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "center", color: "rgba(255,255,255,0.25)", letterSpacing: 1 },
 });
