@@ -24,11 +24,21 @@ import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
 import type {
   BuildingId,
   CountryId,
+  NationalIndicators,
   OperationType,
   PlayerBuilding,
   StrategyGameState,
   StrategyResources,
 } from "@/types/strategy";
+
+const INITIAL_INDICATORS: NationalIndicators = {
+  popularity: 60,
+  economy: 55,
+  security: 50,
+  ecology: 45,
+  cohesion: 60,
+  publicBudget: 20,
+};
 
 const INITIAL_RESOURCES: StrategyResources = {
   money: 2000,
@@ -75,12 +85,18 @@ function buildInitialState(playerName: string): StrategyGameState {
     lastBotUpdate: now,
     ranking: getInitialRanking(power),
     startedAt: now,
+    nationalIndicators: { ...INITIAL_INDICATORS },
+    mandateDay: 0,
+    lastPollShownAt: 0,
+    lastBilanShownAt: 0,
   };
 }
 
 interface StrategyContextValue {
   state: StrategyGameState | null;
   loaded: boolean;
+  shouldShowPoll: boolean;
+  shouldShowBilan: boolean;
   startNewGame: (playerName: string) => void;
   upgradeBuilding: (id: BuildingId) => { success: boolean; reason?: string };
   launchOperation: (type: OperationType, targetCountryId: CountryId) => { success: boolean; message: string };
@@ -88,6 +104,8 @@ interface StrategyContextValue {
   resolveInteractiveNews: (eventId: string, choiceId: string) => void;
   dismissNews: (eventId: string) => void;
   markNewsRead: () => void;
+  acknowledgePoll: () => void;
+  startNewMandate: () => void;
   tick: () => void;
 }
 
@@ -100,7 +118,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStrategy().then((saved) => {
-      if (saved) setState({ ...saved, news: saved.news ?? { ...DEFAULT_NEWS_STATE } });
+      if (saved) {
+        setState({
+          ...saved,
+          news: saved.news ?? { ...DEFAULT_NEWS_STATE },
+          nationalIndicators: saved.nationalIndicators ?? { ...INITIAL_INDICATORS },
+          mandateDay: saved.mandateDay ?? 0,
+          lastPollShownAt: saved.lastPollShownAt ?? 0,
+          lastBilanShownAt: saved.lastBilanShownAt ?? 0,
+        });
+      }
       setLoaded(true);
     });
   }, []);
@@ -208,7 +235,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           type: "upgrade_building",
           buildingId: id,
         });
-        return withNews({ ...prev, resources, buildings, missions });
+        return withNews({ ...prev, resources, buildings, missions, mandateDay: prev.mandateDay + 1 });
       });
 
       return { success: true };
@@ -267,6 +294,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             operationsWon: prev.stats.operationsWon + (result.success ? 1 : 0),
           },
           missions: spyMissions,
+          mandateDay: prev.mandateDay + (result.success ? 1 : 0),
         });
       });
 
@@ -281,7 +309,22 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const event = NEWS_EVENT_MAP[eventId];
         if (!event) return prev;
         const { news, resources } = applyInteractiveNews(prev, event, choiceId);
-        return { ...prev, news, resources };
+
+        const choice = event.choices?.find((c) => c.id === choiceId);
+
+        const nationalIndicators = choice?.indicatorEffects
+          ? applyIndicatorEffects(prev.nationalIndicators, choice.indicatorEffects)
+          : prev.nationalIndicators;
+
+        const relations = choice?.relationDelta
+          ? prev.relations.map((r) => {
+              if (r.countryId !== choice.relationDelta!.countryId) return r;
+              const { score, status } = updateRelationScore(r.score, choice.relationDelta!.delta);
+              return { ...r, score, status };
+            })
+          : prev.relations;
+
+        return { ...prev, news, resources, nationalIndicators, relations, mandateDay: prev.mandateDay + 2 };
       });
     },
     [update],
@@ -318,19 +361,60 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             ...prev.stats,
             rankingPoints: prev.stats.rankingPoints + def.rewardPoints,
           },
+          mandateDay: prev.mandateDay + 1,
         };
       });
     },
     [update],
   );
 
+  const acknowledgePoll = useCallback(() => {
+    update((prev) => ({ ...prev, lastPollShownAt: prev.mandateDay }));
+  }, [update]);
+
+  const startNewMandate = useCallback(() => {
+    update((prev) => {
+      const score = computeMandateScore(prev.nationalIndicators);
+      const bonusResources = score >= 80
+        ? { money: 1000, influence: 100 }
+        : score >= 60
+        ? { money: 500, influence: 50 }
+        : score >= 40
+        ? { money: 200, influence: 25 }
+        : {};
+      return {
+        ...prev,
+        lastBilanShownAt: prev.mandateDay,
+        resources: applyRewards(prev.resources, bonusResources),
+        stats: {
+          ...prev.stats,
+          rankingPoints: prev.stats.rankingPoints + Math.round(score / 2),
+        },
+      };
+    });
+  }, [update]);
+
+  const shouldShowPoll =
+    state !== null &&
+    state.mandateDay > 0 &&
+    Math.floor(state.mandateDay / 10) > Math.floor(state.lastPollShownAt / 10);
+
+  const shouldShowBilan =
+    state !== null &&
+    state.mandateDay >= 100 &&
+    state.mandateDay - state.lastBilanShownAt >= 100;
+
   const value = useMemo<StrategyContextValue>(
     () => ({
-      state, loaded, startNewGame, upgradeBuilding, launchOperation,
-      collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead, tick,
+      state, loaded, shouldShowPoll, shouldShowBilan,
+      startNewGame, upgradeBuilding, launchOperation,
+      collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
+      acknowledgePoll, startNewMandate, tick,
     }),
-    [state, loaded, startNewGame, upgradeBuilding, launchOperation,
-      collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead, tick],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
+      collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
+      acknowledgePoll, startNewMandate, tick],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;
@@ -361,6 +445,31 @@ function withNews(state: StrategyGameState): StrategyGameState {
   }
 
   return stateWithCount;
+}
+
+function applyIndicatorEffects(
+  indicators: NationalIndicators,
+  effects: Partial<NationalIndicators>,
+): NationalIndicators {
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(v)));
+  return {
+    popularity:   clamp(indicators.popularity   + (effects.popularity   ?? 0), 0, 100),
+    economy:      clamp(indicators.economy       + (effects.economy      ?? 0), 0, 100),
+    security:     clamp(indicators.security      + (effects.security     ?? 0), 0, 100),
+    ecology:      clamp(indicators.ecology       + (effects.ecology      ?? 0), 0, 100),
+    cohesion:     clamp(indicators.cohesion      + (effects.cohesion     ?? 0), 0, 100),
+    publicBudget: clamp(indicators.publicBudget  + (effects.publicBudget ?? 0), -150, 100),
+  };
+}
+
+export function computeMandateScore(ind: NationalIndicators): number {
+  return Math.round(
+    ind.popularity * 0.35 +
+    ind.economy    * 0.25 +
+    ind.security   * 0.15 +
+    ind.ecology    * 0.10 +
+    ind.cohesion   * 0.15,
+  );
 }
 
 function applyRewards(resources: StrategyResources, rewards: Partial<StrategyResources>): StrategyResources {

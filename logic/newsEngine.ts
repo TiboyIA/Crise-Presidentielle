@@ -62,15 +62,22 @@ function urgencyScore(e: NewsEvent): number {
 }
 
 function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
-  const { resources, ranking, stats } = state;
+  const { resources, ranking, stats, nationalIndicators: ind } = state;
   const playerRank = ranking.findIndex((r) => r.id === "player") + 1;
+  const indicators = ind ?? { popularity: 60, economy: 55, security: 50, ecology: 45, cohesion: 60, publicBudget: 20 };
   return {
-    low_money:    resources.money < 500,
-    low_cyber:    resources.cyberDefense < 30,
-    low_military: resources.military < 40,
-    high_power:   stats.globalPower >= 200,
-    rank_pressure: playerRank > ranking.length * 0.4,
-    top5_rank:    playerRank <= 5,
+    low_money:       resources.money < 500,
+    low_cyber:       resources.cyberDefense < 30,
+    low_military:    resources.military < 40,
+    high_power:      stats.globalPower >= 200,
+    rank_pressure:   playerRank > ranking.length * 0.4,
+    top5_rank:       playerRank <= 5,
+    low_popularity:  indicators.popularity < 30,
+    low_ind_economy: indicators.economy < 25,
+    low_security:    indicators.security < 25,
+    low_ecology:     indicators.ecology < 25,
+    low_cohesion:    indicators.cohesion < 25,
+    budget_crisis:   indicators.publicBudget < -80,
   };
 }
 

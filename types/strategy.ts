@@ -217,6 +217,15 @@ export type NewsType =
 
 export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
 
+export interface NationalIndicators {
+  popularity: number;    // 0-100
+  economy: number;       // 0-100
+  security: number;      // 0-100
+  ecology: number;       // 0-100
+  cohesion: number;      // 0-100
+  publicBudget: number;  // -150 to +100
+}
+
 export interface NewsChoice {
   id: string;
   label: string;
@@ -224,6 +233,7 @@ export interface NewsChoice {
   effects: Partial<StrategyResources>;
   rankingDelta?: number;
   relationDelta?: { countryId: CountryId; delta: number };
+  indicatorEffects?: Partial<NationalIndicators>;
 }
 
 export interface NewsEvent {
@@ -277,4 +287,8 @@ export interface StrategyGameState {
   lastBotUpdate: number;
   ranking: RankEntry[];
   startedAt: number;
+  nationalIndicators: NationalIndicators;
+  mandateDay: number;
+  lastPollShownAt: number;   // mandateDay value when last poll was shown
+  lastBilanShownAt: number;  // mandateDay value when last bilan was shown
 }

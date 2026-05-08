@@ -31,10 +31,28 @@ const NAV_ITEMS: { mcIcon: McIconName; label: string; route: string; tint?: stri
 
 const RESOURCE_ORDER: ResourceKey[] = ["money", "influence", "energy", "intelligence", "technology", "military", "cyberDefense"];
 
+const INDICATOR_LABELS: Record<string, string> = {
+  popularity: "Popularité",
+  economy: "Économie",
+  security: "Sécurité",
+  ecology: "Écologie",
+  cohesion: "Cohésion",
+  publicBudget: "Budget",
+};
+
+const INDICATOR_COLORS: Record<string, string> = {
+  popularity: "#c9a84c",
+  economy:    "#3fbe7a",
+  security:   "#4a9fff",
+  ecology:    "#52c97a",
+  cohesion:   "#a78bfa",
+  publicBudget: "#e8a93a",
+};
+
 export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, collectMissionReward } = useStrategy();
+  const { state, collectMissionReward, shouldShowBilan } = useStrategy();
   const { hPad, navCols, maxContentWidth } = useResponsive();
 
   if (!state) return null;
@@ -56,8 +74,20 @@ export default function NationScreen() {
         <LinearGradient colors={["rgba(6,8,18,0.05)", "rgba(6,8,18,0.55)", "rgba(10,12,20,0.95)"]} locations={[0, 0.5, 1]} style={styles.heroGrad}>
           <View style={[styles.heroInner, { paddingHorizontal: hPad }]}>
             <View style={styles.heroTop}>
-              <Text style={styles.kicker}>PRÉSIDENCE · MANDAT EN COURS</Text>
-              <Badge label={`Saison ${state.stats.season}`} tone="gold" size="xs" />
+              <View style={{ gap: 2 }}>
+                <Text style={styles.kicker}>PRÉSIDENCE · MANDAT EN COURS</Text>
+                <Text style={styles.mandateDay}>Jour {state.mandateDay}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Badge label={`Saison ${state.stats.season}`} tone="gold" size="xs" />
+                <Pressable
+                  onPress={() => router.push("/briefing" as any)}
+                  style={({ pressed }) => [styles.briefingBtn, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <MaterialCommunityIcons name="file-document-outline" size={13} color={PALETTE.gold} />
+                  <Text style={styles.briefingBtnText}>BRIEFING</Text>
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.heroRow}>
@@ -114,6 +144,47 @@ export default function NationScreen() {
             />
           ))}
         </ScrollView>
+
+        {/* BAROMÈTRE NATIONAL */}
+        <SectionHeader label="Baromètre national" />
+        <Panel style={styles.barometre}>
+          <View style={styles.barometreGrid}>
+            {Object.entries(state.nationalIndicators).map(([key, val]) => {
+              const pct = key === "publicBudget"
+                ? Math.max(0, (val + 150) / 250)
+                : val / 100;
+              const color = INDICATOR_COLORS[key] ?? PALETTE.gold;
+              const isLow = key === "publicBudget" ? val < -80 : val < 30;
+              return (
+                <View key={key} style={styles.barometreItem}>
+                  <View style={styles.barometreLabelRow}>
+                    <Text style={styles.barometreLabel}>{INDICATOR_LABELS[key]}</Text>
+                    <Text style={[styles.barometreVal, isLow && { color: PALETTE.danger }]}>
+                      {key === "publicBudget" ? (val >= 0 ? `+${val}` : `${val}`) : `${val}%`}
+                    </Text>
+                  </View>
+                  <View style={styles.barometreTrack}>
+                    <View style={[styles.barometreFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: isLow ? PALETTE.danger : color }]} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Panel>
+
+        {/* BILAN DISPONIBLE BANNER */}
+        {shouldShowBilan && (
+          <Pressable onPress={() => router.push("/mandate-review" as any)} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}>
+            <Panel variant="gold" glow style={styles.bilanBanner}>
+              <MaterialCommunityIcons name="medal-outline" size={20} color={PALETTE.gold} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bilanTitle}>BILAN DE MANDAT DISPONIBLE</Text>
+                <Text style={styles.bilanSub}>Jour {state.mandateDay} · Consultez votre bilan présidentiel</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.gold} />
+            </Panel>
+          </Pressable>
+        )}
 
         {/* ALERTS — upgrades in progress */}
         {upgrading.length > 0 && (
@@ -222,6 +293,9 @@ const styles = StyleSheet.create({
   heroInner: { paddingTop: 8 },
   heroTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   kicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 3 },
+  mandateDay: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1 },
+  briefingBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: PALETTE.gold + "55", backgroundColor: "rgba(201,168,76,0.08)" },
+  briefingBtnText: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
   heroRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   flagFrame: {
     width: 64, height: 64, borderRadius: 6,
@@ -269,4 +343,17 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh, letterSpacing: 0.3 },
 
   seeAll: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 0.5 },
+
+  barometre: { padding: 12, gap: 8 },
+  barometreGrid: { gap: 8 },
+  barometreItem: { gap: 4 },
+  barometreLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  barometreLabel: { fontSize: 10, fontFamily: FONT.med, color: PALETTE.textMid, letterSpacing: 0.5 },
+  barometreVal: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  barometreTrack: { height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  barometreFill: { height: "100%", borderRadius: 2 },
+
+  bilanBanner: { padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  bilanTitle: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
+  bilanSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, marginTop: 2 },
 });
