@@ -17,6 +17,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
+import { StrategyProvider } from "@/context/StrategyContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,7 +32,15 @@ function RootLayoutNav() {
         animation: "fade",
       }}
     >
+      {/* Strategy game screens */}
       <Stack.Screen name="index" />
+      <Stack.Screen name="nation" />
+      <Stack.Screen name="buildings" />
+      <Stack.Screen name="worldmap" />
+      <Stack.Screen name="operations" />
+      <Stack.Screen name="ranking" />
+      <Stack.Screen name="missions" />
+      {/* Classic game screens */}
       <Stack.Screen name="tutorial" />
       <Stack.Screen name="create" />
       <Stack.Screen name="dashboard" />
@@ -65,10 +74,12 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0a0c0e" }}>
             <KeyboardProvider>
               <EntitlementsProvider>
-                <GameProvider>
-                <StatusBar style="light" />
-                <RootLayoutNav />
-                </GameProvider>
+                <StrategyProvider>
+                  <GameProvider>
+                    <StatusBar style="light" />
+                    <RootLayoutNav />
+                  </GameProvider>
+                </StrategyProvider>
               </EntitlementsProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

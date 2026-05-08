@@ -1,0 +1,220 @@
+export type ResourceKey = keyof StrategyResources;
+
+export interface StrategyResources {
+  money: number;
+  influence: number;
+  energy: number;
+  intelligence: number;
+  technology: number;
+  military: number;
+  cyberDefense: number;
+}
+
+export const RESOURCE_LABELS: Record<ResourceKey, string> = {
+  money: "Argent",
+  influence: "Influence",
+  energy: "Énergie",
+  intelligence: "Renseignement",
+  technology: "Technologie",
+  military: "Militaire",
+  cyberDefense: "Cyberdéfense",
+};
+
+export const RESOURCE_ICONS: Record<ResourceKey, string> = {
+  money: "💰",
+  influence: "🎭",
+  energy: "⚡",
+  intelligence: "🔍",
+  technology: "🔬",
+  military: "⚔️",
+  cyberDefense: "🛡️",
+};
+
+export type BuildingId =
+  | "presidential_palace"
+  | "economy_ministry"
+  | "defense_ministry"
+  | "intelligence_ministry"
+  | "cyber_ministry"
+  | "energy_ministry"
+  | "diplomacy_ministry"
+  | "research_center"
+  | "central_bank"
+  | "media_agency"
+  | "military_hq";
+
+export interface BuildingLevel {
+  cost: Partial<StrategyResources>;
+  upgradeDuration: number; // seconds
+  production: Partial<StrategyResources>; // per minute
+  powerBonus: number;
+}
+
+export interface BuildingDef {
+  id: BuildingId;
+  name: string;
+  description: string;
+  icon: string;
+  maxLevel: number;
+  levels: BuildingLevel[]; // index i = level i+1
+  unlockRequirement?: { buildingId: BuildingId; level: number };
+}
+
+export interface PlayerBuilding {
+  id: BuildingId;
+  level: number; // 0 = not built, 1-10 = active level
+  upgradeStartTime: number | null;
+  upgradeEndTime: number | null;
+}
+
+export type CountryId =
+  | "france"
+  | "usa"
+  | "china"
+  | "russia"
+  | "germany"
+  | "uk"
+  | "india"
+  | "japan"
+  | "brazil"
+  | "turkey"
+  | "iran"
+  | "israel"
+  | "south_korea"
+  | "italy"
+  | "saudi_arabia";
+
+export type RelationStatus = "allied" | "friendly" | "neutral" | "rival" | "hostile";
+
+export interface CountryDef {
+  id: CountryId;
+  name: string;
+  flag: string;
+  region: string;
+  basePower: number;
+  economy: number;
+  military: number;
+  cyber: number;
+  diplomacy: number;
+  description: string;
+}
+
+export interface CountryRelation {
+  countryId: CountryId;
+  status: RelationStatus;
+  score: number; // -100 to 100
+  threatLevel: number; // 0-100
+  operationCooldowns: Partial<Record<OperationType, number>>; // expiry timestamps
+}
+
+export type OperationType =
+  | "espionage"
+  | "steal_intel"
+  | "cyber_attack"
+  | "influence_campaign"
+  | "sabotage"
+  | "sanction"
+  | "sign_treaty"
+  | "diplomatic_aid"
+  | "reinforce_cyber"
+  | "military_operation";
+
+export interface OperationDef {
+  id: OperationType;
+  name: string;
+  description: string;
+  icon: string;
+  cost: Partial<StrategyResources>;
+  cooldown: number; // seconds
+  isOffensive: boolean;
+  minRelationScore?: number; // min score to allow
+  maxRelationScore?: number; // max score to allow
+  requiredBuilding?: { id: BuildingId; level: number };
+}
+
+export interface OperationResult {
+  success: boolean;
+  message: string;
+  rewards: Partial<StrategyResources>;
+  relationDelta: number;
+  rankingPoints: number;
+  xp: number;
+}
+
+export type MissionType =
+  | "upgrade_building"
+  | "launch_operation"
+  | "collect_resources"
+  | "reach_power"
+  | "spy_country"
+  | "win_operation"
+  | "reinforce_defense";
+
+export interface MissionDef {
+  id: string;
+  title: string;
+  description: string;
+  type: MissionType;
+  target: {
+    amount?: number;
+    buildingId?: BuildingId;
+    minPower?: number;
+    resourceKey?: ResourceKey;
+    operationType?: OperationType;
+  };
+  reward: Partial<StrategyResources>;
+  rewardPoints: number;
+}
+
+export interface PlayerMission {
+  defId: string;
+  completed: boolean;
+  progress: number;
+  target: number;
+  assignedAt: number;
+}
+
+export interface BotPlayer {
+  id: string;
+  name: string;
+  countryName: string;
+  flag: string;
+  startPower: number;
+  growthPerHour: number;
+  personality: "aggressive" | "defensive" | "diplomatic" | "economic";
+}
+
+export interface RankEntry {
+  id: string; // "player" or bot id
+  name: string;
+  flag: string;
+  power: number;
+  points: number;
+  trend: "up" | "down" | "stable";
+}
+
+export interface NationalStats {
+  globalPower: number;
+  presidentLevel: number;
+  presidentXP: number;
+  rankingPoints: number;
+  totalOperations: number;
+  operationsWon: number;
+  season: number;
+  seasonStartTime: number;
+}
+
+export interface StrategyGameState {
+  version: number;
+  playerName: string;
+  countryId: CountryId;
+  resources: StrategyResources;
+  buildings: PlayerBuilding[];
+  stats: NationalStats;
+  relations: CountryRelation[];
+  missions: PlayerMission[];
+  lastResourceTick: number; // timestamp
+  lastBotUpdate: number; // timestamp
+  ranking: RankEntry[];
+  startedAt: number;
+}
