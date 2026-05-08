@@ -47,14 +47,14 @@ export const NEWS_IMG: Record<string, any> = {
 };
 
 export const OPERATION_IMG: Record<string, any> = {
-  espionage:            require("../assets/images/hybrid/vector_espionage.png"),
-  cyber_attack:         require("../assets/images/hybrid/vector_cyber.png"),
-  influence:            require("../assets/images/hybrid/vector_disinformation.png"),
-  sanctions:            require("../assets/images/countermeasures/sanctions.png"),
-  trade_deal:           require("../assets/images/gauges/economy.png"),
-  military_threat:      require("../assets/images/countermeasures/military.png"),
-  diplomatic_summit:    require("../assets/images/events/event_diplomacy.png"),
-  propaganda:           require("../assets/images/hybrid/vector_social_manipulation.png"),
-  infrastructure_attack: require("../assets/images/hybrid/vector_infrastructure_attack.png"),
-  treaty:               require("../assets/images/gauges/diplomacy.png"),
+  espionage:           require("../assets/images/hybrid/vector_espionage.png"),
+  steal_intel:         require("../assets/images/hybrid/vector_document_leak.png"),
+  cyber_attack:        require("../assets/images/hybrid/vector_cyber.png"),
+  reinforce_cyber:     require("../assets/images/research/cyber_security.png"),
+  influence_campaign:  require("../assets/images/hybrid/vector_disinformation.png"),
+  sabotage:            require("../assets/images/hybrid/vector_industrial_sabotage.png"),
+  sanction:            require("../assets/images/countermeasures/sanctions.png"),
+  sign_treaty:         require("../assets/images/gauges/diplomacy.png"),
+  diplomatic_aid:      require("../assets/images/events/event_diplomacy.png"),
+  military_operation:  require("../assets/images/countermeasures/military.png"),
 };

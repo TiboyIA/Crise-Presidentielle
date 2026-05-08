@@ -1,30 +1,29 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
 import { NewsCard } from "@/components/NewsCard";
 import { InteractiveNewsModal } from "@/components/InteractiveNewsModal";
+import { Badge, Panel, ScreenHeader, SectionHeader } from "@/components/ui";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { typeIcon, urgencyColor } from "@/logic/newsEngine";
+import { FONT, PALETTE } from "@/constants/uiTokens";
 import type { NewsType } from "@/types/strategy";
 
 const TYPE_FILTERS: { label: string; value: NewsType | "all" }[] = [
-  { label: "Tout", value: "all" },
-  { label: "💻 Cyber", value: "cyber" },
-  { label: "📊 Économie", value: "economie" },
-  { label: "👥 Social", value: "social" },
-  { label: "🤝 Diplomatie", value: "diplomatie" },
-  { label: "⚠️ Hybride", value: "guerre_hybride" },
-  { label: "🌍 Monde", value: "monde" },
-  { label: "🏛️ National", value: "national" },
+  { label: "Tout",       value: "all" },
+  { label: "Cyber",      value: "cyber" },
+  { label: "Économie",   value: "economie" },
+  { label: "Social",     value: "social" },
+  { label: "Diplomatie", value: "diplomatie" },
+  { label: "Hybride",    value: "guerre_hybride" },
+  { label: "Monde",      value: "monde" },
+  { label: "National",   value: "national" },
 ];
 
 export default function JournalDeCriseScreen() {
-  const colors = useColors();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, resolveInteractiveNews, dismissNews, markNewsRead } = useStrategy();
   const { hPad, width } = useResponsive();
@@ -32,14 +31,12 @@ export default function JournalDeCriseScreen() {
   const [filter, setFilter] = useState<NewsType | "all">("all");
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  if (!state) return null;
-
-  const { news } = state;
-
-  // Mark all read when screen opens
-  React.useEffect(() => {
-    markNewsRead();
+  useEffect(() => {
+    if (state) markNewsRead();
   }, []);
+
+  if (!state) return null;
+  const { news } = state;
 
   const pendingInteractive = news.pendingIds
     .map((id) => NEWS_EVENT_MAP[id])
@@ -52,47 +49,53 @@ export default function JournalDeCriseScreen() {
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
-  const handleChoose = (choiceId: string) => {
-    if (!activeModal) return;
-    resolveInteractiveNews(activeModal, choiceId);
-    setActiveModal(null);
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-          <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.foreground }]}>📰 Journal de Crise</Text>
-        <View style={{ width: 60 }} />
+    <View style={styles.container}>
+      <ScreenHeader title="Journal de Crise" kicker="DESK PRÉSIDENTIEL" />
+
+      {/* Breaking news ticker */}
+      <View style={[styles.tickerWrap, { paddingHorizontal: hPad }]}>
+        <View style={styles.tickerBadge}>
+          <Text style={styles.tickerBadgeText}>EN DIRECT</Text>
+        </View>
+        <Text style={styles.tickerText}>
+          {pendingInteractive.length > 0
+            ? `${pendingInteractive.length} décision${pendingInteractive.length > 1 ? "s" : ""} requise${pendingInteractive.length > 1 ? "s" : ""}`
+            : `${news.log.length} dépêche${news.log.length > 1 ? "s" : ""} archivée${news.log.length > 1 ? "s" : ""}`}
+        </Text>
       </View>
 
       {/* Pending interactive decisions */}
       {pendingInteractive.length > 0 && (
-        <View style={[styles.urgentBanner, { backgroundColor: "#FF304015", borderColor: "#FF3040" }]}>
-          <Text style={[styles.urgentTitle, { color: "#FF3040" }]}>
-            ⚡ {pendingInteractive.length} décision{pendingInteractive.length > 1 ? "s" : ""} urgente{pendingInteractive.length > 1 ? "s" : ""} en attente
-          </Text>
+        <Panel variant="danger" glow style={[styles.urgentPanel, { marginHorizontal: hPad }]}>
+          <View style={styles.urgentHeader}>
+            <MaterialCommunityIcons name="alert-octagon" size={16} color={PALETTE.danger} />
+            <Text style={styles.urgentTitle}>DÉCISIONS PRÉSIDENTIELLES EN ATTENTE</Text>
+            <Badge label={`${pendingInteractive.length}`} tone="danger" size="xs" />
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.urgentScroll}>
-            {pendingInteractive.map((event) => (
-              <Pressable
-                key={event.id}
-                onPress={() => setActiveModal(event.id)}
-                style={({ pressed }) => [
-                  styles.urgentChip,
-                  { borderColor: urgencyColor(event.urgency), backgroundColor: urgencyColor(event.urgency) + "18", opacity: pressed ? 0.8 : 1, maxWidth: Math.round(width * 0.58) },
-                ]}
-              >
-                <Text style={styles.urgentChipIcon}>{typeIcon(event.type)}</Text>
-                <Text style={[styles.urgentChipText, { color: urgencyColor(event.urgency) }]} numberOfLines={2}>
-                  {event.title}
-                </Text>
-                <Text style={[styles.urgentChipCta, { color: urgencyColor(event.urgency) }]}>Décider →</Text>
-              </Pressable>
-            ))}
+            {pendingInteractive.map((event) => {
+              const urg = urgencyColor(event.urgency);
+              return (
+                <Pressable
+                  key={event.id}
+                  onPress={() => setActiveModal(event.id)}
+                  style={({ pressed }) => [
+                    styles.urgentChip,
+                    { borderColor: urg, backgroundColor: urg + "1c", maxWidth: Math.round(width * 0.62), opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <View style={styles.urgentChipHeader}>
+                    <Text style={styles.urgentChipIcon}>{typeIcon(event.type)}</Text>
+                    <Text style={[styles.urgentChipUrg, { color: urg }]}>{event.urgency.toUpperCase()}</Text>
+                  </View>
+                  <Text style={[styles.urgentChipTitle, { color: PALETTE.textHigh }]} numberOfLines={2}>{event.title}</Text>
+                  <Text style={[styles.urgentChipCta, { color: urg }]}>Décider →</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
-        </View>
+        </Panel>
       )}
 
       {/* Filters */}
@@ -101,17 +104,25 @@ export default function JournalDeCriseScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.filters, { paddingHorizontal: hPad }]}
       >
-        {TYPE_FILTERS.map((f) => (
-          <Pressable
-            key={f.value}
-            onPress={() => setFilter(f.value)}
-            style={[styles.filterChip, { backgroundColor: filter === f.value ? colors.primary : colors.muted }]}
-          >
-            <Text style={[styles.filterText, { color: filter === f.value ? "#fff" : colors.foreground }]}>
-              {f.label}
-            </Text>
-          </Pressable>
-        ))}
+        {TYPE_FILTERS.map((f) => {
+          const active = filter === f.value;
+          return (
+            <Pressable
+              key={f.value}
+              onPress={() => setFilter(f.value)}
+              style={({ pressed }) => [
+                styles.filterChip,
+                {
+                  backgroundColor: active ? PALETTE.crimson + "33" : "transparent",
+                  borderColor: active ? PALETTE.crimson : PALETTE.panelEdge,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.filterText, { color: active ? PALETTE.textHigh : PALETTE.textMid }]}>{f.label}</Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       {/* Log */}
@@ -119,30 +130,34 @@ export default function JournalDeCriseScreen() {
         contentContainerStyle={[styles.log, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
-        {filteredLog.length === 0 && (
+        {filteredLog.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+            <MaterialCommunityIcons name="archive-outline" size={36} color={PALETTE.textLow} />
+            <Text style={styles.emptyTitle}>{news.log.length === 0 ? "Aucune dépêche" : "Aucun résultat"}</Text>
+            <Text style={styles.emptyText}>
               {news.log.length === 0
-                ? "Aucune actualité pour le moment.\nLancez des actions stratégiques pour générer des événements."
+                ? "Engagez des actions stratégiques pour générer de l'actualité."
                 : "Aucune actualité dans cette catégorie."}
             </Text>
           </View>
+        ) : (
+          <>
+            <SectionHeader label="Archives" count={`${filteredLog.length}`} />
+            {filteredLog.map((entry, i) => (
+              <NewsCard key={`${entry.eventId}_${entry.timestamp}_${i}`} entry={entry} />
+            ))}
+          </>
         )}
-
-        {filteredLog.map((entry, i) => (
-          <NewsCard
-            key={`${entry.eventId}_${entry.timestamp}_${i}`}
-            entry={entry}
-          />
-        ))}
       </ScrollView>
 
-      {/* Interactive modal */}
       <InteractiveNewsModal
         event={activeEvent}
         visible={!!activeModal}
-        onChoose={handleChoose}
+        onChoose={(id) => {
+          if (!activeModal) return;
+          resolveInteractiveNews(activeModal, id);
+          setActiveModal(null);
+        }}
         onDismiss={() => {
           if (activeModal) dismissNews(activeModal);
           setActiveModal(null);
@@ -153,33 +168,29 @@ export default function JournalDeCriseScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  back: { fontSize: 14, fontFamily: "Inter_600SemiBold", width: 60 },
-  title: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  urgentBanner: { borderWidth: 1, borderRadius: 0, paddingVertical: 10, paddingHorizontal: 14, gap: 8 },
-  urgentTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  urgentScroll: { gap: 8, paddingRight: 14 },
-  urgentChip: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    gap: 3,
-  },
-  urgentChipIcon: { fontSize: 16 },
-  urgentChipText: { fontSize: 11, fontFamily: "Inter_700Bold", lineHeight: 14 },
-  urgentChipCta: { fontSize: 10, fontFamily: "Inter_600SemiBold", marginTop: 2 },
-  filters: { paddingVertical: 10, gap: 8 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  filterText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  log: { paddingTop: 8, gap: 10 },
-  empty: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyIcon: { fontSize: 40 },
-  emptyText: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  container: { flex: 1, backgroundColor: PALETTE.ink },
+  tickerWrap: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 8, paddingBottom: 6 },
+  tickerBadge: { paddingHorizontal: 6, paddingVertical: 3, backgroundColor: PALETTE.danger, borderRadius: 2 },
+  tickerBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: "#fff", letterSpacing: 1.5 },
+  tickerText: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 0.5 },
+
+  urgentPanel: { padding: 12, gap: 8, marginTop: 4 },
+  urgentHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  urgentTitle: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.danger, letterSpacing: 1.8, flex: 1 },
+  urgentScroll: { gap: 8, paddingTop: 4 },
+  urgentChip: { borderRadius: 6, padding: 10, gap: 4, borderWidth: 1, minWidth: 200 },
+  urgentChipHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  urgentChipIcon: { fontSize: 14 },
+  urgentChipUrg: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 1 },
+  urgentChipTitle: { fontSize: 12, fontFamily: FONT.semi, lineHeight: 16 },
+  urgentChipCta: { fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.5, marginTop: 2 },
+
+  filters: { paddingVertical: 10, gap: 6 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth },
+  filterText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1 },
+
+  log: { paddingTop: 4, gap: 10 },
+  empty: { alignItems: "center", paddingTop: 60, gap: 10 },
+  emptyTitle: { fontSize: 13, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1 },
+  emptyText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, textAlign: "center", lineHeight: 16, maxWidth: 240 },
 });

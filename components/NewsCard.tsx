@@ -1,11 +1,12 @@
 import React from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { useColors } from "@/hooks/useColors";
-import { urgencyColor, typeIcon } from "@/logic/newsEngine";
+import { LinearGradient } from "expo-linear-gradient";
+import { typeIcon, urgencyColor } from "@/logic/newsEngine";
 import { NEWS_IMG } from "@/constants/assets";
-import type { NewsLogEntry } from "@/types/strategy";
+import { Badge } from "@/components/ui/Badge";
+import { FONT, PALETTE, RADIUS, URGENCY_COLORS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS } from "@/types/strategy";
-import type { ResourceKey } from "@/types/strategy";
+import type { NewsLogEntry, ResourceKey } from "@/types/strategy";
 
 interface Props {
   entry: NewsLogEntry;
@@ -13,82 +14,89 @@ interface Props {
 }
 
 export function NewsCard({ entry, onPress }: Props) {
-  const colors = useColors();
-  const urgColor = urgencyColor(entry.urgency);
+  const urg = urgencyColor(entry.urgency) || URGENCY_COLORS.routine;
   const icon = typeIcon(entry.type);
   const bannerImg = NEWS_IMG[entry.type];
 
-  const hasEffects = Object.values(entry.effects).some((v) => v !== 0);
-  const effectEntries = Object.entries(entry.effects).filter(([, v]) => v !== 0) as [ResourceKey, number][];
+  const effectEntries = (Object.entries(entry.effects) as [ResourceKey, number][]).filter(([, v]) => v !== 0);
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: urgColor, opacity: pressed ? 0.85 : 1 },
-      ]}
+      style={({ pressed }) => [styles.wrap, { opacity: pressed ? 0.9 : 1 }]}
     >
-      {/* Banner image strip */}
-      {bannerImg && (
-        <View style={styles.bannerWrap}>
-          <Image source={bannerImg} style={styles.banner} resizeMode="cover" />
-          <View style={[styles.bannerTint, { backgroundColor: "rgba(6,8,18,0.6)" }]} />
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerIcon}>{icon}</Text>
-            <View style={[styles.urgBadge, { backgroundColor: urgColor + "33" }]}>
-              <Text style={[styles.urgText, { color: urgColor }]}>{entry.urgency.toUpperCase()}</Text>
-            </View>
-          </View>
-        </View>
-      )}
+      <LinearGradient
+        colors={["#161b27", "#0d1119"]}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        style={[styles.card, { borderColor: PALETTE.panelEdge }]}
+      >
+        {/* Urgency stripe */}
+        <View style={[styles.stripe, { backgroundColor: urg }]} />
 
-      <View style={styles.body}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            {!bannerImg && <Text style={styles.typeIcon}>{icon}</Text>}
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>{entry.title}</Text>
-              <Text style={[styles.source, { color: colors.mutedForeground }]}>{entry.source}</Text>
+        {/* Banner */}
+        {bannerImg && (
+          <View style={styles.bannerWrap}>
+            <Image source={bannerImg} style={styles.banner} resizeMode="cover" />
+            <LinearGradient colors={["rgba(13,17,25,0.2)", "rgba(13,17,25,0.92)"]} style={StyleSheet.absoluteFill} />
+            <View style={styles.bannerTop}>
+              <Text style={styles.bannerSource}>{entry.source.toUpperCase()}</Text>
+              <Badge label={entry.urgency} tone={mapUrgency(entry.urgency)} size="xs" />
+            </View>
+            <View style={styles.bannerBottom}>
+              <Text style={styles.bannerType}>{icon} {entry.type.replace("_", " ").toUpperCase()}</Text>
             </View>
           </View>
+        )}
+
+        {/* Body */}
+        <View style={styles.body}>
           {!bannerImg && (
-            <View style={[styles.urgBadge, { backgroundColor: urgColor + "22" }]}>
-              <Text style={[styles.urgText, { color: urgColor }]}>{entry.urgency.toUpperCase()}</Text>
+            <View style={styles.headerNoImg}>
+              <Text style={styles.headerIcon}>{icon}</Text>
+              <Text style={styles.source}>{entry.source}</Text>
+              <Badge label={entry.urgency} tone={mapUrgency(entry.urgency)} size="xs" />
             </View>
           )}
-        </View>
+          <Text style={styles.title} numberOfLines={2}>{entry.title}</Text>
 
-        {entry.choiceLabel && (
-          <View style={[styles.decision, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "44" }]}>
-            <Text style={[styles.decisionLabel, { color: colors.primary }]}>Décision : {entry.choiceLabel}</Text>
-            {entry.consequence && (
-              <Text style={[styles.consequence, { color: colors.mutedForeground }]} numberOfLines={2}>
-                {entry.consequence}
-              </Text>
-            )}
-          </View>
-        )}
-
-        {hasEffects && (
-          <View style={styles.effects}>
-            {effectEntries.map(([key, val]) => (
-              <View key={key} style={[styles.effectChip, { backgroundColor: colors.muted }]}>
-                <Text style={styles.effectIcon}>{RESOURCE_ICONS[key] ?? "📦"}</Text>
-                <Text style={[styles.effectText, { color: val > 0 ? "#60D080" : "#FF5060" }]}>
-                  {val > 0 ? "+" : ""}{val}
-                </Text>
+          {entry.choiceLabel && (
+            <View style={styles.decisionBox}>
+              <View style={styles.decisionRow}>
+                <View style={styles.decisionTag} />
+                <Text style={styles.decisionLabel}>DÉCISION : {entry.choiceLabel}</Text>
               </View>
-            ))}
-          </View>
-        )}
+              {entry.consequence && <Text style={styles.consequence} numberOfLines={2}>{entry.consequence}</Text>}
+            </View>
+          )}
 
-        <Text style={[styles.time, { color: colors.mutedForeground }]}>
-          {formatRelativeTime(entry.timestamp)}
-        </Text>
-      </View>
+          {effectEntries.length > 0 && (
+            <View style={styles.effectsRow}>
+              {effectEntries.map(([key, val]) => (
+                <View key={key} style={styles.effectChip}>
+                  <Text style={styles.effectIcon}>{RESOURCE_ICONS[key] ?? "•"}</Text>
+                  <Text style={[styles.effectText, { color: val > 0 ? PALETTE.success : PALETTE.danger }]}>
+                    {val > 0 ? "+" : ""}{val}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Text style={styles.time}>{formatRelativeTime(entry.timestamp)}</Text>
+        </View>
+      </LinearGradient>
     </Pressable>
   );
+}
+
+function mapUrgency(u: string): "neutral" | "warning" | "danger" | "gold" {
+  switch (u) {
+    case "critical":
+    case "danger":   return "danger";
+    case "alert":    return "warning";
+    case "decisive": return "gold";
+    default:         return "neutral";
+  }
 }
 
 function formatRelativeTime(ts: number): string {
@@ -102,31 +110,32 @@ function formatRelativeTime(ts: number): string {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    overflow: "hidden",
-  },
-  bannerWrap: { height: 60, position: "relative" },
+  wrap: { borderRadius: RADIUS.md, overflow: "hidden" },
+  card: { borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden", position: "relative" },
+  stripe: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, zIndex: 2 },
+  bannerWrap: { height: 78, position: "relative", overflow: "hidden" },
   banner: { width: "100%", height: "100%" },
-  bannerTint: { ...StyleSheet.absoluteFillObject },
-  bannerContent: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 6 },
-  bannerIcon: { fontSize: 20 },
-  body: { padding: 12, gap: 8 },
-  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
-  headerLeft: { flexDirection: "row", alignItems: "flex-start", gap: 8, flex: 1 },
-  typeIcon: { fontSize: 20, width: 26, textAlign: "center", marginTop: 1 },
-  title: { fontSize: 13, fontFamily: "Inter_700Bold", lineHeight: 17 },
-  source: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
-  urgBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0 },
-  urgText: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  decision: { borderRadius: 6, borderWidth: 1, padding: 8, gap: 3 },
-  decisionLabel: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  consequence: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 15 },
-  effects: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
-  effectChip: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+  bannerTop: { position: "absolute", top: 8, left: 12, right: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  bannerSource: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2.5 },
+  bannerBottom: { position: "absolute", bottom: 6, left: 12, right: 12 },
+  bannerType: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.8 },
+
+  body: { padding: 12, gap: 6 },
+  headerNoImg: { flexDirection: "row", alignItems: "center", gap: 6 },
+  headerIcon: { fontSize: 16 },
+  source: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2, flex: 1 },
+  title: { fontSize: 13, fontFamily: FONT.bold, color: PALETTE.textHigh, lineHeight: 17 },
+
+  decisionBox: { borderRadius: 4, padding: 8, gap: 3, backgroundColor: PALETTE.panelHi, borderLeftWidth: 2, borderLeftColor: PALETTE.gold },
+  decisionRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  decisionTag: { width: 5, height: 5, borderRadius: 3, backgroundColor: PALETTE.gold },
+  decisionLabel: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1 },
+  consequence: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 15, marginTop: 2 },
+
+  effectsRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  effectChip: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 3, backgroundColor: PALETTE.panelHi, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge },
   effectIcon: { fontSize: 11 },
-  effectText: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  time: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "right" },
+  effectText: { fontSize: 11, fontFamily: FONT.bold },
+
+  time: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5, textAlign: "right" },
 });

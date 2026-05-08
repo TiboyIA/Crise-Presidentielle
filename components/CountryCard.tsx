@@ -1,7 +1,9 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useColors } from "@/hooks/useColors";
+import { LinearGradient } from "expo-linear-gradient";
 import { COUNTRIES } from "@/data/countries";
+import { Badge } from "@/components/ui/Badge";
+import { FONT, PALETTE, RADIUS, STATUS_COLORS } from "@/constants/uiTokens";
 import type { CountryId, CountryRelation, RelationStatus } from "@/types/strategy";
 
 interface Props {
@@ -10,67 +12,101 @@ interface Props {
   onPress: () => void;
 }
 
+const STATUS_LABELS: Record<RelationStatus, string> = {
+  allied:   "Allié",
+  friendly: "Ami",
+  neutral:  "Neutre",
+  rival:    "Rival",
+  hostile:  "Hostile",
+};
+
 export function CountryCard({ countryId, relation, onPress }: Props) {
-  const colors = useColors();
   const country = COUNTRIES[countryId];
-  const statusStyle = RELATION_STYLES[relation.status];
+  const statusColor = STATUS_COLORS[relation.status];
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: colors.card, borderColor: statusStyle.borderColor, opacity: pressed ? 0.85 : 1 },
-      ]}
-    >
-      {/* Relation color accent bar */}
-      <View style={[styles.accent, { backgroundColor: statusStyle.color }]} />
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.wrap, { opacity: pressed ? 0.85 : 1 }]}>
+      <LinearGradient
+        colors={["#161b27", "#0d1119"]}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        style={[styles.card, { borderColor: statusColor + "55" }]}
+      >
+        {/* Status accent bar */}
+        <View style={[styles.accent, { backgroundColor: statusColor }]} />
 
-      <Text style={styles.flag}>{country.flag}</Text>
-      <View style={styles.info}>
-        <Text style={[styles.name, { color: colors.foreground }]}>{country.name}</Text>
-        <Text style={[styles.region, { color: colors.mutedForeground }]}>{country.region}</Text>
-        {/* Power mini bar */}
-        <View style={[styles.powerBar, { backgroundColor: colors.muted }]}>
-          <View style={[styles.powerFill, { width: `${country.basePower}%`, backgroundColor: statusStyle.color + "99" }]} />
+        <View style={styles.flagWrap}>
+          <Text style={styles.flag}>{country.flag}</Text>
         </View>
-      </View>
-      <View style={styles.right}>
-        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.borderColor }]}>
-          <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label.toUpperCase()}</Text>
+
+        <View style={styles.info}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={1}>{country.name}</Text>
+            <Badge label={STATUS_LABELS[relation.status]} tone={mapStatusToTone(relation.status)} size="xs" outlined />
+          </View>
+          <Text style={styles.region}>{country.region.toUpperCase()}</Text>
+
+          {/* Power & score row */}
+          <View style={styles.metrics}>
+            <View style={styles.metric}>
+              <Text style={styles.metricKicker}>PUISSANCE</Text>
+              <View style={styles.bar}>
+                <LinearGradient
+                  colors={[PALETTE.crimson, PALETTE.gold]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={[styles.barFill, { width: `${country.basePower}%` }]}
+                />
+              </View>
+              <Text style={styles.metricVal}>{country.basePower}</Text>
+            </View>
+            <View style={styles.metric}>
+              <Text style={styles.metricKicker}>SCORE</Text>
+              <Text style={[styles.metricVal, { color: relation.score >= 0 ? PALETTE.success : PALETTE.danger, marginTop: 2 }]}>
+                {relation.score > 0 ? "+" : ""}{relation.score}
+              </Text>
+            </View>
+          </View>
         </View>
-        <Text style={[styles.powerNum, { color: colors.mutedForeground }]}>{country.basePower} pts</Text>
-      </View>
+      </LinearGradient>
     </Pressable>
   );
 }
 
-const RELATION_STYLES: Record<RelationStatus, { label: string; color: string; bg: string; borderColor: string }> = {
-  allied:   { label: "Allié",   color: "#60D080", bg: "#60D08018", borderColor: "#60D08055" },
-  friendly: { label: "Ami",     color: "#60CFFF", bg: "#60CFFF18", borderColor: "#60CFFF44" },
-  neutral:  { label: "Neutre",  color: "#8090A0", bg: "#8090A018", borderColor: "#8090A044" },
-  rival:    { label: "Rival",   color: "#FFA040", bg: "#FFA04018", borderColor: "#FFA04055" },
-  hostile:  { label: "Hostile", color: "#FF5060", bg: "#FF506018", borderColor: "#FF506055" },
-};
+function mapStatusToTone(s: RelationStatus): "success" | "info" | "neutral" | "warning" | "danger" {
+  switch (s) {
+    case "allied":   return "success";
+    case "friendly": return "info";
+    case "neutral":  return "neutral";
+    case "rival":    return "warning";
+    case "hostile":  return "danger";
+  }
+}
 
 const styles = StyleSheet.create({
+  wrap: { borderRadius: RADIUS.sm, overflow: "hidden" },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
-    gap: 10,
+    paddingRight: 12,
   },
   accent: { width: 3, alignSelf: "stretch" },
-  flag: { fontSize: 26, paddingLeft: 4 },
-  info: { flex: 1, gap: 3, paddingVertical: 12 },
-  name: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  region: { fontSize: 10, fontFamily: "Inter_400Regular" },
-  powerBar: { height: 3, borderRadius: 2, overflow: "hidden", marginTop: 2 },
-  powerFill: { height: "100%", borderRadius: 2 },
-  right: { alignItems: "flex-end", gap: 5, paddingRight: 12, paddingVertical: 12 },
-  statusBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5, borderWidth: 1 },
-  statusText: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
-  powerNum: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  flagWrap: {
+    width: 52, height: 52, marginLeft: 8,
+    borderRadius: 4, backgroundColor: "rgba(0,0,0,0.4)",
+    borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge,
+    alignItems: "center", justifyContent: "center",
+  },
+  flag: { fontSize: 28 },
+  info: { flex: 1, paddingLeft: 12, paddingVertical: 10, gap: 3 },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  name: { fontSize: 14, fontFamily: FONT.bold, color: PALETTE.textHigh, flex: 1 },
+  region: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.5 },
+  metrics: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 4 },
+  metric: { flexDirection: "row", alignItems: "center", gap: 6 },
+  metricKicker: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1 },
+  metricVal: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  bar: { width: 56, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 2 },
 });

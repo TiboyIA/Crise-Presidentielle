@@ -1,6 +1,8 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useColors } from "@/hooks/useColors";
+import { LinearGradient } from "expo-linear-gradient";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { RankEntry } from "@/types/strategy";
 
 interface Props {
@@ -10,29 +12,38 @@ interface Props {
 }
 
 export function RankingRow({ entry, rank, isPlayer }: Props) {
-  const colors = useColors();
-
-  const rankColor = rank === 1 ? "#FFD700" : rank === 2 ? "#C0C0C0" : rank === 3 ? "#CD7F32" : colors.mutedForeground;
-  const trendIcon = entry.trend === "up" ? "▲" : entry.trend === "down" ? "▼" : "—";
-  const trendColor = entry.trend === "up" ? "#60D080" : entry.trend === "down" ? "#FF5060" : colors.mutedForeground;
+  const podiumColor = rank === 1 ? "#FFD56A" : rank === 2 ? "#C9D1DC" : rank === 3 ? "#D49154" : null;
+  const trendColor = entry.trend === "up" ? PALETTE.success : entry.trend === "down" ? PALETTE.danger : PALETTE.textLow;
+  const trendIcon = entry.trend === "up" ? "menu-up" : entry.trend === "down" ? "menu-down" : "minus";
 
   return (
-    <View style={[styles.row, { backgroundColor: isPlayer ? colors.primary + "18" : "transparent", borderColor: isPlayer ? colors.primary + "44" : colors.border }]}>
-      <Text style={[styles.rank, { color: rankColor }]}>{rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : `#${rank}`}</Text>
+    <LinearGradient
+      colors={isPlayer ? ["#22150e", "#0d0f17"] : ["#161b27", "#0d1119"]}
+      start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+      style={[styles.row, { borderColor: isPlayer ? PALETTE.gold + "88" : PALETTE.panelEdge }]}
+    >
+      {/* Rank chip */}
+      <View style={[styles.rankChip, { borderColor: podiumColor ?? PALETTE.panelEdge }]}>
+        <Text style={[styles.rankNum, { color: podiumColor ?? PALETTE.textMid }]}>#{rank}</Text>
+      </View>
+
       <Text style={styles.flag}>{entry.flag}</Text>
-      <View style={styles.info}>
-        <Text style={[styles.name, { color: isPlayer ? colors.primary : colors.foreground }]} numberOfLines={1}>
-          {isPlayer ? "Vous" : entry.name}
+
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.name, { color: isPlayer ? PALETTE.gold : PALETTE.textHigh }]} numberOfLines={1}>
+          {isPlayer ? "VOUS · " : ""}{entry.name}
         </Text>
+        <View style={styles.subRow}>
+          <MaterialCommunityIcons name={trendIcon as any} size={14} color={trendColor} />
+          <Text style={[styles.subPower, { color: PALETTE.textMid }]}>Puissance {entry.power}</Text>
+        </View>
       </View>
-      <Text style={[styles.trend, { color: trendColor }]}>{trendIcon}</Text>
-      <View style={[styles.powerBadge, { backgroundColor: colors.muted }]}>
-        <Text style={[styles.power, { color: colors.foreground }]}>⚡ {entry.power}</Text>
+
+      <View style={styles.pointsCol}>
+        <Text style={styles.pointsVal}>{entry.points}</Text>
+        <Text style={styles.pointsLbl}>PTS</Text>
       </View>
-      <View style={[styles.pointsBadge, { backgroundColor: colors.muted }]}>
-        <Text style={[styles.points, { color: colors.primary }]}>{entry.points}pts</Text>
-      </View>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -42,17 +53,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 10,
   },
-  rank: { width: 28, fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "center" },
+  rankChip: {
+    width: 38, height: 30,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  rankNum: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.5 },
   flag: { fontSize: 22 },
-  info: { flex: 1 },
-  name: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  trend: { fontSize: 11, fontFamily: "Inter_700Bold", width: 14, textAlign: "center" },
-  powerBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  power: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  pointsBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  points: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  name: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  subRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 },
+  subPower: { fontSize: 10, fontFamily: FONT.med, letterSpacing: 0.3 },
+  pointsCol: { alignItems: "flex-end" },
+  pointsVal: { fontSize: 14, fontFamily: FONT.bold, color: PALETTE.gold },
+  pointsLbl: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.2 },
 });

@@ -1,20 +1,21 @@
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useColors } from "@/hooks/useColors";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
 import { MissionCard } from "@/components/MissionCard";
+import { Panel, ScreenHeader, SectionHeader } from "@/components/ui";
 import { formatDuration } from "@/logic/buildingEngine";
 import { timeUntilReset } from "@/logic/missionEngine";
+import { FONT, PALETTE } from "@/constants/uiTokens";
+
+const DAY_MS = 86_400_000;
 
 export default function MissionsScreen() {
-  const colors = useColors();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, collectMissionReward } = useStrategy();
-
   const { hPad } = useResponsive();
 
   if (!state) return null;
@@ -22,94 +23,106 @@ export default function MissionsScreen() {
   const completed = state.missions.filter((m) => m.completed);
   const active = state.missions.filter((m) => !m.completed);
   const resetIn = timeUntilReset(state.missions);
+  const dayProgress = (DAY_MS - resetIn) / DAY_MS;
   const allDone = active.length === 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, paddingHorizontal: hPad }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-          <Text style={[styles.back, { color: colors.foreground }]}>← Retour</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.foreground }]}>📋 Missions du jour</Text>
-        <View style={{ width: 60 }} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Missions du jour" kicker="ORDRES DE MISSION" />
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Reset timer */}
-        <View style={[styles.resetCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.resetTitle, { color: colors.foreground }]}>🔄 Réinitialisation dans</Text>
-          <Text style={[styles.resetTime, { color: colors.primary }]}>{formatDuration(resetIn)}</Text>
-          <View style={[styles.progressBar, { backgroundColor: colors.muted }]}>
-            <View style={[styles.progressFill, { width: `${((86400000 - resetIn) / 86400000) * 100}%`, backgroundColor: colors.primary }]} />
+        <Panel style={styles.resetCard}>
+          <View style={styles.resetHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.resetKicker}>PROCHAINE ROTATION</Text>
+              <Text style={styles.resetTime}>{formatDuration(resetIn)}</Text>
+            </View>
+            <MaterialCommunityIcons name="refresh-circle" size={26} color={PALETTE.gold} />
           </View>
-        </View>
+          <View style={styles.resetBar}>
+            <LinearGradient
+              colors={[PALETTE.crimson, PALETTE.gold]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={[styles.resetFill, { width: `${Math.round(dayProgress * 100)}%` }]}
+            />
+          </View>
+        </Panel>
 
-        {/* Progress summary */}
-        <View style={[styles.summary, { backgroundColor: colors.card, borderColor: allDone ? "#60D080" : colors.border }]}>
-          <Text style={[styles.summaryText, { color: allDone ? "#60D080" : colors.foreground }]}>
-            {allDone ? "✅ Toutes les missions complétées !" : `${completed.length}/${state.missions.length} missions complétées`}
-          </Text>
-        </View>
+        <Panel variant={allDone ? "gold" : "default"} glow={allDone} style={styles.summaryCard}>
+          <View style={styles.summaryLeft}>
+            <MaterialCommunityIcons
+              name={allDone ? "check-circle" : "clipboard-check-outline"}
+              size={20}
+              color={allDone ? PALETTE.gold : PALETTE.textMid}
+            />
+            <Text style={[styles.summaryText, { color: allDone ? PALETTE.gold : PALETTE.textHigh }]}>
+              {allDone ? "Toutes les missions complétées" : `${completed.length} sur ${state.missions.length} accomplies`}
+            </Text>
+          </View>
+        </Panel>
 
-        {/* Collectible */}
         {completed.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>À RÉCLAMER</Text>
+            <SectionHeader label="À réclamer" count={completed.length} accent={PALETTE.gold} />
             {completed.map((m) => (
               <MissionCard key={m.defId} mission={m} onCollect={() => collectMissionReward(m.defId)} />
             ))}
           </>
         )}
 
-        {/* Active */}
         {active.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>EN COURS</Text>
+            <SectionHeader label="En cours" count={active.length} />
             {active.map((m) => (
               <MissionCard key={m.defId} mission={m} onCollect={() => {}} />
             ))}
           </>
         )}
 
-        {/* Hints */}
-        <View style={[styles.hintCard, { backgroundColor: colors.muted }]}>
-          <Text style={[styles.hintTitle, { color: colors.foreground }]}>💡 Comment progresser</Text>
-          <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
-            • Améliorez vos bâtiments pour produire plus de ressources{"\n"}
-            • Lancez des opérations depuis la Carte Mondiale{"\n"}
-            • Les ressources s'accumulent même hors ligne{"\n"}
-            • Les missions se réinitialisent toutes les 24h
-          </Text>
-        </View>
+        <Panel style={styles.hintCard}>
+          <View style={styles.hintHeader}>
+            <MaterialCommunityIcons name="lightbulb-on-outline" size={14} color={PALETTE.gold} />
+            <Text style={styles.hintTitle}>COMMENT PROGRESSER</Text>
+          </View>
+          {[
+            "Améliorez vos ministères pour produire plus de ressources",
+            "Lancez des opérations depuis la salle de crise",
+            "Les ressources s'accumulent même hors ligne",
+            "Les missions se réinitialisent toutes les 24h",
+          ].map((t) => (
+            <View key={t} style={styles.hintRow}>
+              <View style={styles.hintBullet} />
+              <Text style={styles.hintText}>{t}</Text>
+            </View>
+          ))}
+        </Panel>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  back: { fontSize: 14, fontFamily: "Inter_600SemiBold", width: 60 },
-  title: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  content: { paddingTop: 12, gap: 12 },
-  resetCard: { borderRadius: 10, borderWidth: 1, padding: 14, gap: 6 },
-  resetTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  resetTime: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  progressBar: { height: 5, borderRadius: 3, overflow: "hidden" },
-  progressFill: { height: "100%", borderRadius: 3 },
-  summary: { borderRadius: 8, borderWidth: 1, padding: 12, alignItems: "center" },
-  summaryText: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  sectionLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2 },
-  hintCard: { borderRadius: 10, padding: 14, gap: 8 },
-  hintTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  hintText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  container: { flex: 1, backgroundColor: PALETTE.ink },
+  content: { paddingTop: 12, gap: 10 },
+
+  resetCard: { padding: 14, gap: 10 },
+  resetHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  resetKicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2 },
+  resetTime: { fontSize: 22, fontFamily: FONT.bold, color: PALETTE.textHigh, marginTop: 4 },
+  resetBar: { height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  resetFill: { height: "100%", borderRadius: 2 },
+
+  summaryCard: { padding: 14, flexDirection: "row", alignItems: "center" },
+  summaryLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  summaryText: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.3 },
+
+  hintCard: { padding: 14, gap: 6, marginTop: 6 },
+  hintHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  hintTitle: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2 },
+  hintRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  hintBullet: { width: 4, height: 4, borderRadius: 2, backgroundColor: PALETTE.gold, marginTop: 6 },
+  hintText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16, flex: 1 },
 });
