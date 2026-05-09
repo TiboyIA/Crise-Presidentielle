@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import Svg, { Defs, LinearGradient as SvgGradient, Line, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  LinearGradient as SvgGradient,
+  Line,
+  Path,
+  RadialGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -8,31 +19,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
 import { COUNTRIES, COUNTRY_LIST } from "@/data/countries";
-import { COUNTRY_POLYGONS, CONTINENT_POLYGONS } from "@/data/mapWorld";
-import { Badge, Panel, PrimaryButton, ScreenHeader, SectionHeader } from "@/components/ui";
+import { MAP_COUNTRY_SHAPES, MAP_COUNTRY_SHAPES_BY_ID, CONTINENTS_V2 } from "@/data/mapGeo";
+import {
+  computeCountryRender,
+  generateHotspots,
+  getHotspotColor,
+  MAP_LAYERS,
+} from "@/logic/hotspotEngine";
+import type { MapLayerId } from "@/logic/hotspotEngine";
+import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
+import { Badge, Panel, PrimaryButton, ScreenHeader } from "@/components/ui";
 import { FONT, PALETTE, RADIUS, STATUS_COLORS } from "@/constants/uiTokens";
-import type { CountryId, RelationStatus } from "@/types/strategy";
+import type { CountryId, OperationType, RelationStatus } from "@/types/strategy";
 
 const REGIONS = ["Europe", "Amériques", "Asie", "Moyen-Orient"];
-
-// Node positions for connection lines (kept for tension/alliance lines)
-const MAP_NODES: Partial<Record<CountryId, { x: number; y: number }>> = {
-  usa:          { x: 14, y: 38 },
-  brazil:       { x: 27, y: 68 },
-  uk:           { x: 42, y: 23 },
-  germany:      { x: 49, y: 27 },
-  france:       { x: 45, y: 32 },
-  italy:        { x: 51, y: 38 },
-  russia:       { x: 68, y: 18 },
-  turkey:       { x: 57, y: 37 },
-  israel:       { x: 56, y: 43 },
-  saudi_arabia: { x: 59, y: 53 },
-  iran:         { x: 63, y: 42 },
-  india:        { x: 68, y: 52 },
-  china:        { x: 74, y: 36 },
-  south_korea:  { x: 80, y: 34 },
-  japan:        { x: 83, y: 31 },
-};
 
 const STATUS_LABELS: Record<RelationStatus, string> = {
   allied:   "Allié",
@@ -41,16 +41,6 @@ const STATUS_LABELS: Record<RelationStatus, string> = {
   rival:    "Rival",
   hostile:  "Hostile",
 };
-
-function statusFill(status: RelationStatus): string {
-  switch (status) {
-    case "allied":   return STATUS_COLORS.allied + "44";
-    case "friendly": return STATUS_COLORS.friendly + "33";
-    case "neutral":  return "#ffffff11";
-    case "rival":    return STATUS_COLORS.rival + "33";
-    case "hostile":  return STATUS_COLORS.hostile + "44";
-  }
-}
 
 function mapStatusToTone(s: RelationStatus): "success" | "info" | "neutral" | "warning" | "danger" {
   switch (s) {
@@ -62,6 +52,18 @@ function mapStatusToTone(s: RelationStatus): "success" | "info" | "neutral" | "w
   }
 }
 
+// Quick actions surfaced directly in the dossier
+const QUICK_ACTIONS: { type: OperationType; icon: string; label: string }[] = [
+  { type: "espionage",          icon: "eye-outline",          label: "Espionner" },
+  { type: "sign_treaty",        icon: "handshake-outline",    label: "Traité" },
+  { type: "sanction",           icon: "block-helper",         label: "Sanction" },
+  { type: "cyber_attack",       icon: "lan-disconnect",       label: "Cyber" },
+  { type: "influence_campaign", icon: "bullhorn-outline",     label: "Influence" },
+  { type: "military_operation", icon: "sword-cross",          label: "Opération" },
+];
+
+type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
 export default function WorldMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -70,6 +72,8 @@ export default function WorldMapScreen() {
   const { hPad, isLandscape } = useResponsive();
   const [selected, setSelected] = useState<CountryId | null>(null);
   const [activeRegion, setActiveRegion] = useState<string | null>(null);
+  const [activeLayer, setActiveLayer] = useState<MapLayerId>("diplomacy");
+  const [showHotspots, setShowHotspots] = useState(true);
 
   if (!state) return null;
 
@@ -78,171 +82,240 @@ export default function WorldMapScreen() {
     [state.relations],
   );
 
-  // In landscape: map takes left side, detail panel takes right side
+  const hotspots = useMemo(() => generateHotspots(state), [state]);
+
+  // Layout: in landscape map takes ~62%, dossier takes the rest.
   const mapW = isLandscape ? Math.round(width * 0.62) : width;
-  const mapH = isLandscape ? height - 90 : Math.round(width * 0.62);
+  const mapH = isLandscape ? height - 110 : Math.round(width * 0.62);
   const detailW = isLandscape ? width - mapW : width;
 
-  const playerNode = MAP_NODES[state.countryId];
+  const playerShape = MAP_COUNTRY_SHAPES_BY_ID[state.countryId];
   const playerCountry = COUNTRIES[state.countryId];
-  const allNodes = COUNTRY_LIST.filter((c) => MAP_NODES[c.id]);
-  const enemyNodes = allNodes.filter((c) => c.id !== state.countryId && (relationMap[c.id]?.status === "hostile" || relationMap[c.id]?.status === "rival"));
-  const allyNodes = allNodes.filter((c) => c.id !== state.countryId && (relationMap[c.id]?.status === "allied" || relationMap[c.id]?.status === "friendly"));
-  const hostileCount = allNodes.filter((c) => c.id !== state.countryId && relationMap[c.id]?.status === "hostile").length;
-  const alliedCount = allNodes.filter((c) => c.id !== state.countryId && relationMap[c.id]?.status === "allied").length;
 
-  const selectedCountry = selected ? COUNTRIES[selected] : null;
+  // Tally counters for the intel strip
+  const allRelations = state.relations;
+  const hostileCount = allRelations.filter((r) => r.status === "hostile").length;
+  const alliedCount  = allRelations.filter((r) => r.status === "allied").length;
+  const rivalCount   = allRelations.filter((r) => r.status === "rival").length;
+
+  const enemyShapes = COUNTRY_LIST
+    .map((c) => MAP_COUNTRY_SHAPES_BY_ID[c.id])
+    .filter((s): s is NonNullable<typeof s> =>
+      !!s && s.countryId !== state.countryId &&
+      (relationMap[s.countryId]?.status === "hostile" || relationMap[s.countryId]?.status === "rival"),
+    );
+  const allyShapes = COUNTRY_LIST
+    .map((c) => MAP_COUNTRY_SHAPES_BY_ID[c.id])
+    .filter((s): s is NonNullable<typeof s> =>
+      !!s && s.countryId !== state.countryId &&
+      (relationMap[s.countryId]?.status === "allied" || relationMap[s.countryId]?.status === "friendly"),
+    );
+
+  const selectedCountry  = selected ? COUNTRIES[selected] : null;
   const selectedRelation = selected ? relationMap[selected] : null;
+  const selectedShape    = selected ? MAP_COUNTRY_SHAPES_BY_ID[selected] : null;
 
-  // Scale polygon points from % to actual pixel coords
-  function scalePoints(pointsStr: string): string {
-    return pointsStr.split(" ").map((pt) => {
-      const [x, y] = pt.split(",").map(Number);
-      return `${(x / 100) * mapW},${(y / 100) * mapH}`;
-    }).join(" ");
+  // ── Path scaling helpers ─────────────────────────────────────────────
+  // % coords → absolute pixel coords, applied lazily via SVG transform.
+  const pctToPxX = (pct: number) => (pct / 100) * mapW;
+  const pctToPxY = (pct: number) => (pct / 100) * mapH;
+
+  // Scale a "M x,y L x,y Q x,y x,y ..." path string from % to pixels.
+  function scalePath(path: string): string {
+    return path.replace(/(-?\d+\.?\d*),(-?\d+\.?\d*)/g, (_m, x: string, y: string) => {
+      return `${pctToPxX(parseFloat(x))},${pctToPxY(parseFloat(y))}`;
+    });
   }
 
+  // ── Country render computation per layer ────────────────────────────
+  function renderForCountry(cid: CountryId) {
+    const isPlayer = cid === state!.countryId;
+    const country = COUNTRIES[cid];
+    const rel = relationMap[cid];
+    return computeCountryRender(
+      activeLayer,
+      isPlayer,
+      country,
+      rel?.status,
+      rel?.threatLevel ?? 0,
+    );
+  }
+
+  // ── MAP SVG ──────────────────────────────────────────────────────────
   const MapSvg = (
     <View style={[styles.mapContainer, { width: mapW, height: mapH }]}>
       <Svg width={mapW} height={mapH} style={StyleSheet.absoluteFill}>
         <Defs>
-          <RadialGradient id="bg" cx="50%" cy="55%" rx="75%" ry="75%">
-            <Stop offset="0%" stopColor="#0a1628" stopOpacity={1} />
+          <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
+            <Stop offset="0%"   stopColor="#0c1a30" stopOpacity={1} />
+            <Stop offset="60%"  stopColor="#070d18" stopOpacity={1} />
             <Stop offset="100%" stopColor="#03050a" stopOpacity={1} />
           </RadialGradient>
-          <SvgGradient id="influence" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor={PALETTE.crimson} stopOpacity={0.55} />
-            <Stop offset="100%" stopColor={PALETTE.crimson} stopOpacity={0.04} />
+          <SvgGradient id="alliance-line" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%"   stopColor={STATUS_COLORS.allied} stopOpacity={0.7} />
+            <Stop offset="100%" stopColor={STATUS_COLORS.allied} stopOpacity={0.05} />
           </SvgGradient>
-          <SvgGradient id="alliance" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor={STATUS_COLORS.allied} stopOpacity={0.5} />
-            <Stop offset="100%" stopColor={STATUS_COLORS.allied} stopOpacity={0.04} />
+          <SvgGradient id="tension-line" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%"   stopColor={STATUS_COLORS.hostile} stopOpacity={0.7} />
+            <Stop offset="100%" stopColor={STATUS_COLORS.hostile} stopOpacity={0.05} />
           </SvgGradient>
+          <RadialGradient id="player-glow" cx="50%" cy="50%" rx="50%" ry="50%">
+            <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.45} />
+            <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
+          </RadialGradient>
         </Defs>
 
         {/* Ocean background */}
-        <Rect x={0} y={0} width={mapW} height={mapH} fill="url(#bg)" />
+        <Rect x={0} y={0} width={mapW} height={mapH} fill="url(#ocean)" />
 
-        {/* Grid lines */}
+        {/* Faint strategic grid */}
         {[15, 30, 45, 60, 75, 90].map((pct) => (
-          <Line key={`h${pct}`} x1={0} y1={(pct / 100) * mapH} x2={mapW} y2={(pct / 100) * mapH} stroke="#162033" strokeWidth={0.5} strokeDasharray="3,6" />
+          <Line key={`h${pct}`} x1={0} y1={(pct / 100) * mapH} x2={mapW} y2={(pct / 100) * mapH}
+            stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
         ))}
         {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((pct) => (
-          <Line key={`v${pct}`} x1={(pct / 100) * mapW} y1={0} x2={(pct / 100) * mapW} y2={mapH} stroke="#162033" strokeWidth={0.5} strokeDasharray="3,6" />
+          <Line key={`v${pct}`} x1={(pct / 100) * mapW} y1={0} x2={(pct / 100) * mapW} y2={mapH}
+            stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
         ))}
 
-        {/* Continent backgrounds (decorative landmass) */}
-        {CONTINENT_POLYGONS.map((cont) => (
-          <Polygon
-            key={cont.id}
-            points={scalePoints(cont.points)}
-            fill="#0d1e30"
-            stroke="#172235"
-            strokeWidth={0.8}
+        {/* Continents (decorative landmasses) */}
+        {CONTINENTS_V2.map((cont) => (
+          <Path key={cont.id} d={scalePath(cont.path)}
+            fill="#0d1f33" stroke="#19283e" strokeWidth={0.6} opacity={0.85} />
+        ))}
+
+        {/* Player glow (radial halo) */}
+        {playerShape && (
+          <Circle
+            cx={pctToPxX(playerShape.centerX)}
+            cy={pctToPxY(playerShape.centerY)}
+            r={Math.max(28, mapW * 0.05)}
+            fill="url(#player-glow)"
           />
-        ))}
+        )}
 
-        {/* Country polygons filled by relation status */}
-        {COUNTRY_POLYGONS.map((cp) => {
-          const cid = cp.id as CountryId;
-          const isPlayer = cid === state.countryId;
-          const rel = relationMap[cid];
-          const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-          const isSelected = selected === cid;
+        {/* Country shapes — V2 paths */}
+        <G>
+          {MAP_COUNTRY_SHAPES.map((shape) => {
+            const cid = shape.countryId;
+            const country = COUNTRIES[cid];
+            const dimmed = activeRegion !== null && country?.region !== activeRegion;
+            const isSelected = selected === cid;
+            const r = renderForCountry(cid);
 
-          const fill = isPlayer
-            ? PALETTE.gold + "28"
-            : rel ? statusFill(rel.status) : "#ffffff08";
-          const stroke = isPlayer
-            ? PALETTE.gold
-            : rel ? STATUS_COLORS[rel.status] : PALETTE.panelEdge;
+            return (
+              <Path
+                key={shape.id}
+                d={scalePath(shape.path!)}
+                fill={r.fill}
+                stroke={r.stroke}
+                strokeWidth={isSelected ? 2 : cid === state.countryId ? 1.6 : 0.9}
+                opacity={dimmed ? 0.22 : 1}
+              />
+            );
+          })}
+        </G>
 
-          return (
-            <Polygon
-              key={cp.id}
-              points={scalePoints(cp.points)}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={isSelected ? 1.8 : 0.9}
-              opacity={dimmed ? 0.3 : 1}
-            />
-          );
-        })}
+        {/* Selected country glow ring */}
+        {selectedShape && (
+          <Circle
+            cx={pctToPxX(selectedShape.centerX)}
+            cy={pctToPxY(selectedShape.centerY)}
+            r={Math.max(20, mapW * 0.035)}
+            fill="none"
+            stroke={PALETTE.gold}
+            strokeWidth={1.2}
+            strokeDasharray="3,4"
+            opacity={0.85}
+          />
+        )}
 
-        {/* Country labels on the polygons */}
-        {COUNTRY_POLYGONS.map((cp) => {
-          const cid = cp.id as CountryId;
+        {/* Country flags as labels */}
+        {MAP_COUNTRY_SHAPES.map((shape) => {
+          const cid = shape.countryId;
           const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
           if (dimmed) return null;
-          const lx = (cp.labelX / 100) * mapW;
-          const ly = (cp.labelY / 100) * mapH;
-          const country = COUNTRIES[cid];
           return (
             <SvgText
-              key={`lbl-${cp.id}`}
-              x={lx}
-              y={ly}
-              fill={cid === state.countryId ? PALETTE.gold : "#8899bb"}
-              fontSize={Math.max(7, mapW * 0.014)}
-              fontWeight="600"
+              key={`lbl-${shape.id}`}
+              x={pctToPxX(shape.labelX)}
+              y={pctToPxY(shape.labelY)}
+              fill="#aeb9d4"
+              fontSize={Math.max(8, mapW * 0.014)}
+              fontWeight="700"
               textAnchor="middle"
-              opacity={0.9}
+              opacity={0.95}
             >
-              {country?.flag ?? ""}
+              {COUNTRIES[cid]?.flag ?? ""}
             </SvgText>
           );
         })}
 
-        {/* Tension lines from player → hostiles */}
-        {playerNode && enemyNodes.map((c) => {
-          const node = MAP_NODES[c.id]!;
-          const dimmed = activeRegion !== null && c.region !== activeRegion;
-          if (dimmed) return null;
-          return (
-            <Line
-              key={`tension-${c.id}`}
-              x1={(playerNode.x / 100) * mapW} y1={(playerNode.y / 100) * mapH}
-              x2={(node.x / 100) * mapW} y2={(node.y / 100) * mapH}
-              stroke={STATUS_COLORS.hostile} strokeWidth={0.8}
-              strokeDasharray="5,5" strokeOpacity={0.4}
-            />
-          );
-        })}
+        {/* Strategic lines from player → others (only when diplomacy/alliances/threat layer) */}
+        {(activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && playerShape && (
+          <>
+            {(activeLayer !== "threat") && allyShapes.map((s) => {
+              const dimmed = activeRegion !== null && COUNTRIES[s.countryId]?.region !== activeRegion;
+              if (dimmed) return null;
+              return (
+                <Line
+                  key={`ally-${s.id}`}
+                  x1={pctToPxX(playerShape.centerX)} y1={pctToPxY(playerShape.centerY)}
+                  x2={pctToPxX(s.centerX)} y2={pctToPxY(s.centerY)}
+                  stroke="url(#alliance-line)" strokeWidth={1.2} strokeOpacity={0.55}
+                />
+              );
+            })}
+            {(activeLayer !== "alliances") && enemyShapes.map((s) => {
+              const dimmed = activeRegion !== null && COUNTRIES[s.countryId]?.region !== activeRegion;
+              if (dimmed) return null;
+              return (
+                <Line
+                  key={`tension-${s.id}`}
+                  x1={pctToPxX(playerShape.centerX)} y1={pctToPxY(playerShape.centerY)}
+                  x2={pctToPxX(s.centerX)} y2={pctToPxY(s.centerY)}
+                  stroke="url(#tension-line)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.6}
+                />
+              );
+            })}
+          </>
+        )}
 
-        {/* Alliance lines */}
-        {playerNode && allyNodes.map((c) => {
-          const node = MAP_NODES[c.id]!;
-          const dimmed = activeRegion !== null && c.region !== activeRegion;
+        {/* Hotspot markers */}
+        {showHotspots && hotspots.map((h) => {
+          const dimmed = activeRegion !== null && COUNTRIES[h.countryId]?.region !== activeRegion;
           if (dimmed) return null;
+          const color = getHotspotColor(h.type);
+          const radius = h.severity === "critical" ? 5 : h.severity === "high" ? 4 : 3;
           return (
-            <Line
-              key={`ally-${c.id}`}
-              x1={(playerNode.x / 100) * mapW} y1={(playerNode.y / 100) * mapH}
-              x2={(node.x / 100) * mapW} y2={(node.y / 100) * mapH}
-              stroke={STATUS_COLORS.allied} strokeWidth={0.7}
-              strokeOpacity={0.3}
-            />
+            <G key={h.id}>
+              <Circle cx={pctToPxX(h.x)} cy={pctToPxY(h.y)} r={radius + 4} fill={color} opacity={0.18} />
+              <Circle cx={pctToPxX(h.x)} cy={pctToPxY(h.y)} r={radius} fill={color} stroke="#000" strokeWidth={0.4} />
+            </G>
           );
         })}
       </Svg>
 
-      {/* Pressable flag overlays on top of SVG */}
-      {COUNTRY_POLYGONS.map((cp) => {
-        const cid = cp.id as CountryId;
-        const rel = relationMap[cid];
+      {/* Pressable tap targets for each country */}
+      {MAP_COUNTRY_SHAPES.map((shape) => {
+        const cid = shape.countryId;
         const isPlayer = cid === state.countryId;
-        if (!rel && !isPlayer) return null;
         const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-        const cx = (cp.labelX / 100) * mapW;
-        const cy = (cp.labelY / 100) * mapH;
+        const cx = pctToPxX(shape.centerX);
+        const cy = pctToPxY(shape.centerY);
+        const w = Math.max(34, (shape.bounds.maxX - shape.bounds.minX) * mapW * 0.8 / 100);
+        const h = Math.max(34, (shape.bounds.maxY - shape.bounds.minY) * mapH * 0.8 / 100);
         return (
           <Pressable
-            key={cid}
+            key={`btn-${cid}`}
             onPress={() => !dimmed && !isPlayer && setSelected(cid)}
             disabled={isPlayer || dimmed}
             style={({ pressed }) => [
               styles.nodeBtn,
-              { left: cx - 14, top: cy - 14, opacity: dimmed ? 0.2 : pressed ? 0.7 : 1 },
+              {
+                left: cx - w / 2, top: cy - h / 2, width: w, height: h,
+                opacity: dimmed ? 0.2 : pressed ? 0.5 : 1,
+              },
             ]}
           />
         );
@@ -250,23 +323,50 @@ export default function WorldMapScreen() {
 
       {/* Frame label */}
       <View style={styles.frameLabel} pointerEvents="none">
-        <Text style={styles.frameKicker}>THÉÂTRE MONDIAL · STRATÉGIQUE</Text>
+        <Text style={styles.frameKicker}>THÉÂTRE MONDIAL · {MAP_LAYERS.find((l) => l.id === activeLayer)?.label.toUpperCase() ?? ""}</Text>
         <Text style={styles.frameTime}>LIVE · {playerCountry.name.toUpperCase()}</Text>
       </View>
 
-      {/* Legend */}
+      {/* Hotspot toggle */}
+      <Pressable
+        onPress={() => setShowHotspots((v) => !v)}
+        style={({ pressed }) => [styles.hotspotToggle, { opacity: pressed ? 0.7 : 1, borderColor: showHotspots ? PALETTE.gold : PALETTE.panelEdge }]}
+      >
+        <MaterialCommunityIcons name={showHotspots ? "map-marker-radius" : "map-marker-off-outline"} size={12} color={showHotspots ? PALETTE.gold : PALETTE.textMid} />
+        <Text style={[styles.hotspotToggleText, { color: showHotspots ? PALETTE.gold : PALETTE.textMid }]}>{hotspots.length} POINTS</Text>
+      </Pressable>
+
+      {/* Layer-specific legend */}
       <View style={styles.legend} pointerEvents="none">
-        {(["allied", "friendly", "neutral", "rival", "hostile"] as RelationStatus[]).map((s) => (
+        {activeLayer === "diplomacy" && (["allied","friendly","neutral","rival","hostile"] as RelationStatus[]).map((s) => (
           <View key={s} style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: STATUS_COLORS[s] }]} />
             <Text style={styles.legendLabel}>{STATUS_LABELS[s]}</Text>
           </View>
         ))}
+        {activeLayer === "threat" && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: "#ff3040" }]} />
+            <Text style={styles.legendLabel}>Menace ↑ rouge</Text>
+          </View>
+        )}
+        {activeLayer === "alliances" && (
+          <>
+            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#52c97a" }]} /><Text style={styles.legendLabel}>Allié</Text></View>
+            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#4a9fff" }]} /><Text style={styles.legendLabel}>Ami</Text></View>
+          </>
+        )}
+        {(activeLayer === "military" || activeLayer === "cyber" || activeLayer === "economy") && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: MAP_LAYERS.find((l) => l.id === activeLayer)!.color }]} />
+            <Text style={styles.legendLabel}>Intensité ↑ pleine</Text>
+          </View>
+        )}
       </View>
     </View>
   );
 
-  // Detail panel content (shared between modal and side panel)
+  // ── DOSSIER PANEL ────────────────────────────────────────────────────
   const DetailContent = selectedCountry && selectedRelation ? (
     <ScrollView contentContainerStyle={[styles.detailScroll, { paddingBottom: insets.bottom + 20 }]} showsVerticalScrollIndicator={false}>
       {/* Header */}
@@ -282,34 +382,55 @@ export default function WorldMapScreen() {
         <Badge label={STATUS_LABELS[selectedRelation.status]} tone={mapStatusToTone(selectedRelation.status)} size="sm" outlined />
       </View>
 
+      {/* Score + threat bar */}
       <Panel style={{ padding: 12, marginTop: 10 }}>
-        <Text style={styles.sectionKicker}>SYNTHÈSE</Text>
-        <Text style={styles.dossierDesc}>{selectedCountry.description}</Text>
-      </Panel>
-
-      <Panel style={{ padding: 12, marginTop: 8 }}>
-        <Text style={styles.sectionKicker}>SCORE DIPLOMATIQUE</Text>
-        <View style={styles.scoreRow}>
-          <Text style={styles.scoreVal}>{selectedRelation.score > 0 ? "+" : ""}{selectedRelation.score}</Text>
-          <View style={styles.scoreTrack}>
-            <View style={[styles.scoreFill, { width: `${Math.min(100, Math.abs(selectedRelation.score))}%`, backgroundColor: selectedRelation.score >= 0 ? STATUS_COLORS.allied : STATUS_COLORS.hostile, alignSelf: selectedRelation.score >= 0 ? "flex-start" : "flex-end" }]} />
+        <View style={styles.scoreRowV2}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionKicker}>SCORE DIPLOMATIQUE</Text>
+            <Text style={styles.scoreValV2}>{selectedRelation.score > 0 ? "+" : ""}{selectedRelation.score}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionKicker, { color: PALETTE.danger }]}>NIVEAU DE MENACE</Text>
+            <Text style={[styles.scoreValV2, { color: selectedRelation.threatLevel >= 60 ? PALETTE.danger : PALETTE.warning }]}>{selectedRelation.threatLevel}</Text>
           </View>
         </View>
+        <Text style={styles.dossierDescV2}>{selectedCountry.description}</Text>
       </Panel>
+
+      {/* Hotspots related to this country */}
+      {(() => {
+        const localHotspots = hotspots.filter((h) => h.countryId === selectedCountry.id);
+        if (localHotspots.length === 0) return null;
+        return (
+          <Panel style={{ padding: 10, marginTop: 8 }}>
+            <Text style={styles.sectionKicker}>SIGNAUX ACTIFS</Text>
+            {localHotspots.map((h) => (
+              <View key={h.id} style={styles.hotspotItem}>
+                <View style={[styles.hotspotPip, { backgroundColor: getHotspotColor(h.type) }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.hotspotTitle}>{h.title}</Text>
+                  <Text style={styles.hotspotDesc}>{h.description}</Text>
+                </View>
+                <Text style={[styles.hotspotSev, { color: h.severity === "critical" ? PALETTE.danger : h.severity === "high" ? PALETTE.warning : PALETTE.textLow }]}>{h.severity.toUpperCase()}</Text>
+              </View>
+            ))}
+          </Panel>
+        );
+      })()}
 
       <Text style={[styles.sectionKicker, { marginTop: 12, marginBottom: 6 }]}>FORCES NATIONALES</Text>
       <View style={styles.statsGrid}>
         {([
-          { label: "Économie",  value: selectedCountry.economy },
-          { label: "Militaire", value: selectedCountry.military },
-          { label: "Cyber",     value: selectedCountry.cyber },
-          { label: "Diplomatie",value: selectedCountry.diplomacy },
-        ]).map(({ label, value }) => (
+          { label: "Économie",  value: selectedCountry.economy,   color: "#3fbe7a" },
+          { label: "Militaire", value: selectedCountry.military,  color: "#e54848" },
+          { label: "Cyber",     value: selectedCountry.cyber,     color: "#a78bfa" },
+          { label: "Diplomatie",value: selectedCountry.diplomacy, color: "#4a9fff" },
+        ]).map(({ label, value, color }) => (
           <Panel key={label} style={styles.statCell}>
-            <Text style={styles.statValue}>{value}</Text>
+            <Text style={[styles.statValue, { color }]}>{value}</Text>
             <Text style={styles.statLabel}>{label.toUpperCase()}</Text>
             <View style={styles.statBar}>
-              <LinearGradient colors={[PALETTE.crimson, PALETTE.gold]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.statFill, { width: `${value}%` }]} />
+              <View style={[styles.statFill, { width: `${value}%`, backgroundColor: color }]} />
             </View>
           </Panel>
         ))}
@@ -343,9 +464,45 @@ export default function WorldMapScreen() {
         );
       })()}
 
+      {/* Quick actions with availability check */}
+      <Text style={[styles.sectionKicker, { marginTop: 12, marginBottom: 6 }]}>ACTIONS RAPIDES</Text>
+      <View style={styles.actionGrid}>
+        {QUICK_ACTIONS.map((qa) => {
+          const op = OPERATIONS[qa.type];
+          const check = canLaunchOperation(qa.type, selectedRelation, state.buildings, state.resources);
+          return (
+            <Pressable
+              key={qa.type}
+              onPress={() => {
+                setSelected(null);
+                router.push({ pathname: "/operations", params: { countryId: selectedCountry.id, op: qa.type } });
+              }}
+              style={({ pressed }) => [
+                styles.actionCell,
+                {
+                  borderColor: check.allowed ? PALETTE.gold + "55" : PALETTE.panelEdge,
+                  opacity: pressed ? 0.7 : check.allowed ? 1 : 0.55,
+                  backgroundColor: check.allowed ? "rgba(201,168,76,0.06)" : "transparent",
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={qa.icon as McIconName}
+                size={16}
+                color={check.allowed ? PALETTE.gold : PALETTE.textLow}
+              />
+              <Text style={[styles.actionLabel, { color: check.allowed ? PALETTE.textHigh : PALETTE.textLow }]}>{qa.label}</Text>
+              <Text style={styles.actionMeta} numberOfLines={1}>
+                {check.allowed ? op.name : (check.reason ?? "Indisponible")}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={{ marginTop: 12 }}>
         <PrimaryButton
-          label="Lancer une opération"
+          label="Ouvrir le centre d'opérations"
           variant="primary"
           size="lg"
           onPress={() => {
@@ -362,6 +519,7 @@ export default function WorldMapScreen() {
     </View>
   );
 
+  // ── LAYOUT ───────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader title="Salle de crise" kicker="THÉÂTRE MONDIAL" />
@@ -373,6 +531,10 @@ export default function WorldMapScreen() {
           <Text style={styles.intelText}>{alliedCount} alliés</Text>
         </View>
         <View style={styles.intelChip}>
+          <View style={[styles.intelDot, { backgroundColor: STATUS_COLORS.rival }]} />
+          <Text style={styles.intelText}>{rivalCount} rivaux</Text>
+        </View>
+        <View style={styles.intelChip}>
           <View style={[styles.intelDot, { backgroundColor: STATUS_COLORS.hostile }]} />
           <Text style={styles.intelText}>{hostileCount} hostiles</Text>
         </View>
@@ -380,6 +542,30 @@ export default function WorldMapScreen() {
           <Text style={[styles.intelText, { color: PALETTE.gold }]}>{state.relations.length} dossiers</Text>
         </View>
       </View>
+
+      {/* Layer selector */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.layerTabs, { paddingHorizontal: hPad }]}>
+        {MAP_LAYERS.map((l) => {
+          const active = activeLayer === l.id;
+          return (
+            <Pressable
+              key={l.id}
+              onPress={() => setActiveLayer(l.id)}
+              style={({ pressed }) => [
+                styles.layerTab,
+                {
+                  backgroundColor: active ? l.color + "22" : "transparent",
+                  borderColor: active ? l.color : PALETTE.panelEdge,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons name={l.icon as McIconName} size={11} color={active ? l.color : PALETTE.textMid} />
+              <Text style={[styles.layerTabText, { color: active ? PALETTE.textHigh : PALETTE.textMid }]}>{l.shortLabel}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       {/* Region filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.regionTabs, { paddingHorizontal: hPad }]}>
@@ -389,7 +575,7 @@ export default function WorldMapScreen() {
         ))}
       </ScrollView>
 
-      {/* LANDSCAPE: side-by-side layout */}
+      {/* LANDSCAPE: side-by-side */}
       {isLandscape ? (
         <View style={styles.landscapeRow}>
           {MapSvg}
@@ -403,14 +589,14 @@ export default function WorldMapScreen() {
         <>
           {MapSvg}
           <View style={[styles.hint, { paddingHorizontal: hPad }]}>
-            <Text style={styles.hintText}>Touchez un pays pour ouvrir son dossier de renseignement.</Text>
+            <Text style={styles.hintText}>Touchez un pays ou un point chaud pour ouvrir le dossier.</Text>
           </View>
 
           {/* Portrait modal */}
           <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
             <Pressable style={styles.overlay} onPress={() => setSelected(null)} />
             {selectedCountry && selectedRelation && (
-              <View style={[styles.sheetWrap, { maxHeight: height * 0.78 }]}>
+              <View style={[styles.sheetWrap, { maxHeight: height * 0.82 }]}>
                 <LinearGradient colors={["#161b27", "#0a0d14"]} style={styles.sheet}>
                   <View style={styles.sheetHandle} />
                   {DetailContent}
@@ -440,19 +626,28 @@ function RegionTab({ label, active, onPress }: { label: string; active: boolean;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PALETTE.ink },
-  intelStrip: { flexDirection: "row", gap: 10, paddingVertical: 8 },
-  intelChip: { flexDirection: "row", alignItems: "center", gap: 6 },
+  intelStrip: { flexDirection: "row", gap: 12, paddingVertical: 6 },
+  intelChip: { flexDirection: "row", alignItems: "center", gap: 5 },
   intelDot: { width: 6, height: 6, borderRadius: 3 },
-  intelText: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 0.5 },
+  intelText: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 0.5 },
+
+  layerTabs: { gap: 6, paddingTop: 4, paddingBottom: 6 },
+  layerTab: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth },
+  layerTabText: { fontSize: 10, fontFamily: FONT.bold, letterSpacing: 1 },
+
   regionTabs: { gap: 6, paddingBottom: 4 },
   regionTab: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth },
   regionTabText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1 },
 
   mapContainer: { position: "relative", overflow: "hidden", borderTopWidth: 1, borderBottomWidth: 1, borderColor: PALETTE.panelEdge },
-  nodeBtn: { position: "absolute", width: 28, height: 28 },
+  nodeBtn: { position: "absolute" },
   frameLabel: { position: "absolute", top: 8, left: 10 },
   frameKicker: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.8 },
   frameTime: { fontSize: 8, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 1, marginTop: 2 },
+
+  hotspotToggle: { position: "absolute", top: 8, right: 10, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, backgroundColor: "rgba(0,0,0,0.55)" },
+  hotspotToggleText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 1 },
+
   legend: { position: "absolute", bottom: 8, right: 10, gap: 3 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
@@ -465,7 +660,7 @@ const styles = StyleSheet.create({
   emptyDetail: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.5 },
   emptyDetailText: { fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textLow, textAlign: "center", lineHeight: 18 },
 
-  hint: { paddingVertical: 10 },
+  hint: { paddingVertical: 8 },
   hintText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, fontStyle: "italic" },
 
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)" },
@@ -481,16 +676,25 @@ const styles = StyleSheet.create({
   dossierRegion: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 1.5, marginTop: 1 },
 
   sectionKicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2, marginBottom: 6 },
-  dossierDesc: { fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textHigh, lineHeight: 17 },
-  scoreRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  scoreVal: { fontSize: 20, fontFamily: FONT.bold, color: PALETTE.textHigh, minWidth: 50 },
-  scoreTrack: { flex: 1, height: 5, borderRadius: 3, backgroundColor: PALETTE.panelEdge, overflow: "hidden", flexDirection: "row" },
-  scoreFill: { height: "100%", borderRadius: 3 },
+  dossierDescV2: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textHigh, lineHeight: 15, marginTop: 8 },
+  scoreRowV2: { flexDirection: "row", gap: 16 },
+  scoreValV2: { fontSize: 22, fontFamily: FONT.bold, color: PALETTE.textHigh, marginTop: 2 },
+
+  hotspotItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 },
+  hotspotPip: { width: 6, height: 6, borderRadius: 3 },
+  hotspotTitle: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh },
+  hotspotDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1 },
+  hotspotSev: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1 },
 
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statCell: { flex: 1, minWidth: "44%", padding: 10, gap: 4 },
-  statValue: { fontSize: 20, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  statValue: { fontSize: 20, fontFamily: FONT.bold },
   statLabel: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.5 },
   statBar: { height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden", marginTop: 4 },
   statFill: { height: "100%", borderRadius: 2 },
+
+  actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  actionCell: { width: "31%", flexGrow: 1, minWidth: 100, padding: 10, gap: 4, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: "center" },
+  actionLabel: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  actionMeta: { fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow, letterSpacing: 0.3, textAlign: "center" },
 });
