@@ -424,4 +424,6 @@ export interface StrategyGameState {
   // Mémoire du peuple + opposition
   publicMemory: PublicMemory;
   oppositionPower: number; // 0-100
+  // Real-time engine state — drives mandateDay from wall-clock time
+  realTime: import("@/logic/realTimeEngine").RealTimeState;
 }

@@ -9,6 +9,7 @@ import { useResponsive } from "@/utils/responsive";
 import { PowerBadge } from "@/components/PowerBadge";
 import { MissionCard } from "@/components/MissionCard";
 import { Badge, Panel, SectionHeader } from "@/components/ui";
+import { StrategicClock } from "@/components/StrategicClock";
 import { BUILDINGS } from "@/data/buildings";
 import { COUNTRIES } from "@/data/countries";
 import { DOCTRINES, DOCTRINE_LIST } from "@/data/doctrines";
@@ -137,6 +138,9 @@ export default function NationScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* HORLOGE STRATÉGIQUE — drives mandate progression in real time */}
+        <StrategicClock />
+
         {/* RESOURCES STRIP */}
         <SectionHeader label="Ressources nationales" />
         <ScrollView

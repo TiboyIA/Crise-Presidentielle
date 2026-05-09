@@ -29,6 +29,7 @@ import { ACHIEVEMENTS } from "@/data/achievements";
 import { UNITS } from "@/data/units";
 import { MILITARY_DOCTRINES } from "@/data/militaryDoctrines";
 import { calculateMilitaryPower, getOperationUnitBonus, calculateDailyUpkeep } from "@/logic/militaryEngine";
+import { computeRealTimeAdvance, initRealTime } from "@/logic/realTimeEngine";
 import type { MilitaryDoctrineId, PlayerUnit, TrainingQueueEntry, UnitId } from "@/types/units";
 import { COUNTRIES } from "@/data/countries";
 import type {
@@ -154,6 +155,7 @@ function buildInitialState(playerName: string): StrategyGameState {
     premiumGold: 0,
     publicMemory: { traces: [] },
     oppositionPower: 35,
+    realTime: initRealTime(now),
   };
 }
 
@@ -211,6 +213,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           premiumGold: saved.premiumGold ?? 0,
           publicMemory: saved.publicMemory ?? { traces: [] },
           oppositionPower: saved.oppositionPower ?? 35,
+          realTime: saved.realTime ?? initRealTime(Date.now()),
         });
       }
       setLoaded(true);
@@ -293,17 +296,25 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           : entry,
       );
 
+      // Real-time mandate advancement (1 mandate day = 24 real hours).
+      // Player actions don't move the mandate forward anymore; the wall clock does.
+      const rtAdvance = computeRealTimeAdvance(prev.realTime, now);
+      let withMandate: StrategyGameState = { ...ds, realTime: rtAdvance.realTime };
+      if (rtAdvance.daysToAdd > 0) {
+        withMandate = advanceMandateDay(withMandate, rtAdvance.daysToAdd);
+      }
+
       return {
-        ...ds,
+        ...withMandate,
         trainingQueue,
         buildings,
         resources,
         stats: {
-          ...prev.stats,
+          ...withMandate.stats,
           globalPower: power,
           presidentLevel: xpResult.level,
           presidentXP: xpResult.xpInLevel,
-          rankingPoints: Math.max(prev.stats.rankingPoints, power * 2),
+          rankingPoints: Math.max(withMandate.stats.rankingPoints, power * 2),
         },
         ranking,
         missions,
@@ -343,7 +354,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           type: "upgrade_building",
           buildingId: id,
         });
-        return withNews(advanceMandateDay({ ...prev, resources, buildings, missions }, 1));
+        return withNews(advanceMandateDay({ ...prev, resources, buildings, missions }, 0));
       });
 
       return { success: true };
@@ -418,7 +429,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           },
           missions: spyMissions,
         };
-        return withNews(advanceMandateDay(baseOp, result.success ? 1 : 0));
+        return withNews(advanceMandateDay(baseOp, 0));
       });
 
       return { success: result.success, message: result.message };
@@ -465,7 +476,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           delayedConsequences = [...delayedConsequences, newConsequence];
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 2);
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 0);
       });
     },
     [update],
@@ -502,7 +513,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             ...prev.stats,
             rankingPoints: prev.stats.rankingPoints + def.rewardPoints,
           },
-        }, 1);
+        }, 0);
       });
     },
     [update],
@@ -533,7 +544,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             tags: ["doctrine", "autoritarisme"],
           });
         }
-        return withNews(advanceMandateDay(next, 1));
+        return withNews(advanceMandateDay(next, 0));
       });
       return { success: true };
     },
@@ -565,7 +576,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           canResurface: true,
           tags: ["reforme", id],
         });
-        return withNews(advanceMandateDay(next, 1));
+        return withNews(advanceMandateDay(next, 0));
       });
       return { success: true };
     },
@@ -615,7 +626,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           units = [...units, { unitId: entry.unitId, level: 1, quantity: entry.quantity }];
         }
       }
-      return withNews(advanceMandateDay({ ...prev, trainingQueue: remaining, playerUnits: units }, 1));
+      return withNews(advanceMandateDay({ ...prev, trainingQueue: remaining, playerUnits: units }, 0));
     });
   }, [update]);
 
@@ -628,7 +639,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       update((prev) => {
         const resources = deductCost(def.switchCost, prev.resources);
         const hiddenPolitics = applyHiddenPoliticsEffects(prev.hiddenPolitics, { scandalRisk: def.scandalRiskDelta });
-        return withNews(advanceMandateDay({ ...prev, resources, militaryDoctrine: id, hiddenPolitics }, 1));
+        return withNews(advanceMandateDay({ ...prev, resources, militaryDoctrine: id, hiddenPolitics }, 0));
       });
       return { success: true };
     },
@@ -660,7 +671,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           canResurface: true,
           tags: ["remaniement", id],
         });
-        return advanceMandateDay(next, 1);
+        return advanceMandateDay(next, 0);
       });
     },
     [update],
@@ -787,7 +798,10 @@ function applyMinisterBonuses(state: StrategyGameState): StrategyGameState {
 }
 
 function advanceMandateDay(state: StrategyGameState, days: number): StrategyGameState {
-  if (days <= 0) return state;
+  // Player actions call this with days = 0 just to refresh achievements;
+  // the real mandate progression comes from realTimeEngine in tick().
+  if (days <= 0) return withAchievements(state);
+
   const prevDay = state.mandateDay;
   const newDay = prevDay + days;
   let s = { ...state, mandateDay: newDay };
