@@ -172,7 +172,10 @@ export type MapLayerId =
   | "military"
   | "cyber"
   | "economy"
-  | "alliances";
+  | "alliances"
+  | "commerce"
+  | "bases"
+  | "hybrid_war";
 
 export interface MapLayerDef {
   id: MapLayerId;
@@ -183,12 +186,15 @@ export interface MapLayerDef {
 }
 
 export const MAP_LAYERS: MapLayerDef[] = [
-  { id: "diplomacy", label: "Diplomatie", shortLabel: "Diplo",  icon: "handshake-outline",      color: "#4a9fff" },
-  { id: "threat",    label: "Menaces",    shortLabel: "Menaces", icon: "alert-octagon-outline",  color: "#ff3040" },
-  { id: "military",  label: "Militaire",  shortLabel: "Mil.",   icon: "shield-sword-outline",   color: "#e54848" },
-  { id: "cyber",     label: "Cyber",      shortLabel: "Cyber",  icon: "lan-pending",            color: "#a78bfa" },
-  { id: "economy",   label: "Économie",   shortLabel: "Éco.",   icon: "chart-line",             color: "#3fbe7a" },
-  { id: "alliances", label: "Alliances",  shortLabel: "Alliés", icon: "handshake",              color: "#52c97a" },
+  { id: "diplomacy",  label: "Diplomatie",   shortLabel: "Diplo",   icon: "handshake-outline",      color: "#4a9fff" },
+  { id: "threat",     label: "Menaces",      shortLabel: "Menaces", icon: "alert-octagon-outline",  color: "#ff3040" },
+  { id: "military",   label: "Militaire",    shortLabel: "Mil.",    icon: "shield-sword-outline",   color: "#e54848" },
+  { id: "cyber",      label: "Cyber",        shortLabel: "Cyber",   icon: "lan-pending",            color: "#a78bfa" },
+  { id: "economy",    label: "Économie",     shortLabel: "Éco.",    icon: "chart-line",             color: "#3fbe7a" },
+  { id: "alliances",  label: "Alliances",    shortLabel: "Alliés",  icon: "handshake",              color: "#52c97a" },
+  { id: "commerce",   label: "Commerce",     shortLabel: "Commerce",icon: "ship-wheel",             color: "#e8a93a" },
+  { id: "bases",      label: "Bases mil.",   shortLabel: "Bases",   icon: "radar",                  color: "#c9a84c" },
+  { id: "hybrid_war", label: "Guerre hybride",shortLabel: "Hybride",icon: "virus-outline",          color: "#d46ae8" },
 ];
 
 const STATUS_COLORS_LAYER: Record<RelationStatus, string> = {
@@ -252,6 +258,40 @@ export function computeCountryRender(
       const intensity = countryStats.economy / 100;
       const a = 0.15 + 0.5 * intensity;
       return { fill: `rgba(63,190,122,${a})`, stroke: `rgba(63,190,122,${0.5 + 0.4 * intensity})` };
+    }
+    case "commerce": {
+      // Trade routes: allied/friendly + high economy = bright orange
+      if (!relationStatus || relationStatus === "hostile") {
+        return { fill: "rgba(40,20,10,0.12)", stroke: "rgba(100,60,20,0.4)" };
+      }
+      const ecoIntensity = countryStats.economy / 100;
+      const relBonus = relationStatus === "allied" ? 0.3 : relationStatus === "friendly" ? 0.2 : 0.05;
+      const a = relBonus + 0.4 * ecoIntensity;
+      return { fill: `rgba(232,169,58,${a})`, stroke: `rgba(232,169,58,${0.5 + 0.3 * ecoIntensity})` };
+    }
+    case "bases": {
+      // Military projection: based on military stat, hostile = red glow
+      const milIntensity = countryStats.military / 100;
+      if (relationStatus === "hostile" || relationStatus === "rival") {
+        return { fill: `rgba(229,72,72,${0.15 + 0.4 * milIntensity})`, stroke: "#e54848", glow: milIntensity > 0.75 };
+      }
+      if (relationStatus === "allied") {
+        return { fill: `rgba(201,168,76,${0.15 + 0.35 * milIntensity})`, stroke: "#c9a84c", glow: milIntensity > 0.8 };
+      }
+      return { fill: `rgba(120,130,150,${0.1 + 0.2 * milIntensity})`, stroke: "rgba(120,130,150,0.5)" };
+    }
+    case "hybrid_war": {
+      // Hybrid warfare threat: cyber × aggression of rival/hostile countries
+      const cyberIntensity = countryStats.cyber / 100;
+      if (relationStatus === "hostile") {
+        const a = 0.2 + 0.5 * cyberIntensity;
+        return { fill: `rgba(212,106,232,${a})`, stroke: `rgba(212,106,232,0.9)`, glow: cyberIntensity > 0.8 };
+      }
+      if (relationStatus === "rival") {
+        const a = 0.1 + 0.35 * cyberIntensity;
+        return { fill: `rgba(212,106,232,${a})`, stroke: `rgba(212,106,232,0.6)` };
+      }
+      return { fill: "rgba(40,20,50,0.08)", stroke: "rgba(100,50,120,0.3)" };
     }
   }
 }

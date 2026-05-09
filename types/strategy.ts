@@ -82,7 +82,12 @@ export type CountryId =
   | "israel"
   | "south_korea"
   | "italy"
-  | "saudi_arabia";
+  | "saudi_arabia"
+  | "australia"
+  | "canada"
+  | "north_korea"
+  | "nigeria"
+  | "pakistan";
 
 export type RelationStatus = "allied" | "friendly" | "neutral" | "rival" | "hostile";
 
@@ -426,4 +431,6 @@ export interface StrategyGameState {
   oppositionPower: number; // 0-100
   // Real-time engine state — drives mandateDay from wall-clock time
   realTime: import("@/logic/realTimeEngine").RealTimeState;
+  // Research tree (optional for backward compat)
+  strategyResearch?: import("@/types/strategyResearch").StrategyResearchState;
 }

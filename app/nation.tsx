@@ -21,19 +21,20 @@ import { timeRemaining, formatDuration } from "@/logic/buildingEngine";
 import { getPlayerRank, getRankTitle, getTitleIcon } from "@/logic/botEngine";
 import { RESOURCE_LABELS } from "@/types/strategy";
 import { BG, RESOURCE_IMG } from "@/constants/assets";
-import { FONT, PALETTE, RADIUS, SPACING } from "@/constants/uiTokens";
+import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { ResourceKey } from "@/types/strategy";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 const NAV_ITEMS: { mcIcon: McIconName; label: string; route: string; tint?: string }[] = [
-  { mcIcon: "city-variant-outline",        label: "Bâtiments",        route: "/buildings",       tint: PALETTE.gold },
-  { mcIcon: "earth",                       label: "Salle de crise",   route: "/worldmap",        tint: PALETTE.crimson },
-  { mcIcon: "sword-cross",                 label: "Opérations",       route: "/operations",      tint: PALETTE.danger },
-  { mcIcon: "tank",                        label: "Forces Armées",    route: "/forces-armees",   tint: "#e54848" },
-  { mcIcon: "trophy-outline",              label: "Classement",       route: "/ranking",         tint: PALETTE.gold },
-  { mcIcon: "clipboard-list-outline",      label: "Missions",         route: "/missions",        tint: PALETTE.info },
-  { mcIcon: "newspaper-variant-outline",   label: "Journal de Crise", route: "/journal-crise",   tint: PALETTE.crimson },
+  { mcIcon: "city-variant-outline",        label: "Bâtiments",        route: "/buildings",            tint: PALETTE.gold },
+  { mcIcon: "earth",                       label: "Salle de crise",   route: "/worldmap",             tint: PALETTE.crimson },
+  { mcIcon: "sword-cross",                 label: "Opérations",       route: "/operations",           tint: PALETTE.danger },
+  { mcIcon: "tank",                        label: "Forces Armées",    route: "/forces-armees",        tint: "#e54848" },
+  { mcIcon: "flask-outline",               label: "Recherche",        route: "/strategy-research",    tint: "#a78bfa" },
+  { mcIcon: "trophy-outline",              label: "Classement",       route: "/ranking",              tint: PALETTE.gold },
+  { mcIcon: "clipboard-list-outline",      label: "Missions",         route: "/missions",             tint: PALETTE.info },
+  { mcIcon: "newspaper-variant-outline",   label: "Journal de Crise", route: "/journal-crise",        tint: PALETTE.crimson },
 ];
 
 const RESOURCE_ORDER: ResourceKey[] = ["money", "influence", "energy", "intelligence", "technology", "military", "cyberDefense"];

@@ -89,6 +89,9 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     minister_scandal_risk:       state.strategyMinisters?.some((m) => m.scandalRisk > 70) ?? false,
     high_opposition:             (state.oppositionPower ?? 35) >= 65,
     low_opposition:              (state.oppositionPower ?? 35) < 30,
+    no_energy_sovereign:         !(state.strategyResearch?.completed ?? []).includes("research_energy_sovereign"),
+    has_satellites:              (state.strategyResearch?.completed ?? []).includes("research_satellites"),
+    has_infowar:                 (state.strategyResearch?.completed ?? []).includes("research_infowar"),
   };
 }
 

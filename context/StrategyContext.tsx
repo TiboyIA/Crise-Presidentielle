@@ -31,6 +31,10 @@ import { MILITARY_DOCTRINES } from "@/data/militaryDoctrines";
 import { calculateMilitaryPower, getOperationUnitBonus, calculateDailyUpkeep } from "@/logic/militaryEngine";
 import { computeRealTimeAdvance, initRealTime } from "@/logic/realTimeEngine";
 import type { MilitaryDoctrineId, PlayerUnit, TrainingQueueEntry, UnitId } from "@/types/units";
+import { STRATEGY_RESEARCH } from "@/data/strategyResearch";
+import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
+import type { StrategyResearchId, StrategyResearchState } from "@/types/strategyResearch";
+import { trackGameStarted, trackCrisisResolved, trackActionUsed } from "@/storage/balanceStorage";
 import { COUNTRIES } from "@/data/countries";
 import type {
   AchievementId,
@@ -156,6 +160,7 @@ function buildInitialState(playerName: string): StrategyGameState {
     publicMemory: { traces: [] },
     oppositionPower: 35,
     realTime: initRealTime(now),
+    strategyResearch: { ...DEFAULT_RESEARCH_STATE },
   };
 }
 
@@ -179,6 +184,7 @@ interface StrategyContextValue {
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
+  launchStrategyResearch: (id: StrategyResearchId) => { success: boolean; reason?: string };
   tick: () => void;
 }
 
@@ -214,6 +220,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           publicMemory: saved.publicMemory ?? { traces: [] },
           oppositionPower: saved.oppositionPower ?? 35,
           realTime: saved.realTime ?? initRealTime(Date.now()),
+          strategyResearch: saved.strategyResearch ?? { ...DEFAULT_RESEARCH_STATE },
         });
       }
       setLoaded(true);
@@ -241,6 +248,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     const initial = buildInitialState(playerName);
     setState(initial);
     saveStrategy(initial);
+    // fire-and-forget balance tracking
+    void trackGameStarted();
   }, []);
 
   const tick = useCallback(() => {
@@ -677,6 +686,40 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const launchStrategyResearch = useCallback(
+    (id: StrategyResearchId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      const def = STRATEGY_RESEARCH[id];
+      if (!def) return { success: false, reason: "Recherche introuvable" };
+      const research: StrategyResearchState = state.strategyResearch ?? { ...DEFAULT_RESEARCH_STATE };
+      if (research.completed.includes(id)) return { success: false, reason: "Déjà complétée" };
+      if (research.inProgress) return { success: false, reason: "Une recherche est déjà en cours" };
+      // Check prerequisites
+      for (const prereq of def.prerequisites) {
+        if (!research.completed.includes(prereq)) {
+          return { success: false, reason: `Prérequis manquant : ${STRATEGY_RESEARCH[prereq]?.name ?? prereq}` };
+        }
+      }
+      if (!canAfford(def.cost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      update((prev) => {
+        const resources = deductCost(def.cost, prev.resources);
+        const prevResearch: StrategyResearchState = prev.strategyResearch ?? { ...DEFAULT_RESEARCH_STATE };
+        const strategyResearch: StrategyResearchState = {
+          ...prevResearch,
+          inProgress: {
+            id,
+            startedAtDay: prev.mandateDay,
+            completesAtDay: prev.mandateDay + def.durationDays,
+          },
+        };
+        return withNews(advanceMandateDay({ ...prev, resources, strategyResearch }, 0));
+      });
+      void trackActionUsed(`research_${id}`);
+      return { success: true };
+    },
+    [state, update],
+  );
+
   const startNewMandate = useCallback(() => {
     update((prev) => {
       const score = computeMandateScore(prev.nationalIndicators);
@@ -715,13 +758,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
-      trainUnit, collectTraining, setMilitaryDoctrine, tick,
+      trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
-      trainUnit, collectTraining, setMilitaryDoctrine, tick],
+      trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;
@@ -731,6 +774,22 @@ export function useStrategy(): StrategyContextValue {
   const ctx = useContext(StrategyContext);
   if (!ctx) throw new Error("useStrategy must be used within StrategyProvider");
   return ctx;
+}
+
+function processResearchCompletion(state: StrategyGameState): StrategyGameState {
+  const research: StrategyResearchState = state.strategyResearch ?? { ...DEFAULT_RESEARCH_STATE };
+  const ip = research.inProgress;
+  if (!ip || state.mandateDay < ip.completesAtDay) return state;
+  if (research.completed.includes(ip.id)) {
+    return { ...state, strategyResearch: { ...research, inProgress: null } };
+  }
+  return {
+    ...state,
+    strategyResearch: {
+      completed: [...research.completed, ip.id],
+      inProgress: null,
+    },
+  };
 }
 
 function processReformCompletions(state: StrategyGameState): StrategyGameState {
@@ -808,6 +867,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
   // Check reform completions
   s = processReformCompletions(s);
+
+  // Tick research completion
+  s = processResearchCompletion(s);
 
   // Apply doctrine drift + minister bonuses + debt update every 10 days
   if (Math.floor(newDay / 10) > Math.floor(prevDay / 10)) {

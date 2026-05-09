@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
+import { getTutorialSeen } from "@/storage/tutorialStorage";
 import { BG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
@@ -27,7 +28,14 @@ export default function StartScreen() {
       startNewGame(playerName.trim());
       router.replace("/nation");
     } else {
-      setShowNameInput(true);
+      // Check tutorial before showing name input
+      getTutorialSeen().then((seen) => {
+        if (!seen) {
+          router.push("/tutorial");
+        } else {
+          setShowNameInput(true);
+        }
+      });
     }
   };
 

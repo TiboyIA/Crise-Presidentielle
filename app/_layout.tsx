@@ -42,6 +42,7 @@ function RootLayoutNav() {
       <Stack.Screen name="ranking" />
       <Stack.Screen name="missions" />
       <Stack.Screen name="journal-crise" />
+      <Stack.Screen name="strategy-research" />
       <Stack.Screen name="briefing" options={{ presentation: "modal" }} />
       <Stack.Screen name="mandate-review" options={{ presentation: "modal" }} />
       {/* Classic game screens */}
