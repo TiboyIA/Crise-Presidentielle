@@ -1,7 +1,5 @@
-import Purchases, {
-  type CustomerInfo,
-  type PurchasesPackage,
-} from "react-native-purchases";
+// Type-only imports — zero runtime cost, work everywhere including Expo Go.
+import type { CustomerInfo, PurchasesPackage } from "react-native-purchases";
 import { Platform } from "react-native";
 import type { EventPack } from "@/data/events";
 
@@ -13,6 +11,22 @@ const PACK_TO_ENTITLEMENT: Record<EventPack, string> = {
 
 let initialized = false;
 
+/**
+ * Lazy accessor for the native RevenueCat module.
+ * Returns null in Expo Go (native module not present) or on web.
+ * Returns the real module in any proper native build (EAS / local run).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPurchases(): any | null {
+  if (Platform.OS === "web") return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("react-native-purchases").default;
+  } catch {
+    return null;
+  }
+}
+
 export function initPurchases(): void {
   if (initialized || Platform.OS === "web") return;
   const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
@@ -22,6 +36,11 @@ export function initPurchases(): void {
     );
     return;
   }
+  const Purchases = getPurchases();
+  if (!Purchases) {
+    console.warn("[RevenueCat] Native module unavailable (Expo Go?) — purchases disabled.");
+    return;
+  }
   Purchases.configure({ apiKey });
   initialized = true;
 }
@@ -29,7 +48,7 @@ export function initPurchases(): void {
 export async function fetchCustomerInfo(): Promise<CustomerInfo | null> {
   if (!initialized || Platform.OS === "web") return null;
   try {
-    return await Purchases.getCustomerInfo();
+    return await getPurchases()?.getCustomerInfo() ?? null;
   } catch (e) {
     console.warn("[RevenueCat] getCustomerInfo failed:", e);
     return null;
@@ -50,12 +69,14 @@ export function packsFromCustomerInfo(info: CustomerInfo): EventPack[] {
  */
 export async function purchasePack(pack: EventPack): Promise<EventPack[]> {
   if (!initialized) throw new Error("RevenueCat not initialized");
+  const Purchases = getPurchases();
+  if (!Purchases) throw new Error("Native module unavailable");
   const offerings = await Purchases.getOfferings();
   const offering = offerings.current;
   if (!offering) throw new Error("Aucune offre RevenueCat disponible");
 
   const rcPackage: PurchasesPackage | undefined =
-    offering.availablePackages.find((p) => p.identifier === pack);
+    offering.availablePackages.find((p: PurchasesPackage) => p.identifier === pack);
   if (!rcPackage)
     throw new Error(`Pack "${pack}" introuvable dans l'offre RevenueCat`);
 
@@ -70,7 +91,8 @@ export async function purchasePack(pack: EventPack): Promise<EventPack[]> {
 export async function restorePurchases(): Promise<EventPack[]> {
   if (!initialized || Platform.OS === "web") return [];
   try {
-    const customerInfo = await Purchases.restorePurchases();
+    const customerInfo = await getPurchases()?.restorePurchases();
+    if (!customerInfo) return [];
     return packsFromCustomerInfo(customerInfo);
   } catch (e) {
     console.warn("[RevenueCat] restorePurchases failed:", e);
