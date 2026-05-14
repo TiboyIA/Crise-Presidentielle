@@ -104,7 +104,7 @@ type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 // Tap target for a game country — position follows the SVG G transform on the UI thread.
 function CountryTapTarget({
-  entry, cid, selected, scale, translateX, translateY, svMapW, svMapH, svWidth, svHeight, onPress,
+  entry, cid, selected, scale, translateX, translateY, svWidth, svHeight, onPress,
 }: {
   entry: SvgEntry;
   cid: CountryId;
@@ -112,8 +112,6 @@ function CountryTapTarget({
   scale: SharedValue<number>;
   translateX: SharedValue<number>;
   translateY: SharedValue<number>;
-  svMapW: SharedValue<number>;
-  svMapH: SharedValue<number>;
   svWidth: SharedValue<number>;
   svHeight: SharedValue<number>;
   onPress: () => void;
@@ -123,15 +121,16 @@ function CountryTapTarget({
     const s  = scale.value;
     const tx = translateX.value;
     const ty = translateY.value;
-    const mW = svMapW.value;
-    const mH = svMapH.value;
-    // SVG G transform: translate(gx gy) scale(gs)
-    const gs = (mW / SVG_W) * s;
+    const W  = svWidth.value;
+    const H  = svHeight.value;
+    const coverS = W > 0 ? Math.max(W / SVG_W, H / SVG_H) : 1;
+    const mW = SVG_W * coverS;
+    const mH = SVG_H * coverS;
+    const gs = coverS * s;
     const gx = tx + mW / 2 * (1 - s);
     const gy = ty + mH / 2 * (1 - s);
-    // Map SVG centroid → screen position
-    const screenX = (svWidth.value  - mW) / 2 + gx + entry.cx * gs;
-    const screenY = (svHeight.value - mH) / 2 + gy + entry.cy * gs;
+    const screenX = (W - mW) / 2 + gx + entry.cx * gs;
+    const screenY = (H - mH) / 2 + gy + entry.cy * gs;
     return {
       position: "absolute" as const,
       left: screenX - TAP / 2,
@@ -310,15 +309,20 @@ export default function WorldMapScreen() {
     pinch,
   );
 
-  // SVG G transform — zoom native au sein du SVG (pas de scale CSS sur le conteneur)
+  // SVG G transform — zoom natif dans le SVG (pas de scale CSS sur le conteneur).
+  // Calcule coverScale depuis svWidth/svHeight (initialisés à width/height dès le 1er rendu)
+  // pour éviter gs=0 si svMapW/svMapH ne sont pas encore synchronisés.
   const animatedGroupProps = useAnimatedProps(() => {
     "worklet";
     const s  = scale.value;
     const tx = translateX.value;
     const ty = translateY.value;
-    const mW = svMapW.value;
-    const mH = svMapH.value;
-    const gs = (mW / SVG_W) * s;
+    const W  = svWidth.value;
+    const H  = svHeight.value;
+    const coverS = W > 0 ? Math.max(W / SVG_W, H / SVG_H) : 1;
+    const mW = SVG_W * coverS;
+    const mH = SVG_H * coverS;
+    const gs = coverS * s;
     const gx = tx + mW / 2 * (1 - s);
     const gy = ty + mH / 2 * (1 - s);
     return { transform: `translate(${gx} ${gy}) scale(${gs})` };
@@ -574,8 +578,6 @@ export default function WorldMapScreen() {
               scale={scale}
               translateX={translateX}
               translateY={translateY}
-              svMapW={svMapW}
-              svMapH={svMapH}
               svWidth={svWidth}
               svHeight={svHeight}
               onPress={() => setSelected(cid === selected ? null : cid)}
