@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { FONT, PALETTE } from "@/constants/uiTokens";
@@ -15,6 +15,9 @@ interface Props {
 
 type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
+const COMPACT_W  = 38;
+const EXPANDED_W = 110;
+
 export function FloatingMapLegend({
   activeLayer,
   onLayerChange,
@@ -22,16 +25,34 @@ export function FloatingMapLegend({
   onToggleHotspots,
   style,
 }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <View style={[styles.positioner, style]} pointerEvents="box-none">
-      <View style={styles.panel} pointerEvents="auto">
-        <View style={styles.header}>
-          <MaterialCommunityIcons name="layers-outline" size={9} color={PALETTE.gold} />
-          <Text style={styles.kicker}>COUCHES</Text>
-        </View>
+      <View
+        style={[styles.panel, expanded ? styles.panelExpanded : styles.panelCompact]}
+        pointerEvents="auto"
+      >
+        {/* ── Toggle compact / étendu ── */}
+        <Pressable
+          onPress={() => setExpanded((e) => !e)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.toggleBtn, pressed && { opacity: 0.6 }]}
+        >
+          {expanded ? (
+            <>
+              <MaterialCommunityIcons name="layers-outline" size={9} color={PALETTE.gold} />
+              <Text style={styles.toggleLabel}>COUCHES</Text>
+              <MaterialCommunityIcons name="chevron-right" size={11} color={PALETTE.gold} />
+            </>
+          ) : (
+            <MaterialCommunityIcons name="menu" size={13} color={PALETTE.gold} />
+          )}
+        </Pressable>
 
         <View style={styles.hairline} />
 
+        {/* ── Couches ── */}
         {EXTENDED_MAP_LAYERS.map((layer) => {
           const active = activeLayer === layer.id;
           return (
@@ -40,33 +61,56 @@ export function FloatingMapLegend({
               onPress={() => onLayerChange(layer.id)}
               style={({ pressed }) => [
                 styles.row,
-                active && { backgroundColor: layer.color + "18" },
-                pressed && { opacity: 0.7 },
+                expanded ? styles.rowExpanded : styles.rowCompact,
+                active && { backgroundColor: layer.color + "1a" },
+                pressed && { opacity: 0.6 },
               ]}
             >
-              <View style={[styles.dot, { backgroundColor: active ? layer.color : "#2e3e52" }]} />
-              <Text style={[styles.rowLabel, { color: active ? layer.color : PALETTE.textMid }]}>
-                {layer.shortLabel}
-              </Text>
-              {active && <View style={[styles.activePip, { backgroundColor: layer.color }]} />}
+              {active && <View style={[styles.accentBar, { backgroundColor: layer.color }]} />}
+
+              <MaterialCommunityIcons
+                name={layer.icon as McName}
+                size={16}
+                color={active ? layer.color : "#364d65"}
+              />
+
+              {expanded && (
+                <Text
+                  style={[styles.rowLabel, { color: active ? layer.color : PALETTE.textMid }]}
+                  numberOfLines={1}
+                >
+                  {layer.shortLabel}
+                </Text>
+              )}
             </Pressable>
           );
         })}
 
         <View style={styles.hairline} />
 
+        {/* ── Signaux (hotspots) — séparé des couches ── */}
         <Pressable
           onPress={onToggleHotspots}
           style={({ pressed }) => [
             styles.row,
+            expanded ? styles.rowExpanded : styles.rowCompact,
             showHotspots && { backgroundColor: "rgba(255,96,64,0.14)" },
-            pressed && { opacity: 0.7 },
+            pressed && { opacity: 0.6 },
           ]}
         >
-          <View style={[styles.dot, { backgroundColor: showHotspots ? "#ff6040" : "#2e3e52" }]} />
-          <Text style={[styles.rowLabel, { color: showHotspots ? "#ff6040" : PALETTE.textMid }]}>
-            Points
-          </Text>
+          {showHotspots && (
+            <View style={[styles.accentBar, { backgroundColor: "#ff6040" }]} />
+          )}
+          <MaterialCommunityIcons
+            name={"map-marker-alert-outline" as McName}
+            size={16}
+            color={showHotspots ? "#ff6040" : "#364d65"}
+          />
+          {expanded && (
+            <Text style={[styles.rowLabel, { color: showHotspots ? "#ff6040" : PALETTE.textMid }]}>
+              Signaux
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>
@@ -76,64 +120,81 @@ export function FloatingMapLegend({
 const styles = StyleSheet.create({
   positioner: {
     position: "absolute",
-    right: 10,
+    right: 8,
     alignItems: "flex-end",
     justifyContent: "center",
   },
+
   panel: {
-    backgroundColor: "rgba(4,9,20,0.92)",
+    backgroundColor: "rgba(3,8,18,0.94)",
     borderWidth: 1,
-    borderColor: "rgba(74,159,255,0.2)",
+    borderColor: "rgba(74,159,255,0.18)",
     borderRadius: 10,
-    paddingVertical: 8,
+    paddingVertical: 5,
     shadowColor: "#4a9fff",
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    shadowOffset: { width: -2, height: 0 },
-    elevation: 12,
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: -3, height: 0 },
+    elevation: 14,
+    overflow: "hidden",
   },
-  header: {
+  panelCompact:  { width: COMPACT_W },
+  panelExpanded: { width: EXPANDED_W },
+
+  toggleBtn: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 4,
-    paddingHorizontal: 10,
-    paddingBottom: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    minHeight: 28,
   },
-  kicker: {
-    fontSize: 8,
+  toggleLabel: {
+    flex: 1,
+    fontSize: 7,
     fontFamily: FONT.bold,
     color: PALETTE.gold,
-    letterSpacing: 1.8,
+    letterSpacing: 1.6,
   },
+
   hairline: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(74,159,255,0.18)",
-    marginHorizontal: 8,
-    marginVertical: 4,
+    backgroundColor: "rgba(74,159,255,0.15)",
+    marginHorizontal: 5,
+    marginVertical: 3,
   },
+
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
     borderRadius: 5,
-    marginHorizontal: 4,
+    marginHorizontal: 3,
+    marginVertical: 1,
+    overflow: "hidden",
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  rowCompact: {
+    justifyContent: "center",
+    paddingVertical: 8,
   },
+  rowExpanded: {
+    paddingVertical: 8,
+    paddingLeft: 10,
+    gap: 8,
+  },
+
+  accentBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 2.5,
+  },
+
   rowLabel: {
     fontSize: 10,
     fontFamily: FONT.bold,
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     flex: 1,
-  },
-  activePip: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
   },
 });
