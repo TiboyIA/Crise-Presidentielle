@@ -496,8 +496,7 @@ export default function WorldMapScreen() {
             if (labelMode === "tier2" && !isTier1 && !isTier2) return null;
 
             const label = LABEL_NAMES[cid] ?? cid.toUpperCase();
-            // Tier 1 : texte plus grand et plus lumineux
-            const fontSize = isTier1 ? (labelMode === "tier1" ? 13 : 11) : 9;
+            const fontSize = isTier1 ? (labelMode === "tier1" ? 8 : 7) : 6;
             const fill     = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#5a7590";
             const opacity  = isSelected ? 1 : isTier1 ? 0.9 : 0.75;
 
@@ -505,7 +504,8 @@ export default function WorldMapScreen() {
               <SvgText
                 key={`lbl-${code}`}
                 x={entry.cx}
-                y={entry.cy + 5}
+                y={entry.cy}
+                dy={fontSize * 0.35}
                 fill={fill}
                 fontSize={fontSize}
                 fontWeight="700"
