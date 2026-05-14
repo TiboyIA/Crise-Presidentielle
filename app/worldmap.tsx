@@ -53,6 +53,7 @@ const ALPHA2_TO_CID = new Map(GAME_ENTRIES.map(([code]) => [code, ALPHA2_TO_COUN
 const COUNTRY_SVG   = new Map<string, SvgEntry>(
   GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
 );
+const CID_TO_ALPHA2 = new Map(Object.entries(ALPHA2_TO_COUNTRY_ID).map(([a2, cid]) => [cid, a2]));
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 12;
@@ -141,13 +142,27 @@ export default function WorldMapScreen() {
 
   // Sync layout into shared values; reset zoom on orientation change
   useEffect(() => {
-    svMapW.value  = mapW;
-    svMapH.value  = mapH;
+    svMapW.value   = mapW;
+    svMapH.value   = mapH;
     svWidth.value  = width;
     svHeight.value = height;
-    scale.value      = withSpring(1, { damping: 20 });
-    translateX.value = withSpring(0, { damping: 20 });
-    translateY.value = withSpring(0, { damping: 20 });
+
+    const initScale = 1.4;
+    const entry = COUNTRY_SVG.get(state.countryId);
+    if (entry) {
+      // Translate to center player country at initScale (transform applied around screen center)
+      const rawTx = (SVG_W / 2 - entry.cx) * coverScale * initScale;
+      const rawTy = (SVG_H / 2 - entry.cy) * coverScale * initScale;
+      const maxTx = Math.max(0, mapW * initScale - width)  / 2;
+      const maxTy = Math.max(0, mapH * initScale - height) / 2;
+      scale.value      = withSpring(initScale, { damping: 20 });
+      translateX.value = withSpring(Math.max(-maxTx, Math.min(maxTx, rawTx)), { damping: 20 });
+      translateY.value = withSpring(Math.max(-maxTy, Math.min(maxTy, rawTy)), { damping: 20 });
+    } else {
+      scale.value      = withSpring(1, { damping: 20 });
+      translateX.value = withSpring(0, { damping: 20 });
+      translateY.value = withSpring(0, { damping: 20 });
+    }
   }, [mapW, mapH]);
 
   // Mise à jour des labels selon le niveau de zoom
@@ -375,7 +390,7 @@ export default function WorldMapScreen() {
                 d={entry.d}
                 fill="none"
                 stroke="#02050a"
-                strokeWidth={2.8}
+                strokeWidth={1.8}
               />
             ))}
           </G>
@@ -392,7 +407,7 @@ export default function WorldMapScreen() {
                   d={entry.d}
                   fill={r.fill}
                   stroke={isSelected ? "#f8d36a" : r.stroke}
-                  strokeWidth={isSelected ? 2.2 : isPlayer ? 1.6 : 1.2}
+                  strokeWidth={isSelected ? 1.6 : isPlayer ? 1.0 : 0.7}
                 />
               );
             })}
@@ -526,7 +541,9 @@ export default function WorldMapScreen() {
 
           {/* Left: player identity */}
           <View style={styles.topLeft}>
-            <Text style={styles.topFlag}>{playerCountry?.flag ?? ""}</Text>
+            <View style={styles.topFlagBox}>
+              <Text style={styles.topFlagCode}>{CID_TO_ALPHA2.get(state.countryId) ?? "—"}</Text>
+            </View>
             <View>
               <Text style={styles.topCountry} numberOfLines={1}>{playerCountry?.name ?? ""}</Text>
               <Text style={styles.topKicker}>COMMANDANT EN CHEF</Text>
@@ -716,7 +733,22 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  topFlag: { fontSize: 22 },
+  topFlagBox: {
+    width: 30,
+    height: 22,
+    backgroundColor: "rgba(201,168,76,0.12)",
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: PALETTE.gold + "55",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topFlagCode: {
+    fontSize: 10,
+    fontFamily: FONT.bold,
+    color: PALETTE.gold,
+    letterSpacing: 1.2,
+  },
   topCountry: {
     fontSize: 12,
     fontFamily: FONT.bold,
