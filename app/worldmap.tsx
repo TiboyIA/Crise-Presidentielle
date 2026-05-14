@@ -145,13 +145,17 @@ function CountryMapLabel({
   svWidth: SharedValue<number>;
   svHeight: SharedValue<number>;
 }) {
-  // Ancre manuelle si définie, sinon fallback sur entry.cx/cy
-  const anchor  = COUNTRY_LABEL_ANCHORS[cid];
-  const svgX    = anchor?.x  ?? entry.cx;
-  const svgY    = anchor?.y  ?? entry.cy;
-  const dx      = anchor?.dx ?? 0;
-  const dy      = anchor?.dy ?? 0;
-  const hasDot  = anchor?.callout ?? false;
+  const rawAnchor = COUNTRY_LABEL_ANCHORS[cid];
+  if (!rawAnchor && !isSelected) {
+    if (__DEV__) console.warn(`[worldmap] Missing label anchor for country: ${cid}`);
+    return null;
+  }
+  const anchor = rawAnchor ?? { x: entry.cx, y: entry.cy };
+  const svgX   = anchor.x;
+  const svgY   = anchor.y;
+  const dx     = anchor.dx ?? 0;
+  const dy     = anchor.dy ?? 0;
+  const hasDot = anchor.callout ?? false;
 
   const color = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#6a8aa8";
   const label = LABEL_NAMES[cid] ?? cid.toUpperCase();
