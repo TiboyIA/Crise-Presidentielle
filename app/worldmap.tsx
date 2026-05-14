@@ -55,7 +55,7 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
 );
 
 const MIN_SCALE = 1;
-const MAX_SCALE = 6;
+const MAX_SCALE = 12;
 
 // Grandes puissances visibles dès le zoom moyen
 const MAJOR_POWERS = new Set<CountryId>([
