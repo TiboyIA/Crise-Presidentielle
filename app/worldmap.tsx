@@ -69,6 +69,17 @@ const TIER2 = new Set<CountryId>([
   "australia", "canada", "north_korea", "nigeria", "pakistan",
 ]);
 
+// Tap target de base selon la superficie géographique du pays
+const TAP_LARGE  = new Set<CountryId>(["usa", "russia", "china", "brazil", "australia", "canada", "india"]);
+const TAP_MEDIUM = new Set<CountryId>(["france", "germany", "uk", "saudi_arabia", "nigeria", "turkey", "iran", "pakistan"]);
+// Petit (36px) : israel, south_korea, japan, italy, north_korea
+
+function tapBaseForCountry(cid: CountryId): number {
+  if (TAP_LARGE.has(cid))  return 60;
+  if (TAP_MEDIUM.has(cid)) return 48;
+  return 36;
+}
+
 // Noms courts pour labels carte (sans emoji)
 const LABEL_NAMES: Partial<Record<CountryId, string>> = {
   usa:         "USA",
@@ -100,11 +111,12 @@ type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 // Tap target for a game country — position follows the SVG G transform on the UI thread.
 function CountryTapTarget({
-  entry, cid, selected, scale, translateX, translateY, svWidth, svHeight, onPress,
+  entry, cid, selected, tapBase, scale, translateX, translateY, svWidth, svHeight, onPress,
 }: {
   entry: SvgEntry;
   cid: CountryId;
   selected: CountryId | null;
+  tapBase: number;
   scale: SharedValue<number>;
   translateX: SharedValue<number>;
   translateY: SharedValue<number>;
@@ -112,7 +124,6 @@ function CountryTapTarget({
   svHeight: SharedValue<number>;
   onPress: () => void;
 }) {
-  const TAP = 52;
   const style = useAnimatedStyle(() => {
     const s  = scale.value;
     const tx = translateX.value;
@@ -127,12 +138,14 @@ function CountryTapTarget({
     const gy = ty + mH / 2 * (1 - s);
     const screenX = (W - mW) / 2 + gx + entry.cx * gs;
     const screenY = (H - mH) / 2 + gy + entry.cy * gs;
+    // Au zoom élevé les pays sont visuellement grands → tap peut rétrécir
+    const tap = Math.max(28, tapBase / Math.max(1, s));
     return {
       position: "absolute" as const,
-      left: screenX - TAP / 2,
-      top:  screenY - TAP / 2,
-      width: TAP,
-      height: TAP,
+      left: screenX - tap / 2,
+      top:  screenY - tap / 2,
+      width: tap,
+      height: tap,
     };
   });
   return (
@@ -557,6 +570,7 @@ export default function WorldMapScreen() {
               entry={entry}
               cid={cid}
               selected={selected}
+              tapBase={tapBaseForCountry(cid)}
               scale={scale}
               translateX={translateX}
               translateY={translateY}
