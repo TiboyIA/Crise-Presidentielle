@@ -20,6 +20,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedProps,
   useAnimatedReaction,
   withSpring,
   runOnJS,
@@ -54,6 +55,9 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
   GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
 );
 const CID_TO_ALPHA2 = new Map(Object.entries(ALPHA2_TO_COUNTRY_ID).map(([a2, cid]) => [cid, a2]));
+
+// AnimatedG lets useAnimatedProps drive the SVG transform on the UI thread
+const AnimatedG = Animated.createAnimatedComponent(G);
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 12;
@@ -98,6 +102,54 @@ type LabelMode = "none" | "tier1" | "tier2" | "all";
 
 type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
+// Tap target for a game country — position follows the SVG G transform on the UI thread.
+function CountryTapTarget({
+  entry, cid, selected, scale, translateX, translateY, svMapW, svMapH, svWidth, svHeight, onPress,
+}: {
+  entry: SvgEntry;
+  cid: CountryId;
+  selected: CountryId | null;
+  scale: SharedValue<number>;
+  translateX: SharedValue<number>;
+  translateY: SharedValue<number>;
+  svMapW: SharedValue<number>;
+  svMapH: SharedValue<number>;
+  svWidth: SharedValue<number>;
+  svHeight: SharedValue<number>;
+  onPress: () => void;
+}) {
+  const TAP = 52;
+  const style = useAnimatedStyle(() => {
+    const s  = scale.value;
+    const tx = translateX.value;
+    const ty = translateY.value;
+    const mW = svMapW.value;
+    const mH = svMapH.value;
+    // SVG G transform: translate(gx gy) scale(gs)
+    const gs = (mW / SVG_W) * s;
+    const gx = tx + mW / 2 * (1 - s);
+    const gy = ty + mH / 2 * (1 - s);
+    // Map SVG centroid → screen position
+    const screenX = (svWidth.value  - mW) / 2 + gx + entry.cx * gs;
+    const screenY = (svHeight.value - mH) / 2 + gy + entry.cy * gs;
+    return {
+      position: "absolute" as const,
+      left: screenX - TAP / 2,
+      top:  screenY - TAP / 2,
+      width: TAP,
+      height: TAP,
+    };
+  });
+  return (
+    <Animated.View style={style}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [StyleSheet.absoluteFill, { opacity: pressed ? 0.4 : 1 }]}
+      />
+    </Animated.View>
+  );
+}
+
 export default function WorldMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -136,9 +188,6 @@ export default function WorldMapScreen() {
   const mapLeft = Math.round((width  - mapW) / 2);
   const mapTop  = Math.round((height - mapH) / 2);
 
-  // SVG → screen scale factors (for tap target positioning)
-  const scaleX = mapW / SVG_W;
-  const scaleY = mapH / SVG_H;
 
   // Sync layout into shared values; reset zoom on orientation change
   useEffect(() => {
@@ -261,13 +310,19 @@ export default function WorldMapScreen() {
     pinch,
   );
 
-  const animatedMapStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
+  // SVG G transform — zoom native au sein du SVG (pas de scale CSS sur le conteneur)
+  const animatedGroupProps = useAnimatedProps(() => {
+    "worklet";
+    const s  = scale.value;
+    const tx = translateX.value;
+    const ty = translateY.value;
+    const mW = svMapW.value;
+    const mH = svMapH.value;
+    const gs = (mW / SVG_W) * s;
+    const gx = tx + mW / 2 * (1 - s);
+    const gy = ty + mH / 2 * (1 - s);
+    return { transform: `translate(${gx} ${gy}) scale(${gs})` };
+  });
 
   const relationMap = useMemo(
     () => Object.fromEntries(state.relations.map((r) => [r.countryId, r])),
@@ -328,9 +383,10 @@ export default function WorldMapScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* ── MAP LAYER (gesture area) ─────────────────────────────────────────── */}
+      {/* ── MAP LAYER (gesture area plein écran) ──────────────────────────────── */}
       <GestureDetector gesture={combinedGesture}>
-      <Animated.View style={[styles.mapLayer, { top: mapTop, left: mapLeft }, animatedMapStyle]}>
+      <View style={StyleSheet.absoluteFillObject}>
+        <View style={[styles.mapLayer, { top: mapTop, left: mapLeft }]}>
         <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH}>
           <Defs>
             <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
@@ -355,6 +411,9 @@ export default function WorldMapScreen() {
               <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
             </RadialGradient>
           </Defs>
+
+          {/* Tout le contenu visuel dans AnimatedG — zoom SVG-natif, pas de scale CSS */}
+          <AnimatedG animatedProps={animatedGroupProps}>
 
           {/* Ocean */}
           <Rect x={0} y={0} width={SVG_W} height={SVG_H} fill="url(#ocean)" />
@@ -497,31 +556,33 @@ export default function WorldMapScreen() {
               </G>
             );
           })}
-        </Svg>
 
-        {/* Pressable tap targets (absolute, over SVG) */}
+          </AnimatedG>
+        </Svg>
+        </View>
+
+        {/* Tap targets animés — position recalculée depuis le transform SVG */}
         {GAME_ENTRIES.map(([code, entry]) => {
           const cid = ALPHA2_TO_CID.get(code)!;
           if (cid === state.countryId) return null;
-          const cx = entry.cx * scaleX;
-          const cy = entry.cy * scaleY;
-          const TAP = 52;
           return (
-            <Pressable
+            <CountryTapTarget
               key={`tp-${code}`}
+              entry={entry}
+              cid={cid}
+              selected={selected}
+              scale={scale}
+              translateX={translateX}
+              translateY={translateY}
+              svMapW={svMapW}
+              svMapH={svMapH}
+              svWidth={svWidth}
+              svHeight={svHeight}
               onPress={() => setSelected(cid === selected ? null : cid)}
-              style={({ pressed }) => ({
-                position: "absolute",
-                left: cx - TAP / 2,
-                top: cy - TAP / 2,
-                width: TAP,
-                height: TAP,
-                opacity: pressed ? 0.5 : 1,
-              })}
             />
           );
         })}
-      </Animated.View>
+      </View>
       </GestureDetector>
 
       {/* ── HUD OVERLAY ──────────────────────────────────────────────────────── */}
