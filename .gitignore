@@ -44,3 +44,4 @@ play-store/
 .vercel
 
 .env
+.claude/

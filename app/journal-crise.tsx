@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   urgentHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   urgentTitle: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.danger, letterSpacing: 1.8, flex: 1 },
   urgentScroll: { gap: 8, paddingTop: 4 },
-  urgentChip: { borderRadius: 6, padding: 10, gap: 4, borderWidth: 1, minWidth: 200 },
+  urgentChip: { borderRadius: 6, padding: 10, gap: 4, borderWidth: 1, minWidth: 160 },
   urgentChipHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   urgentChipIcon: { fontSize: 14 },
   urgentChipUrg: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 1 },

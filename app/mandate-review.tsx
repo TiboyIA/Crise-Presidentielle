@@ -1,11 +1,13 @@
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { computeMandateScore } from "@/context/StrategyContext";
+import { useAuth } from "@/context/AuthContext";
+import { submitRankedRun, hasActiveRun, isRankedIntended } from "@/services/RankedService";
 import { getPlayerRank } from "@/logic/botEngine";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
@@ -56,7 +58,16 @@ export default function MandateReviewScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, startNewMandate } = useStrategy();
-  const { isLandscape } = useResponsive();
+  const { isLandscape, hPad } = useResponsive();
+  const auth = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [rankedScore, setRankedScore] = useState<number | null>(null);
+  const [offlineRanked, setOfflineRanked] = useState(false);
+
+  useEffect(() => {
+    if (!isRankedIntended()) return;
+    hasActiveRun().then((active) => { if (!active) setOfflineRanked(true); });
+  }, []);
 
   if (!state) return null;
 
@@ -72,7 +83,27 @@ export default function MandateReviewScreen() {
   const negativeTraces = allTraces.filter((t) => t.politicalImpact < 0);
   const positiveTraces = allTraces.filter((t) => t.politicalImpact > 0);
 
-  const handleNewMandate = () => {
+  const handleNewMandate = async () => {
+    // Submit ranked run if active
+    if (auth.accessToken && (await hasActiveRun())) {
+      setSubmitting(true);
+      const result = await submitRankedRun(
+        auth.accessToken,
+        {
+          popularity: ind.popularity,
+          economy: ind.economy,
+          security: ind.security,
+          ecology: ind.ecology,
+          cohesion: ind.cohesion,
+        },
+        state.mandateDay,
+      );
+      setSubmitting(false);
+      if (result.ok && result.score != null) {
+        setRankedScore(result.score);
+        return; // Show score first — player taps again to proceed
+      }
+    }
     startNewMandate();
     router.back();
   };
@@ -95,7 +126,7 @@ export default function MandateReviewScreen() {
       </LinearGradient>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
         {/* SCORE GLOBAL — always full width */}
@@ -116,6 +147,19 @@ export default function MandateReviewScreen() {
             />
           </View>
         </LinearGradient>
+
+        {/* OFFLINE RANKED BANNER */}
+        {offlineRanked && (
+          <View style={styles.offlineBanner}>
+            <MaterialCommunityIcons name="wifi-off" size={14} color={PALETTE.warning} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.offlineBannerTitle}>Partie hors ligne</Text>
+              <Text style={styles.offlineBannerSub}>
+                Cette partie a été jouée sans connexion. Elle est enregistrée dans votre progression, mais non éligible au classement mondial.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Panel grid — 2-col in landscape */}
         <View style={[styles.panelGrid, isLandscape && styles.panelGridLandscape]}>
@@ -338,12 +382,33 @@ export default function MandateReviewScreen() {
           </Panel>
         )}
 
+        {/* RANKED SCORE */}
+        {rankedScore != null && (
+          <View style={styles.rankedResult}>
+            <Text style={styles.rankedResultLabel}>SCORE CLASSÉ SOUMIS</Text>
+            <Text style={styles.rankedResultScore}>{rankedScore.toLocaleString()}</Text>
+            <Text style={styles.rankedResultSub}>Inscrit au classement mondial</Text>
+          </View>
+        )}
+
         {/* ACTION */}
-        <Pressable onPress={handleNewMandate} style={({ pressed }) => [styles.newMandateBtn, { opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] }]}>
+        <Pressable
+          onPress={rankedScore != null ? () => { startNewMandate(); router.back(); } : handleNewMandate}
+          disabled={submitting}
+          style={({ pressed }) => [styles.newMandateBtn, { opacity: pressed || submitting ? 0.75 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] }]}
+        >
           <LinearGradient colors={["#dcb858", "#a07f30"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.newMandateInner}>
-            <View style={styles.mandateRule} />
-            <Text style={styles.newMandateText}>ENTAMER UN NOUVEAU MANDAT</Text>
-            <View style={styles.mandateRule} />
+            {submitting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <View style={styles.mandateRule} />
+                <Text style={styles.newMandateText}>
+                  {rankedScore != null ? "CONTINUER" : "ENTAMER UN NOUVEAU MANDAT"}
+                </Text>
+                <View style={styles.mandateRule} />
+              </>
+            )}
           </LinearGradient>
         </Pressable>
         <Text style={styles.newMandateHint}>La progression, les ressources et le rang sont conservés.</Text>
@@ -364,7 +429,7 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, letterSpacing: 1 },
   headerRule: { height: StyleSheet.hairlineWidth, backgroundColor: PALETTE.gold + "44" },
 
-  content: { paddingHorizontal: 16, paddingTop: 14, gap: 10 },
+  content: { paddingTop: 14, gap: 10 },
 
   scoreCard: { borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.gold + "44", padding: 20, alignItems: "center", gap: 4 },
   scoreKicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.goldDim, letterSpacing: 3, marginBottom: 6 },
@@ -381,7 +446,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2 },
 
   indicatorRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  indicatorLabel: { fontSize: 11, fontFamily: FONT.med, color: PALETTE.textMid, width: 78 },
+  indicatorLabel: { fontSize: 11, fontFamily: FONT.med, color: PALETTE.textMid, width: 84 },
   indicatorTrack: { flex: 1, height: 5, borderRadius: 3, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
   indicatorFill: { height: "100%", borderRadius: 3 },
   indicatorVal: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.textHigh, width: 38, textAlign: "right" },
@@ -395,6 +460,15 @@ const styles = StyleSheet.create({
   rewardChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: "rgba(201,168,76,0.1)", borderWidth: 1, borderColor: PALETTE.gold + "55" },
   rewardIcon: { fontSize: 16 },
   rewardVal: { fontSize: 14, fontFamily: FONT.bold, color: PALETTE.gold },
+
+  offlineBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PALETTE.warning + "55", backgroundColor: PALETTE.warning + "0d" },
+  offlineBannerTitle: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.warning, letterSpacing: 0.5 },
+  offlineBannerSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, marginTop: 2, lineHeight: 15 },
+
+  rankedResult: { alignItems: "center", gap: 4, paddingVertical: 16, paddingHorizontal: 20, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PALETTE.gold + "55", backgroundColor: PALETTE.gold + "0d", marginBottom: 8 },
+  rankedResultLabel: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 3 },
+  rankedResultScore: { fontSize: 40, fontFamily: FONT.bold, color: PALETTE.gold },
+  rankedResultSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid },
 
   newMandateBtn: { borderRadius: RADIUS.sm, overflow: "hidden", marginTop: 8 },
   newMandateInner: { paddingVertical: 16, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 12 },

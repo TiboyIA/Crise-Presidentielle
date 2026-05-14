@@ -36,6 +36,7 @@ import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import type { StrategyResearchId, StrategyResearchState } from "@/types/strategyResearch";
 import { trackGameStarted, trackCrisisResolved, trackActionUsed } from "@/storage/balanceStorage";
 import { COUNTRIES } from "@/data/countries";
+import { recordEvent as rankRecord } from "@/services/RankedService";
 import type {
   AchievementId,
   BuildingId,
@@ -106,7 +107,7 @@ const INITIAL_RESOURCES: StrategyResources = {
   cyberDefense: 40,
 };
 
-function buildInitialState(playerName: string): StrategyGameState {
+function buildInitialState(playerName: string, doctrine: GovernanceDoctrine = "democratique"): StrategyGameState {
   const buildings: PlayerBuilding[] = INITIAL_BUILDINGS.map((b) => ({
     id: b.id,
     level: b.level,
@@ -148,7 +149,7 @@ function buildInitialState(playerName: string): StrategyGameState {
     hiddenPolitics: { ...INITIAL_HIDDEN_POLITICS },
     delayedConsequences: [],
     campaignPromises: buildInitialPromises(),
-    governanceDoctrine: "democratique",
+    governanceDoctrine: doctrine,
     reforms: [],
     strategyMinisters: buildInitialMinisters(),
     nationalDebt: 30,
@@ -169,7 +170,7 @@ interface StrategyContextValue {
   loaded: boolean;
   shouldShowPoll: boolean;
   shouldShowBilan: boolean;
-  startNewGame: (playerName: string) => void;
+  startNewGame: (playerName: string, doctrine?: GovernanceDoctrine) => void;
   upgradeBuilding: (id: BuildingId) => { success: boolean; reason?: string };
   launchOperation: (type: OperationType, targetCountryId: CountryId) => { success: boolean; message: string };
   collectMissionReward: (defId: string) => void;
@@ -244,8 +245,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [scheduleSave],
   );
 
-  const startNewGame = useCallback((playerName: string) => {
-    const initial = buildInitialState(playerName);
+  const startNewGame = useCallback((playerName: string, doctrine?: GovernanceDoctrine) => {
+    const initial = buildInitialState(playerName, doctrine);
     setState(initial);
     saveStrategy(initial);
     // fire-and-forget balance tracking
@@ -487,8 +488,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
 
         return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 0);
       });
+      rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
     },
-    [update],
+    [state, update],
   );
 
   const dismissNews = useCallback(
@@ -538,6 +540,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       if (state.governanceDoctrine === id) return { success: false, reason: "Doctrine déjà active" };
       const def = DOCTRINES[id];
       if (!canAfford(def.switchCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      const mandateDaySnap = state.mandateDay;
       update((prev) => {
         const resources = deductCost(def.switchCost, prev.resources);
         let next = { ...prev, resources, governanceDoctrine: id };
@@ -555,6 +558,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         }
         return withNews(advanceMandateDay(next, 0));
       });
+      rankRecord("doctrine_set", id, mandateDaySnap);
       return { success: true };
     },
     [state, update],
@@ -566,6 +570,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       const def = REFORMS[id];
       if (!canAfford(def.cost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
       if (state.reforms.some((r) => r.id === id && !r.applied)) return { success: false, reason: "Réforme déjà en cours" };
+      const mandateDaySnap = state.mandateDay;
       update((prev) => {
         const resources = deductCost(def.cost, prev.resources);
         const newReform: PlayerReform = {
@@ -587,6 +592,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         });
         return withNews(advanceMandateDay(next, 0));
       });
+      rankRecord("reform_launched", id, mandateDaySnap);
       return { success: true };
     },
     [state, update],
@@ -721,6 +727,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   );
 
   const startNewMandate = useCallback(() => {
+    const mandateDaySnap = state?.mandateDay ?? 0;
     update((prev) => {
       const score = computeMandateScore(prev.nationalIndicators);
       const bonusResources = score >= 80
@@ -740,7 +747,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         },
       };
     });
-  }, [update]);
+    rankRecord("mandate_end", "mandate_end", mandateDaySnap);
+  }, [state, update]);
 
   const shouldShowPoll =
     state !== null &&

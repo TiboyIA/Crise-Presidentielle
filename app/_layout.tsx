@@ -18,6 +18,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 SplashScreen.preventAutoHideAsync();
@@ -43,6 +44,8 @@ function RootLayoutNav() {
       <Stack.Screen name="missions" />
       <Stack.Screen name="journal-crise" />
       <Stack.Screen name="strategy-research" />
+      <Stack.Screen name="ranking-global" />
+      <Stack.Screen name="account-link" />
       <Stack.Screen name="briefing" options={{ presentation: "modal" }} />
       <Stack.Screen name="mandate-review" options={{ presentation: "modal" }} />
       {/* Classic game screens */}
@@ -88,14 +91,16 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0a0c0e" }}>
             <KeyboardProvider>
-              <EntitlementsProvider>
-                <StrategyProvider>
-                  <GameProvider>
-                    <StatusBar style="light" />
-                    <RootLayoutNav />
-                  </GameProvider>
-                </StrategyProvider>
-              </EntitlementsProvider>
+              <AuthProvider>
+                <EntitlementsProvider>
+                  <StrategyProvider>
+                    <GameProvider>
+                      <StatusBar style="light" />
+                      <RootLayoutNav />
+                    </GameProvider>
+                  </StrategyProvider>
+                </EntitlementsProvider>
+              </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

@@ -64,6 +64,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "expo-secure-store": "~15.0.8",
     "react-native-purchases": "^10.1.0"
   }
 }

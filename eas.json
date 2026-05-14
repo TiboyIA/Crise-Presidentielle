@@ -10,6 +10,9 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "simulator": false
       }
     },
     "preview": {
@@ -17,15 +20,18 @@
       "android": {
         "buildType": "apk",
         "credentialsSource": "remote"
+      },
+      "ios": {
+        "credentialsSource": "remote"
       }
     },
     "production": {
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACER_PAR_URL_PRODUCTION",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "REMPLACER_PAR_CLE_REVENUECAT"
-      },
       "android": {
         "buildType": "app-bundle",
+        "credentialsSource": "remote"
+      },
+      "ios": {
+        "buildType": "archive",
         "credentialsSource": "remote"
       }
     }

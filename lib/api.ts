@@ -14,11 +14,17 @@ function getExtra(): ExtraConfig {
 
 export function apiBaseUrl(): string {
   // EXPO_PUBLIC_API_URL is baked into the bundle at build time and works in
-  // all environments (native Android/iOS, web, Replit). Set it in .env or
-  // in your EAS build profile environment variables.
+  // all environments (native Android/iOS, web, Replit). Set it in EAS Secrets
+  // (not in eas.json env block) for production builds.
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (typeof fromEnv === "string" && fromEnv.length > 0) {
-    return fromEnv.replace(/\/$/, "");
+    const url = fromEnv.replace(/\/$/, "");
+    // Enforce HTTPS in production to prevent traffic interception.
+    if (!__DEV__ && !url.startsWith("https://")) {
+      console.error("[api] Non-HTTPS API URL rejected in production:", url);
+      return "";
+    }
+    return url;
   }
   // Replit fallback: apiHost is injected by app.config.js via REPLIT_DOMAINS.
   const extra = getExtra();

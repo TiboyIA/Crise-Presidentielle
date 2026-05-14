@@ -1,9 +1,11 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
+import { useAuth } from "@/context/AuthContext";
 import { useResponsive } from "@/utils/responsive";
 import { RankingRow } from "@/components/RankingRow";
 import { PowerBadge } from "@/components/PowerBadge";
@@ -23,7 +25,9 @@ const SEASON_TITLES = [
 
 export default function RankingScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { state } = useStrategy();
+  const auth = useAuth();
   const { hPad } = useResponsive();
 
   if (!state) return null;
@@ -87,6 +91,46 @@ export default function RankingScreen() {
             <Text style={styles.seasonRemaining}>{formatDuration(seasonTimeLeft)}</Text>
           </View>
         </Panel>
+
+        {/* Account security */}
+        {auth.isEnabled && (
+          <Pressable
+            onPress={() => router.push("/account-link")}
+            style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <LinearGradient colors={["#0d1119", "#0d1119"]} style={[styles.leaderboardBtnInner, { borderColor: auth.isLinked ? PALETTE.success + "55" : PALETTE.warning + "55" }]}>
+              <MaterialCommunityIcons
+                name={auth.isLinked ? "shield-check" : "shield-alert-outline"}
+                size={20}
+                color={auth.isLinked ? PALETTE.success : PALETTE.warning}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.leaderboardBtnTitle, { color: auth.isLinked ? PALETTE.success : PALETTE.warning }]}>
+                  {auth.isLinked ? "COMPTE SÉCURISÉ" : "SÉCURISER MON COMPTE"}
+                </Text>
+                <Text style={styles.leaderboardBtnSub}>
+                  {auth.isLinked ? `Lié via ${auth.linkedProviders.join(", ")}` : "Protégez votre progression avec Google ou Apple"}
+                </Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* Leaderboard mondial */}
+        <Pressable
+          onPress={() => router.push("/ranking-global")}
+          style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+        >
+          <LinearGradient colors={["#1c1408", "#0d1119"]} style={styles.leaderboardBtnInner}>
+            <MaterialCommunityIcons name="trophy" size={20} color={PALETTE.gold} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.leaderboardBtnTitle}>TABLEAU D'HONNEUR MONDIAL</Text>
+              <Text style={styles.leaderboardBtnSub}>Classement des meilleurs mandats en ligne</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+          </LinearGradient>
+        </Pressable>
 
         {/* Global ranking */}
         <SectionHeader label="Classement mondial" count={`${state.ranking.length}`} />
@@ -172,4 +216,13 @@ const styles = StyleSheet.create({
   },
   titleCardTitle: { fontSize: 13, fontFamily: FONT.bold },
   titleCardDesc: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2 },
+
+  leaderboardBtn: { borderRadius: RADIUS.sm, overflow: "hidden" },
+  leaderboardBtnInner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    padding: 14, borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.gold + "55",
+  },
+  leaderboardBtnTitle: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
+  leaderboardBtnSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2 },
 });

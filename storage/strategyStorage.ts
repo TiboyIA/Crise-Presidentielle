@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { StrategyGameState } from "@/types/strategy";
+import { scheduleUpload } from "@/services/SyncService";
 
 const KEY = "@strategy_v1";
 const CURRENT_VERSION = 1;
 
 export async function saveStrategy(state: StrategyGameState): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(state));
+  scheduleUpload(state, state.version); // fire-and-forget cloud sync
 }
 
 export async function loadStrategy(): Promise<StrategyGameState | null> {

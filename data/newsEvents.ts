@@ -2077,6 +2077,53 @@ export const NEWS_EVENTS: NewsEvent[] = [
       },
     ],
   },
+  // ── CATASTROPHES NATURELLES ───────────────────────────────────
+  {
+    id: "inondations_massives",
+    title: "Inondations massives : plusieurs villes sous les eaux",
+    source: "Sécurité Civile",
+    type: "national",
+    urgency: "critique",
+    conditionKey: "low_ecology",
+    description: "Des pluies extrêmes provoquent des inondations dans plusieurs villes. Les maires réclament une aide immédiate tandis que les infrastructures critiques sont menacées.",
+    isInteractive: true,
+    choices: [
+      {
+        id: "flood_army_rescue",
+        label: "Envoyer l'armée et les secours en renfort",
+        consequence: "Les forces de l'ordre et les pompiers quadrillent les zones sinistrées. Les évacuations sont menées en 48h. L'État est au rendez-vous.",
+        effects: { money: -500, military: -10 },
+        indicatorEffects: { security: 8, popularity: 8, cohesion: 4, publicBudget: -8 },
+      },
+      {
+        id: "flood_prevention_fund",
+        label: "Créer un fonds national de prévention inondation",
+        consequence: "Une enveloppe de long terme est annoncée. Les experts saluent la vision. Les populations sinistrées attendent davantage à court terme.",
+        effects: { money: -700, technology: 5 },
+        indicatorEffects: { ecology: 10, security: 5, popularity: 3, publicBudget: -12 },
+        queuesDelayedConsequence: {
+          id: "flood_fund_payoff",
+          delayActions: 15,
+          effectType: "indicator_effect",
+          payload: { ecology: 5, security: 3, economy: 2 },
+        },
+      },
+      {
+        id: "flood_local_manage",
+        label: "Laisser les collectivités gérer",
+        consequence: "Les communes débordées crient à l'abandon. Les images de rues inondées sans secours nationaux font le tour des médias. La fracture territoriale s'aggrave.",
+        effects: { money: 100 },
+        indicatorEffects: { popularity: -15, cohesion: -10, security: -5 },
+        hiddenPoliticsEffects: { scandalRisk: 15, regionalTension: 10 },
+        queuesDelayedConsequence: {
+          id: "flood_abandonment_fallout",
+          delayActions: 8,
+          effectType: "indicator_effect",
+          payload: { cohesion: -5, popularity: -5 },
+        },
+      },
+    ],
+  },
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

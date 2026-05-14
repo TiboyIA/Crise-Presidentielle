@@ -73,7 +73,7 @@ export default function ForcesArmeesScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
-      <LinearGradient colors={["#110d1a", "#0d1119"]} style={styles.header}>
+      <LinearGradient colors={["#110d1a", "#0d1119"]} style={[styles.header, { paddingHorizontal: hPad }]}>
         <View style={styles.headerTop}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}>
             <MaterialCommunityIcons name="arrow-left" size={20} color={PALETTE.textMid} />

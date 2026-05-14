@@ -15,6 +15,8 @@
       "backgroundColor": "#0a0c0e"
     },
     "ios": {
+      "bundleIdentifier": "com.etatdecrise.president",
+      "buildNumber": "1",
       "supportsTablet": false
     },
     "android": {

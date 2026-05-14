@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
   statFill: { height: "100%", borderRadius: 2 },
 
   actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  actionCell: { width: "31%", flexGrow: 1, minWidth: 100, padding: 10, gap: 4, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: "center" },
+  actionCell: { width: "31%", flexGrow: 1, minWidth: 88, padding: 10, gap: 4, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: "center" },
   actionLabel: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
   actionMeta: { fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow, letterSpacing: 0.3, textAlign: "center" },
 });
