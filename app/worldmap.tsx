@@ -349,19 +349,33 @@ export default function WorldMapScreen() {
             <Circle cx={playerEntry.cx} cy={playerEntry.cy} r={SVG_W * 0.048} fill="url(#playerGlow)" />
           )}
 
-          {/* Game countries — colored by active layer */}
+          {/* Game countries — double bordure : passe sombre épaisse + passe colorée fine */}
+          {/* Passe 1 : contour sombre séparateur */}
+          <G>
+            {GAME_ENTRIES.map(([code, entry]) => (
+              <Path
+                key={`sep-${code}`}
+                d={entry.d}
+                fill="none"
+                stroke="#02050a"
+                strokeWidth={2.8}
+              />
+            ))}
+          </G>
+          {/* Passe 2 : fill + contour coloré selon la couche */}
           <G>
             {GAME_ENTRIES.map(([code, entry]) => {
               const cid = ALPHA2_TO_CID.get(code)!;
               const isSelected = selected === cid;
+              const isPlayer   = cid === state.countryId;
               const r = renderFor(cid);
               return (
                 <Path
-                  key={code}
+                  key={`fill-${code}`}
                   d={entry.d}
                   fill={r.fill}
-                  stroke={r.stroke}
-                  strokeWidth={isSelected ? 2.4 : cid === state.countryId ? 1.8 : 1}
+                  stroke={isSelected ? "#f8d36a" : r.stroke}
+                  strokeWidth={isSelected ? 2.2 : isPlayer ? 1.6 : 1.2}
                 />
               );
             })}
