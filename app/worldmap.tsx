@@ -20,7 +20,6 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  useAnimatedProps,
   useAnimatedReaction,
   withSpring,
   runOnJS,
@@ -55,9 +54,6 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
   GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
 );
 const CID_TO_ALPHA2 = new Map(Object.entries(ALPHA2_TO_COUNTRY_ID).map(([a2, cid]) => [cid, a2]));
-
-// AnimatedG lets useAnimatedProps drive the SVG transform on the UI thread
-const AnimatedG = Animated.createAnimatedComponent(G);
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 12;
@@ -309,24 +305,14 @@ export default function WorldMapScreen() {
     pinch,
   );
 
-  // SVG G transform — zoom natif dans le SVG (pas de scale CSS sur le conteneur).
-  // Calcule coverScale depuis svWidth/svHeight (initialisés à width/height dès le 1er rendu)
-  // pour éviter gs=0 si svMapW/svMapH ne sont pas encore synchronisés.
-  const animatedGroupProps = useAnimatedProps(() => {
-    "worklet";
-    const s  = scale.value;
-    const tx = translateX.value;
-    const ty = translateY.value;
-    const W  = svWidth.value;
-    const H  = svHeight.value;
-    const coverS = W > 0 ? Math.max(W / SVG_W, H / SVG_H) : 1;
-    const mW = SVG_W * coverS;
-    const mH = SVG_H * coverS;
-    const gs = coverS * s;
-    const gx = tx + mW / 2 * (1 - s);
-    const gy = ty + mH / 2 * (1 - s);
-    return { transform: `translate(${gx} ${gy}) scale(${gs})` };
-  });
+  // CSS transform sur le conteneur SVG — UI thread via Reanimated (smooth 60fps)
+  const animatedMapStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
 
   const relationMap = useMemo(
     () => Object.fromEntries(state.relations.map((r) => [r.countryId, r])),
@@ -390,7 +376,7 @@ export default function WorldMapScreen() {
       {/* ── MAP LAYER (gesture area plein écran) ──────────────────────────────── */}
       <GestureDetector gesture={combinedGesture}>
       <View style={StyleSheet.absoluteFillObject}>
-        <View style={[styles.mapLayer, { top: mapTop, left: mapLeft }]}>
+        <Animated.View style={[styles.mapLayer, { top: mapTop, left: mapLeft }, animatedMapStyle]}>
         <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH}>
           <Defs>
             <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
@@ -415,9 +401,6 @@ export default function WorldMapScreen() {
               <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
             </RadialGradient>
           </Defs>
-
-          {/* Tout le contenu visuel dans AnimatedG — zoom SVG-natif, pas de scale CSS */}
-          <AnimatedG animatedProps={animatedGroupProps}>
 
           {/* Ocean */}
           <Rect x={0} y={0} width={SVG_W} height={SVG_H} fill="url(#ocean)" />
@@ -561,11 +544,10 @@ export default function WorldMapScreen() {
             );
           })}
 
-          </AnimatedG>
         </Svg>
-        </View>
+        </Animated.View>
 
-        {/* Tap targets animés — position recalculée depuis le transform SVG */}
+        {/* Tap targets animés — position absolue sur l'écran, miroir du transform CSS */}
         {GAME_ENTRIES.map(([code, entry]) => {
           const cid = ALPHA2_TO_CID.get(code)!;
           if (cid === state.countryId) return null;
