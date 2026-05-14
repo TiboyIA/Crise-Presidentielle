@@ -18,8 +18,8 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
-import { COUNTRIES, COUNTRY_LIST } from "@/data/countries";
-import { MAP_COUNTRY_SHAPES, MAP_COUNTRY_SHAPES_BY_ID, CONTINENTS_V2 } from "@/data/mapGeo";
+import { COUNTRIES } from "@/data/countries";
+import { ISO_TO_COUNTRY_ID, GAME_ISO_SET } from "@/data/isoCountryMap";
 import {
   computeCountryRender,
   generateHotspots,
@@ -27,10 +27,58 @@ import {
   MAP_LAYERS,
 } from "@/logic/hotspotEngine";
 import type { MapLayerId } from "@/logic/hotspotEngine";
+import { feature as topoFeature } from "topojson-client";
+import type { Topology, Objects } from "topojson-specification";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
 import { Badge, Panel, PrimaryButton, ScreenHeader } from "@/components/ui";
 import { FONT, PALETTE, RADIUS, STATUS_COLORS } from "@/constants/uiTokens";
 import type { CountryId, OperationType, RelationStatus } from "@/types/strategy";
+
+// ── Natural Earth topology (110m resolution) ──────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const topoData = require("world-atlas/countries-110m.json") as unknown as Topology<Objects>;
+const WORLD_FEATURES: Feature[] = (topoFeature(topoData, (topoData as any).objects.countries) as unknown as FeatureCollection).features;
+
+// Equirectangular projection — no distortion, correct proportions for political maps
+function project(lon: number, lat: number, w: number, h: number): [number, number] {
+  return [((lon + 180) / 360) * w, ((90 - lat) / 180) * h];
+}
+
+function ringToPath(ring: number[][], w: number, h: number): string {
+  if (!ring.length) return "";
+  const pts = ring.map(([lon, lat]) => { const [x, y] = project(lon, lat, w, h); return `${x.toFixed(1)},${y.toFixed(1)}`; });
+  return `M${pts[0]}L${pts.slice(1).join("L")}Z`;
+}
+
+function geometryToPath(geom: Geometry | null | undefined, w: number, h: number): string {
+  if (!geom) return "";
+  if (geom.type === "Polygon") return (geom.coordinates as number[][][]).map((r) => ringToPath(r, w, h)).join("");
+  if (geom.type === "MultiPolygon") return (geom.coordinates as number[][][][]).flatMap((p) => p.map((r) => ringToPath(r, w, h))).join("");
+  return "";
+}
+
+function featureCentroid(f: Feature, w: number, h: number): [number, number] {
+  const geom = f.geometry;
+  if (!geom) return [w / 2, h / 2];
+  const firstRing: number[][] =
+    geom.type === "Polygon" ? (geom.coordinates[0] as number[][]) :
+    geom.type === "MultiPolygon" ? ((geom.coordinates as number[][][][]).reduce((a, b) => a[0].length > b[0].length ? a : b, [[]])[0] ?? []) : [];
+  let lonSum = 0, latSum = 0, n = 0;
+  for (const [lon, lat] of firstRing) { lonSum += lon; latSum += lat; n++; }
+  if (!n) return [w / 2, h / 2];
+  return project(lonSum / n, latSum / n, w, h);
+}
+
+function featureBBox(f: Feature, w: number, h: number): { cx: number; cy: number; bw: number; bh: number } {
+  const geom = f.geometry;
+  if (!geom) return { cx: w / 2, cy: h / 2, bw: 40, bh: 40 };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const scan = (ring: number[][]) => { for (const [lon, lat] of ring) { const [x, y] = project(lon, lat, w, h); if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; } };
+  if (geom.type === "Polygon") (geom.coordinates as number[][][]).forEach(scan);
+  else if (geom.type === "MultiPolygon") (geom.coordinates as number[][][][]).forEach((p) => p.forEach(scan));
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, bw: Math.max(34, maxX - minX), bh: Math.max(34, maxY - minY) };
+}
 
 const REGIONS = ["Europe", "Amériques", "Asie", "Moyen-Orient"];
 
@@ -89,43 +137,43 @@ export default function WorldMapScreen() {
   const mapH = isLandscape ? height - 110 : Math.round(width * 0.62);
   const detailW = isLandscape ? width - mapW : width;
 
-  const playerShape = MAP_COUNTRY_SHAPES_BY_ID[state.countryId];
   const playerCountry = COUNTRIES[state.countryId];
 
-  // Tally counters for the intel strip
-  const allRelations = state.relations;
-  const hostileCount = allRelations.filter((r) => r.status === "hostile").length;
-  const alliedCount  = allRelations.filter((r) => r.status === "allied").length;
-  const rivalCount   = allRelations.filter((r) => r.status === "rival").length;
-
-  const enemyShapes = COUNTRY_LIST
-    .map((c) => MAP_COUNTRY_SHAPES_BY_ID[c.id])
-    .filter((s): s is NonNullable<typeof s> =>
-      !!s && s.countryId !== state.countryId &&
-      (relationMap[s.countryId]?.status === "hostile" || relationMap[s.countryId]?.status === "rival"),
-    );
-  const allyShapes = COUNTRY_LIST
-    .map((c) => MAP_COUNTRY_SHAPES_BY_ID[c.id])
-    .filter((s): s is NonNullable<typeof s> =>
-      !!s && s.countryId !== state.countryId &&
-      (relationMap[s.countryId]?.status === "allied" || relationMap[s.countryId]?.status === "friendly"),
-    );
+  // Intel strip tallies
+  const hostileCount = state.relations.filter((r) => r.status === "hostile").length;
+  const alliedCount  = state.relations.filter((r) => r.status === "allied").length;
+  const rivalCount   = state.relations.filter((r) => r.status === "rival").length;
 
   const selectedCountry  = selected ? COUNTRIES[selected] : null;
   const selectedRelation = selected ? relationMap[selected] : null;
-  const selectedShape    = selected ? MAP_COUNTRY_SHAPES_BY_ID[selected] : null;
 
-  // ── Path scaling helpers ─────────────────────────────────────────────
-  // % coords → absolute pixel coords, applied lazily via SVG transform.
-  const pctToPxX = (pct: number) => (pct / 100) * mapW;
-  const pctToPxY = (pct: number) => (pct / 100) * mapH;
+  // ── Topology-derived paths, centroids, bboxes (recompute on resize) ──
+  const { pathMap, centroidMap, gameFeatures } = useMemo(() => {
+    const pathMap    = new Map<number, string>();
+    const centroidMap = new Map<CountryId, [number, number]>();
+    const gameFeatures: { f: Feature; cid: CountryId }[] = [];
 
-  // Scale a "M x,y L x,y Q x,y x,y ..." path string from % to pixels.
-  function scalePath(path: string): string {
-    return path.replace(/(-?\d+\.?\d*),(-?\d+\.?\d*)/g, (_m, x: string, y: string) => {
-      return `${pctToPxX(parseFloat(x))},${pctToPxY(parseFloat(y))}`;
-    });
-  }
+    for (const f of WORLD_FEATURES) {
+      const isoId = Number(f.id);
+      pathMap.set(isoId, geometryToPath(f.geometry as Geometry, mapW, mapH));
+      const cid = ISO_TO_COUNTRY_ID[isoId];
+      if (cid) {
+        centroidMap.set(cid, featureCentroid(f, mapW, mapH));
+        gameFeatures.push({ f, cid });
+      }
+    }
+    return { pathMap, centroidMap, gameFeatures };
+  }, [mapW, mapH]);
+
+  const playerCentroid = centroidMap.get(state.countryId) ?? [mapW / 2, mapH / 2] as [number, number];
+
+  const allyCountryIds = state.relations
+    .filter((r) => (r.status === "allied" || r.status === "friendly") && r.countryId !== state.countryId)
+    .map((r) => r.countryId as CountryId);
+
+  const enemyCountryIds = state.relations
+    .filter((r) => r.status === "hostile" || r.status === "rival")
+    .map((r) => r.countryId as CountryId);
 
   // ── Country render computation per layer ────────────────────────────
   function renderForCountry(cid: CountryId) {
@@ -178,35 +226,35 @@ export default function WorldMapScreen() {
             stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
         ))}
 
-        {/* Continents (decorative landmasses) */}
-        {CONTINENTS_V2.map((cont) => (
-          <Path key={cont.id} d={scalePath(cont.path)}
-            fill="#0d1f33" stroke="#19283e" strokeWidth={0.6} opacity={0.85} />
-        ))}
+        {/* Non-game world countries (geographic background) */}
+        <G>
+          {WORLD_FEATURES.filter((f) => !GAME_ISO_SET.has(Number(f.id))).map((f) => {
+            const d = pathMap.get(Number(f.id));
+            if (!d) return null;
+            return <Path key={String(f.id)} d={d} fill="#0c1c30" stroke="#172234" strokeWidth={0.35} opacity={0.8} />;
+          })}
+        </G>
 
         {/* Player glow (radial halo) */}
-        {playerShape && (
-          <Circle
-            cx={pctToPxX(playerShape.centerX)}
-            cy={pctToPxY(playerShape.centerY)}
-            r={Math.max(28, mapW * 0.05)}
-            fill="url(#player-glow)"
-          />
-        )}
+        <Circle
+          cx={playerCentroid[0]} cy={playerCentroid[1]}
+          r={Math.max(28, mapW * 0.05)}
+          fill="url(#player-glow)"
+        />
 
-        {/* Country shapes — V2 paths */}
+        {/* Game countries — real Natural Earth shapes, colored by layer */}
         <G>
-          {MAP_COUNTRY_SHAPES.map((shape) => {
-            const cid = shape.countryId;
+          {gameFeatures.map(({ f, cid }) => {
             const country = COUNTRIES[cid];
             const dimmed = activeRegion !== null && country?.region !== activeRegion;
             const isSelected = selected === cid;
             const r = renderForCountry(cid);
-
+            const d = pathMap.get(Number(f.id));
+            if (!d) return null;
             return (
               <Path
-                key={shape.id}
-                d={scalePath(shape.path!)}
+                key={String(f.id)}
+                d={d}
                 fill={r.fill}
                 stroke={r.stroke}
                 strokeWidth={isSelected ? 2 : cid === state.countryId ? 1.6 : 0.9}
@@ -217,94 +265,90 @@ export default function WorldMapScreen() {
         </G>
 
         {/* Selected country glow ring */}
-        {selectedShape && (
-          <Circle
-            cx={pctToPxX(selectedShape.centerX)}
-            cy={pctToPxY(selectedShape.centerY)}
-            r={Math.max(20, mapW * 0.035)}
-            fill="none"
-            stroke={PALETTE.gold}
-            strokeWidth={1.2}
-            strokeDasharray="3,4"
-            opacity={0.85}
-          />
-        )}
+        {selected && centroidMap.has(selected) && (() => {
+          const [cx, cy] = centroidMap.get(selected)!;
+          return (
+            <Circle cx={cx} cy={cy} r={Math.max(20, mapW * 0.035)}
+              fill="none" stroke={PALETTE.gold} strokeWidth={1.2} strokeDasharray="3,4" opacity={0.85} />
+          );
+        })()}
 
-        {/* Country flags as labels */}
-        {MAP_COUNTRY_SHAPES.map((shape) => {
-          const cid = shape.countryId;
-          const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
+        {/* Country flag labels */}
+        {gameFeatures.map(({ f, cid }) => {
+          const country = COUNTRIES[cid];
+          const dimmed = activeRegion !== null && country?.region !== activeRegion;
           if (dimmed) return null;
+          const centroid = centroidMap.get(cid);
+          if (!centroid) return null;
           return (
             <SvgText
-              key={`lbl-${shape.id}`}
-              x={pctToPxX(shape.labelX)}
-              y={pctToPxY(shape.labelY)}
+              key={`lbl-${cid}`}
+              x={centroid[0]} y={centroid[1] + 5}
               fill="#aeb9d4"
               fontSize={Math.max(8, mapW * 0.014)}
               fontWeight="700"
               textAnchor="middle"
               opacity={0.95}
             >
-              {COUNTRIES[cid]?.flag ?? ""}
+              {country?.flag ?? ""}
             </SvgText>
           );
         })}
 
-        {/* Strategic lines from player → others (only when diplomacy/alliances/threat layer) */}
-        {(activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && playerShape && (
+        {/* Strategic lines: player → allies/enemies */}
+        {(activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && (
           <>
-            {(activeLayer !== "threat") && allyShapes.map((s) => {
-              const dimmed = activeRegion !== null && COUNTRIES[s.countryId]?.region !== activeRegion;
+            {activeLayer !== "threat" && allyCountryIds.map((cid) => {
+              const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
               if (dimmed) return null;
+              const ally = centroidMap.get(cid);
+              if (!ally) return null;
               return (
-                <Line
-                  key={`ally-${s.id}`}
-                  x1={pctToPxX(playerShape.centerX)} y1={pctToPxY(playerShape.centerY)}
-                  x2={pctToPxX(s.centerX)} y2={pctToPxY(s.centerY)}
-                  stroke="url(#alliance-line)" strokeWidth={1.2} strokeOpacity={0.55}
-                />
+                <Line key={`ally-${cid}`}
+                  x1={playerCentroid[0]} y1={playerCentroid[1]} x2={ally[0]} y2={ally[1]}
+                  stroke="url(#alliance-line)" strokeWidth={1.2} strokeOpacity={0.55} />
               );
             })}
-            {(activeLayer !== "alliances") && enemyShapes.map((s) => {
-              const dimmed = activeRegion !== null && COUNTRIES[s.countryId]?.region !== activeRegion;
+            {activeLayer !== "alliances" && enemyCountryIds.map((cid) => {
+              const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
               if (dimmed) return null;
+              const enemy = centroidMap.get(cid);
+              if (!enemy) return null;
               return (
-                <Line
-                  key={`tension-${s.id}`}
-                  x1={pctToPxX(playerShape.centerX)} y1={pctToPxY(playerShape.centerY)}
-                  x2={pctToPxX(s.centerX)} y2={pctToPxY(s.centerY)}
-                  stroke="url(#tension-line)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.6}
-                />
+                <Line key={`tension-${cid}`}
+                  x1={playerCentroid[0]} y1={playerCentroid[1]} x2={enemy[0]} y2={enemy[1]}
+                  stroke="url(#tension-line)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.6} />
               );
             })}
           </>
         )}
 
-        {/* Hotspot markers */}
+        {/* Hotspot markers — positioned by centroid of their country */}
         {showHotspots && hotspots.map((h) => {
           const dimmed = activeRegion !== null && COUNTRIES[h.countryId]?.region !== activeRegion;
           if (dimmed) return null;
+          const pos = centroidMap.get(h.countryId as CountryId);
+          if (!pos) return null;
           const color = getHotspotColor(h.type);
           const radius = h.severity === "critical" ? 5 : h.severity === "high" ? 4 : 3;
+          const offsetX = (h.x - 50) * mapW * 0.003;
+          const offsetY = (h.y - 50) * mapH * 0.003;
+          const hx = pos[0] + offsetX;
+          const hy = pos[1] + offsetY;
           return (
             <G key={h.id}>
-              <Circle cx={pctToPxX(h.x)} cy={pctToPxY(h.y)} r={radius + 4} fill={color} opacity={0.18} />
-              <Circle cx={pctToPxX(h.x)} cy={pctToPxY(h.y)} r={radius} fill={color} stroke="#000" strokeWidth={0.4} />
+              <Circle cx={hx} cy={hy} r={radius + 4} fill={color} opacity={0.18} />
+              <Circle cx={hx} cy={hy} r={radius} fill={color} stroke="#000" strokeWidth={0.4} />
             </G>
           );
         })}
       </Svg>
 
-      {/* Pressable tap targets for each country */}
-      {MAP_COUNTRY_SHAPES.map((shape) => {
-        const cid = shape.countryId;
+      {/* Pressable tap targets — sized from real bounding boxes */}
+      {gameFeatures.map(({ f, cid }) => {
         const isPlayer = cid === state.countryId;
         const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-        const cx = pctToPxX(shape.centerX);
-        const cy = pctToPxY(shape.centerY);
-        const w = Math.max(34, (shape.bounds.maxX - shape.bounds.minX) * mapW * 0.8 / 100);
-        const h = Math.max(34, (shape.bounds.maxY - shape.bounds.minY) * mapH * 0.8 / 100);
+        const { cx, cy, bw, bh } = featureBBox(f, mapW, mapH);
         return (
           <Pressable
             key={`btn-${cid}`}
@@ -313,7 +357,7 @@ export default function WorldMapScreen() {
             style={({ pressed }) => [
               styles.nodeBtn,
               {
-                left: cx - w / 2, top: cy - h / 2, width: w, height: h,
+                left: cx - bw / 2, top: cy - bh / 2, width: bw, height: bh,
                 opacity: dimmed ? 0.2 : pressed ? 0.5 : 1,
               },
             ]}
