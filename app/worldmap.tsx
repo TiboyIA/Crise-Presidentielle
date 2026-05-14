@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, {
   Circle,
   Defs,
   G,
-  LinearGradient as SvgGradient,
   Line,
+  LinearGradient as SvgGradient,
   Path,
   RadialGradient,
   Rect,
@@ -17,22 +17,18 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
-import { useResponsive } from "@/utils/responsive";
 import { COUNTRIES } from "@/data/countries";
 import { ALPHA2_TO_COUNTRY_ID, GAME_ALPHA2_SET } from "@/data/isoCountryMap";
-import {
-  computeCountryRender,
-  generateHotspots,
-  getHotspotColor,
-  MAP_LAYERS,
-} from "@/logic/hotspotEngine";
-import type { MapLayerId } from "@/logic/hotspotEngine";
-import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
-import { Badge, Panel, PrimaryButton, ScreenHeader } from "@/components/ui";
-import { FONT, PALETTE, RADIUS, STATUS_COLORS } from "@/constants/uiTokens";
-import type { CountryId, OperationType, RelationStatus } from "@/types/strategy";
+import { generateHotspots, getHotspotColor } from "@/logic/hotspotEngine";
+import { canLaunchOperation } from "@/logic/operationEngine";
+import { FloatingMapLegend } from "@/components/FloatingMapLegend";
+import { CountryCommandPanel } from "@/components/CountryCommandPanel";
+import { computeCountryRenderExt } from "@/data/countryStatus";
+import { FONT, PALETTE, STATUS_COLORS } from "@/constants/uiTokens";
+import type { ExtMapLayerId } from "@/data/mapLayers";
+import type { CountryId, OperationType } from "@/types/strategy";
 
-// ── SVG World Map paths (Natural Earth quality, 243 countries) ───────────────
+// ── SVG World Map data ─────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const SVG_WORLD = require("@/data/svgWorldPaths.json") as Record<string, { d: string; cx: number; cy: number }>;
 
@@ -41,62 +37,41 @@ const SVG_H = 507.209;
 
 type SvgEntry = { d: string; cx: number; cy: number };
 
-// Pre-built lookup tables (computed once at module load)
-const ALL_ENTRIES = Object.entries(SVG_WORLD) as [string, SvgEntry][];
-const BG_ENTRIES  = ALL_ENTRIES.filter(([code]) => !GAME_ALPHA2_SET.has(code));
+const ALL_ENTRIES  = Object.entries(SVG_WORLD) as [string, SvgEntry][];
+const BG_ENTRIES   = ALL_ENTRIES.filter(([code]) => !GAME_ALPHA2_SET.has(code));
 const GAME_ENTRIES = ALL_ENTRIES.filter(([code]) => GAME_ALPHA2_SET.has(code));
-
-// alpha-2 code → CountryId for quick rendering loop
-const ALPHA2_TO_CID = new Map(GAME_ENTRIES.map(([code, _]) => [code, ALPHA2_TO_COUNTRY_ID[code]]));
-// CountryId → SVG entry
-const COUNTRY_SVG = new Map<string, SvgEntry>(
+const ALPHA2_TO_CID = new Map(GAME_ENTRIES.map(([code]) => [code, ALPHA2_TO_COUNTRY_ID[code]]));
+const COUNTRY_SVG   = new Map<string, SvgEntry>(
   GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
 );
 
-const REGIONS = ["Europe", "Amériques", "Asie", "Moyen-Orient"];
-
-const STATUS_LABELS: Record<RelationStatus, string> = {
-  allied:   "Allié",
-  friendly: "Ami",
-  neutral:  "Neutre",
-  rival:    "Rival",
-  hostile:  "Hostile",
-};
-
-function mapStatusToTone(s: RelationStatus): "success" | "info" | "neutral" | "warning" | "danger" {
-  switch (s) {
-    case "allied":   return "success";
-    case "friendly": return "info";
-    case "neutral":  return "neutral";
-    case "rival":    return "warning";
-    case "hostile":  return "danger";
-  }
-}
-
-// Quick actions surfaced directly in the dossier
-const QUICK_ACTIONS: { type: OperationType; icon: string; label: string }[] = [
-  { type: "espionage",          icon: "eye-outline",          label: "Espionner" },
-  { type: "sign_treaty",        icon: "handshake-outline",    label: "Traité" },
-  { type: "sanction",           icon: "block-helper",         label: "Sanction" },
-  { type: "cyber_attack",       icon: "lan-disconnect",       label: "Cyber" },
-  { type: "influence_campaign", icon: "bullhorn-outline",     label: "Influence" },
-  { type: "military_operation", icon: "sword-cross",          label: "Opération" },
-];
-
-type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 export default function WorldMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { state } = useStrategy();
-  const { hPad, isLandscape } = useResponsive();
-  const [selected, setSelected] = useState<CountryId | null>(null);
-  const [activeRegion, setActiveRegion] = useState<string | null>(null);
-  const [activeLayer, setActiveLayer] = useState<MapLayerId>("diplomacy");
+
+  const [selected, setSelected]       = useState<CountryId | null>(null);
+  const [activeLayer, setActiveLayer] = useState<ExtMapLayerId>("diplomacy");
   const [showHotspots, setShowHotspots] = useState(true);
 
   if (!state) return null;
+
+  const isLandscape = width > height;
+
+  // Map fills screen width (portrait) or screen height (landscape)
+  const mapW = isLandscape ? Math.round(height * SVG_W / SVG_H) : width;
+  const mapH = isLandscape ? height : Math.round(width * SVG_H / SVG_W);
+
+  // Center the map on screen
+  const mapLeft = isLandscape ? Math.round((width - mapW) / 2) : 0;
+  const mapTop  = isLandscape ? 0 : Math.round((height - mapH) / 2);
+
+  // SVG → screen scale factors (for tap target positioning)
+  const scaleX = mapW / SVG_W;
+  const scaleY = mapH / SVG_H;
 
   const relationMap = useMemo(
     () => Object.fromEntries(state.relations.map((r) => [r.countryId, r])),
@@ -105,599 +80,405 @@ export default function WorldMapScreen() {
 
   const hotspots = useMemo(() => generateHotspots(state), [state]);
 
-  // Layout: in landscape map takes ~62%, dossier takes the rest.
-  const mapW = isLandscape ? Math.round(width * 0.62) : width;
-  const mapH = isLandscape ? height - 110 : Math.round(width * 0.62);
-  const detailW = isLandscape ? width - mapW : width;
-
+  const playerEntry   = COUNTRY_SVG.get(state.countryId);
   const playerCountry = COUNTRIES[state.countryId];
 
-  // Intel strip tallies
-  const hostileCount = state.relations.filter((r) => r.status === "hostile").length;
-  const alliedCount  = state.relations.filter((r) => r.status === "allied").length;
-  const rivalCount   = state.relations.filter((r) => r.status === "rival").length;
-
   const selectedCountry  = selected ? COUNTRIES[selected] : null;
-  const selectedRelation = selected ? relationMap[selected] : null;
+  const selectedRelation = selected ? (relationMap[selected] ?? null) : null;
+  const selectedHotspots = selected ? hotspots.filter((h) => h.countryId === selected) : [];
 
-  // Scale factors: SVG coord (0-1000 × 0-507) → screen pixels
-  const scaleX = mapW / SVG_W;
-  const scaleY = mapH / SVG_H;
-
-  const playerEntry = COUNTRY_SVG.get(state.countryId);
-
-  const allyCountryIds = state.relations
+  const allyIds  = state.relations
     .filter((r) => (r.status === "allied" || r.status === "friendly") && r.countryId !== state.countryId)
     .map((r) => r.countryId as CountryId);
-
-  const enemyCountryIds = state.relations
+  const enemyIds = state.relations
     .filter((r) => r.status === "hostile" || r.status === "rival")
     .map((r) => r.countryId as CountryId);
 
-  // ── Country render computation per layer ────────────────────────────
-  function renderForCountry(cid: CountryId) {
-    const isPlayer = cid === state!.countryId;
+  const alliedCount  = state.relations.filter((r) => r.status === "allied").length;
+  const hostileCount = state.relations.filter((r) => r.status === "hostile").length;
+
+  function renderFor(cid: CountryId) {
     const country = COUNTRIES[cid];
     const rel = relationMap[cid];
-    return computeCountryRender(
+    return computeCountryRenderExt(
       activeLayer,
-      isPlayer,
-      country,
+      cid === state!.countryId,
+      { ...country },
       rel?.status,
       rel?.threatLevel ?? 0,
     );
   }
 
-  // ── MAP SVG ──────────────────────────────────────────────────────────
-  const MapSvg = (
-    <View style={[styles.mapContainer, { width: mapW, height: mapH }]}>
-      {/* viewBox auto-scales all SVG paths from 0-1000×0-507 to mapW×mapH */}
-      <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH} style={StyleSheet.absoluteFill}>
-        <Defs>
-          <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
-            <Stop offset="0%"   stopColor="#0c1a30" stopOpacity={1} />
-            <Stop offset="60%"  stopColor="#070d18" stopOpacity={1} />
-            <Stop offset="100%" stopColor="#03050a" stopOpacity={1} />
-          </RadialGradient>
-          <SvgGradient id="alliance-line" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%"   stopColor={STATUS_COLORS.allied} stopOpacity={0.7} />
-            <Stop offset="100%" stopColor={STATUS_COLORS.allied} stopOpacity={0.05} />
-          </SvgGradient>
-          <SvgGradient id="tension-line" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%"   stopColor={STATUS_COLORS.hostile} stopOpacity={0.7} />
-            <Stop offset="100%" stopColor={STATUS_COLORS.hostile} stopOpacity={0.05} />
-          </SvgGradient>
-          <RadialGradient id="player-glow" cx="50%" cy="50%" rx="50%" ry="50%">
-            <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.45} />
-            <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
+  // Legend vertical span: from below top bar to above country panel (if open)
+  const topBarH     = insets.top + 56;
+  const panelOffset = selected ? 200 : 24;
+  const legendTop    = topBarH + 8;
+  const legendBottom = panelOffset;
 
-        {/* Ocean background */}
-        <Rect x={0} y={0} width={SVG_W} height={SVG_H} fill="url(#ocean)" />
+  return (
+    <View style={styles.root}>
+      {/* Ocean gradient fills entire screen */}
+      <LinearGradient
+        colors={["#040b18", "#030710", "#040b18"]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
 
-        {/* Faint strategic grid */}
-        {[15, 30, 45, 60, 75, 90].map((pct) => (
-          <Line key={`h${pct}`} x1={0} y1={(pct / 100) * SVG_H} x2={SVG_W} y2={(pct / 100) * SVG_H}
-            stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
-        ))}
-        {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((pct) => (
-          <Line key={`v${pct}`} x1={(pct / 100) * SVG_W} y1={0} x2={(pct / 100) * SVG_W} y2={SVG_H}
-            stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
-        ))}
+      {/* ── MAP LAYER ────────────────────────────────────────────────────────── */}
+      <View style={[styles.mapLayer, { top: mapTop, left: mapLeft }]}>
+        <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH}>
+          <Defs>
+            <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
+              <Stop offset="0%"   stopColor="#0a1828" stopOpacity={1} />
+              <Stop offset="65%"  stopColor="#060e1a" stopOpacity={1} />
+              <Stop offset="100%" stopColor="#020609" stopOpacity={1} />
+            </RadialGradient>
+            <SvgGradient id="gAlliance" x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop offset="0%"   stopColor={STATUS_COLORS.allied}  stopOpacity={0.8} />
+              <Stop offset="100%" stopColor={STATUS_COLORS.allied}  stopOpacity={0} />
+            </SvgGradient>
+            <SvgGradient id="gTension" x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop offset="0%"   stopColor={STATUS_COLORS.hostile} stopOpacity={0.8} />
+              <Stop offset="100%" stopColor={STATUS_COLORS.hostile} stopOpacity={0} />
+            </SvgGradient>
+            <RadialGradient id="playerGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+              <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.55} />
+              <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
+            </RadialGradient>
+            <RadialGradient id="selectedGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+              <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.18} />
+              <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
 
-        {/* Non-game world countries (geographic background) */}
-        <G>
-          {BG_ENTRIES.map(([code, entry]) => (
-            <Path key={code} d={entry.d} fill="#0c1c30" stroke="#172234" strokeWidth={0.35} opacity={0.8} />
+          {/* Ocean */}
+          <Rect x={0} y={0} width={SVG_W} height={SVG_H} fill="url(#ocean)" />
+
+          {/* Strategic grid */}
+          {[20, 40, 60, 80].map((p) => (
+            <Line key={`h${p}`} x1={0} y1={(p / 100) * SVG_H} x2={SVG_W} y2={(p / 100) * SVG_H}
+              stroke="#1a2d45" strokeWidth={0.4} strokeDasharray="4,12" opacity={0.45} />
           ))}
-        </G>
+          {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((p) => (
+            <Line key={`v${p}`} x1={(p / 100) * SVG_W} y1={0} x2={(p / 100) * SVG_W} y2={SVG_H}
+              stroke="#1a2d45" strokeWidth={0.4} strokeDasharray="4,12" opacity={0.45} />
+          ))}
 
-        {/* Player glow (radial halo) — in SVG coords */}
-        {playerEntry && (
-          <Circle
-            cx={playerEntry.cx} cy={playerEntry.cy}
-            r={SVG_W * 0.05}
-            fill="url(#player-glow)"
-          />
-        )}
+          {/* Background countries */}
+          <G>
+            {BG_ENTRIES.map(([code, entry]) => (
+              <Path key={code} d={entry.d} fill="#0d1e35" stroke="#162740" strokeWidth={0.3} opacity={0.9} />
+            ))}
+          </G>
 
-        {/* Game countries — SVG World Map shapes, colored by layer */}
-        <G>
-          {GAME_ENTRIES.map(([code, entry]) => {
-            const cid = ALPHA2_TO_CID.get(code)!;
-            const country = COUNTRIES[cid];
-            const dimmed = activeRegion !== null && country?.region !== activeRegion;
-            const isSelected = selected === cid;
-            const r = renderForCountry(cid);
+          {/* Player country glow halo */}
+          {playerEntry && (
+            <Circle cx={playerEntry.cx} cy={playerEntry.cy} r={SVG_W * 0.048} fill="url(#playerGlow)" />
+          )}
+
+          {/* Game countries — colored by active layer */}
+          <G>
+            {GAME_ENTRIES.map(([code, entry]) => {
+              const cid = ALPHA2_TO_CID.get(code)!;
+              const isSelected = selected === cid;
+              const r = renderFor(cid);
+              return (
+                <Path
+                  key={code}
+                  d={entry.d}
+                  fill={r.fill}
+                  stroke={r.stroke}
+                  strokeWidth={isSelected ? 2.4 : cid === state.countryId ? 1.8 : 1}
+                />
+              );
+            })}
+          </G>
+
+          {/* Selected country: glow + dashed ring */}
+          {selected && COUNTRY_SVG.has(selected) && (() => {
+            const e = COUNTRY_SVG.get(selected)!;
             return (
-              <Path
-                key={code}
-                d={entry.d}
-                fill={r.fill}
-                stroke={r.stroke}
-                strokeWidth={isSelected ? 2 : cid === state.countryId ? 1.6 : 0.9}
-                opacity={dimmed ? 0.22 : 1}
-              />
+              <G key="sel-ring">
+                <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.042} fill="url(#selectedGlow)" />
+                <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.036}
+                  fill="none" stroke={PALETTE.gold} strokeWidth={1.6} strokeDasharray="4,5" opacity={0.9} />
+              </G>
+            );
+          })()}
+
+          {/* Flag emoji labels */}
+          {GAME_ENTRIES.map(([code, entry]) => {
+            const cid  = ALPHA2_TO_CID.get(code)!;
+            const flag = COUNTRIES[cid]?.flag ?? "";
+            const isSelected = selected === cid;
+            return (
+              <SvgText
+                key={`fl-${code}`}
+                x={entry.cx} y={entry.cy + 6}
+                fill={isSelected ? PALETTE.gold : "#9aafc4"}
+                fontSize={13}
+                fontWeight="700"
+                textAnchor="middle"
+                opacity={0.95}
+              >
+                {flag}
+              </SvgText>
             );
           })}
-        </G>
 
-        {/* Selected country glow ring — in SVG coords */}
-        {selected && COUNTRY_SVG.has(selected) && (() => {
-          const e = COUNTRY_SVG.get(selected)!;
-          return (
-            <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.035}
-              fill="none" stroke={PALETTE.gold} strokeWidth={1.2} strokeDasharray="3,4" opacity={0.85} />
-          );
-        })()}
+          {/* Strategic lines: player → allies / enemies */}
+          {playerEntry && (activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && (
+            <G>
+              {activeLayer !== "threat" && allyIds.map((cid) => {
+                const e = COUNTRY_SVG.get(cid);
+                if (!e) return null;
+                return (
+                  <Line key={`al-${cid}`}
+                    x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
+                    stroke="url(#gAlliance)" strokeWidth={1.2} strokeOpacity={0.65} />
+                );
+              })}
+              {activeLayer !== "alliances" && enemyIds.map((cid) => {
+                const e = COUNTRY_SVG.get(cid);
+                if (!e) return null;
+                return (
+                  <Line key={`en-${cid}`}
+                    x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
+                    stroke="url(#gTension)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.7} />
+                );
+              })}
+            </G>
+          )}
 
-        {/* Country flag labels — in SVG coords */}
+          {/* Hotspot markers */}
+          {showHotspots && hotspots.map((h) => {
+            const e = COUNTRY_SVG.get(h.countryId);
+            if (!e) return null;
+            const color  = getHotspotColor(h.type);
+            const radius = h.severity === "critical" ? 6 : h.severity === "high" ? 4.5 : 3;
+            const hx = e.cx + (h.x - 50) * SVG_W * 0.003;
+            const hy = e.cy + (h.y - 50) * SVG_H * 0.003;
+            return (
+              <G key={h.id}>
+                <Circle cx={hx} cy={hy} r={radius + 5} fill={color} opacity={0.14} />
+                <Circle cx={hx} cy={hy} r={radius}     fill={color} stroke="#000" strokeWidth={0.4} />
+              </G>
+            );
+          })}
+        </Svg>
+
+        {/* Pressable tap targets (absolute, over SVG) */}
         {GAME_ENTRIES.map(([code, entry]) => {
           const cid = ALPHA2_TO_CID.get(code)!;
-          const country = COUNTRIES[cid];
-          const dimmed = activeRegion !== null && country?.region !== activeRegion;
-          if (dimmed) return null;
-          return (
-            <SvgText
-              key={`lbl-${code}`}
-              x={entry.cx} y={entry.cy + 5}
-              fill="#aeb9d4"
-              fontSize={14}
-              fontWeight="700"
-              textAnchor="middle"
-              opacity={0.95}
-            >
-              {country?.flag ?? ""}
-            </SvgText>
-          );
-        })}
-
-        {/* Strategic lines: player → allies/enemies — in SVG coords */}
-        {playerEntry && (activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && (
-          <>
-            {activeLayer !== "threat" && allyCountryIds.map((cid) => {
-              const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-              if (dimmed) return null;
-              const e = COUNTRY_SVG.get(cid);
-              if (!e) return null;
-              return (
-                <Line key={`ally-${cid}`}
-                  x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
-                  stroke="url(#alliance-line)" strokeWidth={1.2} strokeOpacity={0.55} />
-              );
-            })}
-            {activeLayer !== "alliances" && enemyCountryIds.map((cid) => {
-              const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-              if (dimmed) return null;
-              const e = COUNTRY_SVG.get(cid);
-              if (!e) return null;
-              return (
-                <Line key={`tension-${cid}`}
-                  x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
-                  stroke="url(#tension-line)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.6} />
-              );
-            })}
-          </>
-        )}
-
-        {/* Hotspot markers — in SVG coords */}
-        {showHotspots && hotspots.map((h) => {
-          const dimmed = activeRegion !== null && COUNTRIES[h.countryId]?.region !== activeRegion;
-          if (dimmed) return null;
-          const e = COUNTRY_SVG.get(h.countryId);
-          if (!e) return null;
-          const color = getHotspotColor(h.type);
-          const radius = h.severity === "critical" ? 5 : h.severity === "high" ? 4 : 3;
-          const hx = e.cx + (h.x - 50) * SVG_W * 0.003;
-          const hy = e.cy + (h.y - 50) * SVG_H * 0.003;
-          return (
-            <G key={h.id}>
-              <Circle cx={hx} cy={hy} r={radius + 4} fill={color} opacity={0.18} />
-              <Circle cx={hx} cy={hy} r={radius} fill={color} stroke="#000" strokeWidth={0.4} />
-            </G>
-          );
-        })}
-      </Svg>
-
-      {/* Pressable tap targets — centered at screen-space centroid */}
-      {GAME_ENTRIES.map(([code, entry]) => {
-        const cid = ALPHA2_TO_CID.get(code)!;
-        const isPlayer = cid === state.countryId;
-        const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-        const screenCx = entry.cx * scaleX;
-        const screenCy = entry.cy * scaleY;
-        const tapW = 52, tapH = 40;
-        return (
-          <Pressable
-            key={`btn-${code}`}
-            onPress={() => !dimmed && !isPlayer && setSelected(cid)}
-            disabled={isPlayer || dimmed}
-            style={({ pressed }) => [
-              styles.nodeBtn,
-              {
-                left: screenCx - tapW / 2, top: screenCy - tapH / 2, width: tapW, height: tapH,
-                opacity: dimmed ? 0.2 : pressed ? 0.5 : 1,
-              },
-            ]}
-          />
-        );
-      })}
-
-      {/* Frame label */}
-      <View style={styles.frameLabel} pointerEvents="none">
-        <Text style={styles.frameKicker}>THÉÂTRE MONDIAL · {MAP_LAYERS.find((l) => l.id === activeLayer)?.label.toUpperCase() ?? ""}</Text>
-        <Text style={styles.frameTime}>LIVE · {playerCountry.name.toUpperCase()}</Text>
-      </View>
-
-      {/* Hotspot toggle */}
-      <Pressable
-        onPress={() => setShowHotspots((v) => !v)}
-        style={({ pressed }) => [styles.hotspotToggle, { opacity: pressed ? 0.7 : 1, borderColor: showHotspots ? PALETTE.gold : PALETTE.panelEdge }]}
-      >
-        <MaterialCommunityIcons name={showHotspots ? "map-marker-radius" : "map-marker-off-outline"} size={12} color={showHotspots ? PALETTE.gold : PALETTE.textMid} />
-        <Text style={[styles.hotspotToggleText, { color: showHotspots ? PALETTE.gold : PALETTE.textMid }]}>{hotspots.length} POINTS</Text>
-      </Pressable>
-
-      {/* Layer-specific legend */}
-      <View style={styles.legend} pointerEvents="none">
-        {activeLayer === "diplomacy" && (["allied","friendly","neutral","rival","hostile"] as RelationStatus[]).map((s) => (
-          <View key={s} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: STATUS_COLORS[s] }]} />
-            <Text style={styles.legendLabel}>{STATUS_LABELS[s]}</Text>
-          </View>
-        ))}
-        {activeLayer === "threat" && (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: "#ff3040" }]} />
-            <Text style={styles.legendLabel}>Menace ↑ rouge</Text>
-          </View>
-        )}
-        {activeLayer === "alliances" && (
-          <>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#52c97a" }]} /><Text style={styles.legendLabel}>Allié</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#4a9fff" }]} /><Text style={styles.legendLabel}>Ami</Text></View>
-          </>
-        )}
-        {(activeLayer === "military" || activeLayer === "cyber" || activeLayer === "economy") && (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: MAP_LAYERS.find((l) => l.id === activeLayer)!.color }]} />
-            <Text style={styles.legendLabel}>Intensité ↑ pleine</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-
-  // ── DOSSIER PANEL ────────────────────────────────────────────────────
-  const DetailContent = selectedCountry && selectedRelation ? (
-    <ScrollView contentContainerStyle={[styles.detailScroll, { paddingBottom: insets.bottom + 20 }]} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.dossierHeader}>
-        <View style={styles.dossierFlagWrap}>
-          <Text style={styles.dossierFlag}>{selectedCountry.flag}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.dossierKicker}>DOSSIER DE RENSEIGNEMENT</Text>
-          <Text style={styles.dossierName}>{selectedCountry.name}</Text>
-          <Text style={styles.dossierRegion}>{selectedCountry.region.toUpperCase()}</Text>
-        </View>
-        <Badge label={STATUS_LABELS[selectedRelation.status]} tone={mapStatusToTone(selectedRelation.status)} size="sm" outlined />
-      </View>
-
-      {/* Score + threat bar */}
-      <Panel style={{ padding: 12, marginTop: 10 }}>
-        <View style={styles.scoreRowV2}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sectionKicker}>SCORE DIPLOMATIQUE</Text>
-            <Text style={styles.scoreValV2}>{selectedRelation.score > 0 ? "+" : ""}{selectedRelation.score}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sectionKicker, { color: PALETTE.danger }]}>NIVEAU DE MENACE</Text>
-            <Text style={[styles.scoreValV2, { color: selectedRelation.threatLevel >= 60 ? PALETTE.danger : PALETTE.warning }]}>{selectedRelation.threatLevel}</Text>
-          </View>
-        </View>
-        <Text style={styles.dossierDescV2}>{selectedCountry.description}</Text>
-      </Panel>
-
-      {/* Hotspots related to this country */}
-      {(() => {
-        const localHotspots = hotspots.filter((h) => h.countryId === selectedCountry.id);
-        if (localHotspots.length === 0) return null;
-        return (
-          <Panel style={{ padding: 10, marginTop: 8 }}>
-            <Text style={styles.sectionKicker}>SIGNAUX ACTIFS</Text>
-            {localHotspots.map((h) => (
-              <View key={h.id} style={styles.hotspotItem}>
-                <View style={[styles.hotspotPip, { backgroundColor: getHotspotColor(h.type) }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.hotspotTitle}>{h.title}</Text>
-                  <Text style={styles.hotspotDesc}>{h.description}</Text>
-                </View>
-                <Text style={[styles.hotspotSev, { color: h.severity === "critical" ? PALETTE.danger : h.severity === "high" ? PALETTE.warning : PALETTE.textLow }]}>{h.severity.toUpperCase()}</Text>
-              </View>
-            ))}
-          </Panel>
-        );
-      })()}
-
-      <Text style={[styles.sectionKicker, { marginTop: 12, marginBottom: 6 }]}>FORCES NATIONALES</Text>
-      <View style={styles.statsGrid}>
-        {([
-          { label: "Économie",  value: selectedCountry.economy,   color: "#3fbe7a" },
-          { label: "Militaire", value: selectedCountry.military,  color: "#e54848" },
-          { label: "Cyber",     value: selectedCountry.cyber,     color: "#a78bfa" },
-          { label: "Diplomatie",value: selectedCountry.diplomacy, color: "#4a9fff" },
-        ]).map(({ label, value, color }) => (
-          <Panel key={label} style={styles.statCell}>
-            <Text style={[styles.statValue, { color }]}>{value}</Text>
-            <Text style={styles.statLabel}>{label.toUpperCase()}</Text>
-            <View style={styles.statBar}>
-              <View style={[styles.statFill, { width: `${value}%`, backgroundColor: color }]} />
-            </View>
-          </Panel>
-        ))}
-      </View>
-
-      {selectedRelation.revealedIntel && (() => {
-        const intel = selectedRelation.revealedIntel!;
-        const isStale = state.news.actionCount - intel.revealedAtAction > 50;
-        return (
-          <Panel style={{ padding: 12, marginTop: 8, borderColor: "#52c97a44", borderWidth: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <MaterialCommunityIcons name="eye-check-outline" size={13} color="#52c97a" />
-              <Text style={[styles.sectionKicker, { color: "#52c97a", flex: 1 }]}>INTELLIGENCE RÉVÉLÉE</Text>
-              {isStale && <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.warning, letterSpacing: 1 }}>DATÉE</Text>}
-            </View>
-            {([
-              { label: "Capacité militaire", value: intel.military },
-              { label: "Cybersécurité",      value: intel.cyber },
-              { label: "Économie réelle",    value: intel.economy },
-              { label: "Stabilité interne",  value: intel.stability },
-            ]).map(({ label, value }) => (
-              <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <Text style={{ fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid, width: 110 }}>{label}</Text>
-                <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" }}>
-                  <View style={{ height: "100%", width: `${value}%`, borderRadius: 2, backgroundColor: isStale ? PALETTE.textLow : "#52c97a" }} />
-                </View>
-                <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: isStale ? PALETTE.textLow : "#52c97a", width: 24, textAlign: "right" }}>{value}</Text>
-              </View>
-            ))}
-          </Panel>
-        );
-      })()}
-
-      {/* Quick actions with availability check */}
-      <Text style={[styles.sectionKicker, { marginTop: 12, marginBottom: 6 }]}>ACTIONS RAPIDES</Text>
-      <View style={styles.actionGrid}>
-        {QUICK_ACTIONS.map((qa) => {
-          const op = OPERATIONS[qa.type];
-          const check = canLaunchOperation(qa.type, selectedRelation, state.buildings, state.resources);
+          if (cid === state.countryId) return null;
+          const cx = entry.cx * scaleX;
+          const cy = entry.cy * scaleY;
+          const TAP = 52;
           return (
             <Pressable
-              key={qa.type}
-              onPress={() => {
-                setSelected(null);
-                router.push({ pathname: "/operations", params: { countryId: selectedCountry.id, op: qa.type } });
-              }}
-              style={({ pressed }) => [
-                styles.actionCell,
-                {
-                  borderColor: check.allowed ? PALETTE.gold + "55" : PALETTE.panelEdge,
-                  opacity: pressed ? 0.7 : check.allowed ? 1 : 0.55,
-                  backgroundColor: check.allowed ? "rgba(201,168,76,0.06)" : "transparent",
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={qa.icon as McIconName}
-                size={16}
-                color={check.allowed ? PALETTE.gold : PALETTE.textLow}
-              />
-              <Text style={[styles.actionLabel, { color: check.allowed ? PALETTE.textHigh : PALETTE.textLow }]}>{qa.label}</Text>
-              <Text style={styles.actionMeta} numberOfLines={1}>
-                {check.allowed ? op.name : (check.reason ?? "Indisponible")}
-              </Text>
-            </Pressable>
+              key={`tp-${code}`}
+              onPress={() => setSelected(cid === selected ? null : cid)}
+              style={({ pressed }) => ({
+                position: "absolute",
+                left: cx - TAP / 2,
+                top: cy - TAP / 2,
+                width: TAP,
+                height: TAP,
+                opacity: pressed ? 0.5 : 1,
+              })}
+            />
           );
         })}
       </View>
 
-      <View style={{ marginTop: 12 }}>
-        <PrimaryButton
-          label="Ouvrir le centre d'opérations"
-          variant="primary"
-          size="lg"
-          onPress={() => {
-            setSelected(null);
-            router.push({ pathname: "/operations", params: { countryId: selectedCountry.id } });
-          }}
+      {/* ── HUD OVERLAY ──────────────────────────────────────────────────────── */}
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+
+        {/* Top command bar */}
+        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10) + 4 }]} pointerEvents="none">
+          {/* Left: player identity */}
+          <View style={styles.topLeft}>
+            <Text style={styles.topFlag}>{playerCountry?.flag ?? ""}</Text>
+            <View>
+              <Text style={styles.topCountry} numberOfLines={1}>{playerCountry?.name ?? ""}</Text>
+              <Text style={styles.topKicker}>COMMANDANT EN CHEF</Text>
+            </View>
+          </View>
+
+          {/* Center: mandate day */}
+          <View style={styles.topCenter}>
+            <Text style={styles.topDay}>J·{state.mandateDay}</Text>
+            <Text style={styles.topDayLabel}>MANDAT</Text>
+          </View>
+
+          {/* Right: quick stats */}
+          <View style={styles.topRight}>
+            <HudStat
+              value={`${state.nationalIndicators.popularity}%`}
+              label="POPU"
+              color={state.nationalIndicators.popularity >= 50 ? "#52c97a" : "#ff3040"}
+            />
+            <View style={styles.topDivider} />
+            <HudStat value={`${alliedCount}`}  label="ALLIÉS"  color="#52c97a" />
+            <HudStat value={`${hostileCount}`} label="HOSTILE" color="#ff3040" />
+          </View>
+        </View>
+
+        {/* Floating layer legend — right side */}
+        <FloatingMapLegend
+          activeLayer={activeLayer}
+          onLayerChange={setActiveLayer}
+          showHotspots={showHotspots}
+          onToggleHotspots={() => setShowHotspots((v) => !v)}
+          style={{ top: legendTop, bottom: legendBottom }}
         />
-      </View>
-    </ScrollView>
-  ) : (
-    <View style={styles.emptyDetail}>
-      <MaterialCommunityIcons name="crosshairs-gps" size={28} color={PALETTE.textLow} />
-      <Text style={styles.emptyDetailText}>Sélectionnez un pays{"\n"}pour ouvrir son dossier</Text>
-    </View>
-  );
 
-  // ── LAYOUT ───────────────────────────────────────────────────────────
-  return (
-    <View style={styles.container}>
-      <ScreenHeader title="Salle de crise" kicker="THÉÂTRE MONDIAL" />
+        {/* Country command panel — slides up from bottom */}
+        {selected && selectedCountry && selectedRelation && (
+          <CountryCommandPanel
+            country={selectedCountry}
+            relation={selectedRelation}
+            hotspots={selectedHotspots}
+            buildings={state.buildings}
+            resources={state.resources}
+            insets={insets}
+            onClose={() => setSelected(null)}
+            onOpenDossier={() => {
+              setSelected(null);
+              router.push({ pathname: "/operations", params: { countryId: selected } });
+            }}
+            onAction={(op: OperationType) => {
+              setSelected(null);
+              router.push({ pathname: "/operations", params: { countryId: selected, op } });
+            }}
+          />
+        )}
 
-      {/* Intel strip */}
-      <View style={[styles.intelStrip, { paddingHorizontal: hPad }]}>
-        <View style={styles.intelChip}>
-          <View style={[styles.intelDot, { backgroundColor: STATUS_COLORS.allied }]} />
-          <Text style={styles.intelText}>{alliedCount} alliés</Text>
-        </View>
-        <View style={styles.intelChip}>
-          <View style={[styles.intelDot, { backgroundColor: STATUS_COLORS.rival }]} />
-          <Text style={styles.intelText}>{rivalCount} rivaux</Text>
-        </View>
-        <View style={styles.intelChip}>
-          <View style={[styles.intelDot, { backgroundColor: STATUS_COLORS.hostile }]} />
-          <Text style={styles.intelText}>{hostileCount} hostiles</Text>
-        </View>
-        <View style={styles.intelChip}>
-          <Text style={[styles.intelText, { color: PALETTE.gold }]}>{state.relations.length} dossiers</Text>
-        </View>
-      </View>
-
-      {/* Layer selector */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.layerTabs, { paddingHorizontal: hPad }]}>
-        {MAP_LAYERS.map((l) => {
-          const active = activeLayer === l.id;
-          return (
-            <Pressable
-              key={l.id}
-              onPress={() => setActiveLayer(l.id)}
-              style={({ pressed }) => [
-                styles.layerTab,
-                {
-                  backgroundColor: active ? l.color + "22" : "transparent",
-                  borderColor: active ? l.color : PALETTE.panelEdge,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons name={l.icon as McIconName} size={11} color={active ? l.color : PALETTE.textMid} />
-              <Text style={[styles.layerTabText, { color: active ? PALETTE.textHigh : PALETTE.textMid }]}>{l.shortLabel}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* Region filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.regionTabs, { paddingHorizontal: hPad }]}>
-        <RegionTab label="Tous" active={!activeRegion} onPress={() => setActiveRegion(null)} />
-        {REGIONS.map((r) => (
-          <RegionTab key={r} label={r} active={activeRegion === r} onPress={() => setActiveRegion(r === activeRegion ? null : r)} />
-        ))}
-      </ScrollView>
-
-      {/* LANDSCAPE: side-by-side */}
-      {isLandscape ? (
-        <View style={styles.landscapeRow}>
-          {MapSvg}
-          <View style={[styles.detailSide, { width: detailW }]}>
-            <LinearGradient colors={["#0f1420", "#080b12"]} style={{ flex: 1, padding: 14 }}>
-              {DetailContent}
-            </LinearGradient>
+        {/* Bottom-right: hotspot count badge */}
+        {showHotspots && hotspots.length > 0 && (
+          <View
+            style={[styles.hotspotBadge, { bottom: (selected ? 200 : 16) + Math.max(insets.bottom, 4) }]}
+            pointerEvents="none"
+          >
+            <MaterialCommunityIcons name="map-marker-radius" size={10} color="#ff6040" />
+            <Text style={styles.hotspotBadgeText}>{hotspots.length} signaux</Text>
           </View>
-        </View>
-      ) : (
-        <>
-          {MapSvg}
-          <View style={[styles.hint, { paddingHorizontal: hPad }]}>
-            <Text style={styles.hintText}>Touchez un pays ou un point chaud pour ouvrir le dossier.</Text>
-          </View>
-
-          {/* Portrait modal */}
-          <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
-            <Pressable style={styles.overlay} onPress={() => setSelected(null)} />
-            {selectedCountry && selectedRelation && (
-              <View style={[styles.sheetWrap, { maxHeight: height * 0.82 }]}>
-                <LinearGradient colors={["#161b27", "#0a0d14"]} style={styles.sheet}>
-                  <View style={styles.sheetHandle} />
-                  {DetailContent}
-                </LinearGradient>
-              </View>
-            )}
-          </Modal>
-        </>
-      )}
+        )}
+      </View>
     </View>
   );
 }
 
-function RegionTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function HudStat({ value, label, color }: { value: string; label: string; color: string }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.regionTab,
-        { backgroundColor: active ? PALETTE.crimson + "33" : "transparent", borderColor: active ? PALETTE.crimson : PALETTE.panelEdge, opacity: pressed ? 0.85 : 1 },
-      ]}
-    >
-      <Text style={[styles.regionTabText, { color: active ? PALETTE.textHigh : PALETTE.textMid }]}>{label}</Text>
-    </Pressable>
+    <View style={styles.hudStat}>
+      <Text style={[styles.hudStatValue, { color }]}>{value}</Text>
+      <Text style={styles.hudStatLabel}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: PALETTE.ink },
-  intelStrip: { flexDirection: "row", gap: 12, paddingVertical: 6 },
-  intelChip: { flexDirection: "row", alignItems: "center", gap: 5 },
-  intelDot: { width: 6, height: 6, borderRadius: 3 },
-  intelText: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 0.5 },
+  root: {
+    flex: 1,
+    backgroundColor: "#040b18",
+  },
+  mapLayer: {
+    position: "absolute",
+  },
 
-  layerTabs: { gap: 6, paddingTop: 4, paddingBottom: 6 },
-  layerTab: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth },
-  layerTabText: { fontSize: 10, fontFamily: FONT.bold, letterSpacing: 1 },
+  // ── Top command bar ────────────────────────────────────────────────────────
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    backgroundColor: "rgba(3,7,16,0.85)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(74,159,255,0.2)",
+    gap: 8,
+  },
+  topLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+    minWidth: 0,
+  },
+  topFlag: { fontSize: 22 },
+  topCountry: {
+    fontSize: 12,
+    fontFamily: FONT.bold,
+    color: PALETTE.textHigh,
+  },
+  topKicker: {
+    fontSize: 7,
+    fontFamily: FONT.bold,
+    color: PALETTE.gold,
+    letterSpacing: 1.8,
+    marginTop: 1,
+  },
+  topCenter: {
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  topDay: {
+    fontSize: 16,
+    fontFamily: FONT.bold,
+    color: PALETTE.textHigh,
+    letterSpacing: 1,
+  },
+  topDayLabel: {
+    fontSize: 7,
+    fontFamily: FONT.bold,
+    color: PALETTE.textLow,
+    letterSpacing: 2,
+    marginTop: -2,
+  },
+  topRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  topDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 22,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  hudStat: {
+    alignItems: "center",
+    gap: 1,
+  },
+  hudStatValue: {
+    fontSize: 11,
+    fontFamily: FONT.bold,
+  },
+  hudStatLabel: {
+    fontSize: 6,
+    fontFamily: FONT.bold,
+    color: PALETTE.textLow,
+    letterSpacing: 1,
+  },
 
-  regionTabs: { gap: 6, paddingBottom: 4 },
-  regionTab: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth },
-  regionTabText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1 },
-
-  mapContainer: { position: "relative", overflow: "hidden", borderTopWidth: 1, borderBottomWidth: 1, borderColor: PALETTE.panelEdge },
-  nodeBtn: { position: "absolute" },
-  frameLabel: { position: "absolute", top: 8, left: 10 },
-  frameKicker: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.8 },
-  frameTime: { fontSize: 8, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 1, marginTop: 2 },
-
-  hotspotToggle: { position: "absolute", top: 8, right: 10, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, backgroundColor: "rgba(0,0,0,0.55)" },
-  hotspotToggleText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 1 },
-
-  legend: { position: "absolute", bottom: 8, right: 10, gap: 3 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  legendDot: { width: 6, height: 6, borderRadius: 3 },
-  legendLabel: { fontSize: 8, fontFamily: FONT.med, color: PALETTE.textMid, letterSpacing: 0.4 },
-
-  landscapeRow: { flex: 1, flexDirection: "row" },
-  detailSide: { borderLeftWidth: 1, borderColor: PALETTE.panelEdge },
-
-  detailScroll: { gap: 0 },
-  emptyDetail: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.5 },
-  emptyDetailText: { fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textLow, textAlign: "center", lineHeight: 18 },
-
-  hint: { paddingVertical: 8 },
-  hintText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, fontStyle: "italic" },
-
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)" },
-  sheetWrap: { borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, overflow: "hidden" },
-  sheet: { padding: 18, paddingTop: 8 },
-  sheetHandle: { width: 40, height: 4, backgroundColor: PALETTE.panelEdge, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
-
-  dossierHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
-  dossierFlagWrap: { width: 52, height: 52, borderRadius: 6, backgroundColor: PALETTE.panelHi, borderWidth: 1, borderColor: PALETTE.goldDim + "55", alignItems: "center", justifyContent: "center" },
-  dossierFlag: { fontSize: 30 },
-  dossierKicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2.5 },
-  dossierName: { fontSize: 18, fontFamily: FONT.bold, color: PALETTE.textHigh, marginTop: 2 },
-  dossierRegion: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textMid, letterSpacing: 1.5, marginTop: 1 },
-
-  sectionKicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2, marginBottom: 6 },
-  dossierDescV2: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textHigh, lineHeight: 15, marginTop: 8 },
-  scoreRowV2: { flexDirection: "row", gap: 16 },
-  scoreValV2: { fontSize: 22, fontFamily: FONT.bold, color: PALETTE.textHigh, marginTop: 2 },
-
-  hotspotItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 },
-  hotspotPip: { width: 6, height: 6, borderRadius: 3 },
-  hotspotTitle: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh },
-  hotspotDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1 },
-  hotspotSev: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1 },
-
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  statCell: { flex: 1, minWidth: "44%", padding: 10, gap: 4 },
-  statValue: { fontSize: 20, fontFamily: FONT.bold },
-  statLabel: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.5 },
-  statBar: { height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden", marginTop: 4 },
-  statFill: { height: "100%", borderRadius: 2 },
-
-  actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  actionCell: { width: "31%", flexGrow: 1, minWidth: 88, padding: 10, gap: 4, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: "center" },
-  actionLabel: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
-  actionMeta: { fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow, letterSpacing: 0.3, textAlign: "center" },
+  // ── Hotspot badge ──────────────────────────────────────────────────────────
+  hotspotBadge: {
+    position: "absolute",
+    left: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: "rgba(4,9,20,0.82)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,96,64,0.3)",
+  },
+  hotspotBadgeText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: "#ff6040",
+    letterSpacing: 0.5,
+  },
 });
