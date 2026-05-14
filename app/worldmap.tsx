@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, {
   Circle,
@@ -16,6 +16,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedReaction,
+  withSpring,
+  runOnJS,
+} from "react-native-reanimated";
+import type { SharedValue } from "react-native-reanimated";
 import { useStrategy } from "@/context/StrategyContext";
 import { COUNTRIES } from "@/data/countries";
 import { ALPHA2_TO_COUNTRY_ID, GAME_ALPHA2_SET } from "@/data/isoCountryMap";
@@ -45,6 +54,9 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
   GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
 );
 
+const MIN_SCALE = 1;
+const MAX_SCALE = 6;
+
 type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 export default function WorldMapScreen() {
@@ -53,9 +65,26 @@ export default function WorldMapScreen() {
   const { width, height } = useWindowDimensions();
   const { state } = useStrategy();
 
-  const [selected, setSelected]       = useState<CountryId | null>(null);
-  const [activeLayer, setActiveLayer] = useState<ExtMapLayerId>("diplomacy");
+  const [selected, setSelected]         = useState<CountryId | null>(null);
+  const [activeLayer, setActiveLayer]   = useState<ExtMapLayerId>("diplomacy");
   const [showHotspots, setShowHotspots] = useState(true);
+
+  // ── Zoom / pan shared values ────────────────────────────────────────────────
+  const scale      = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  // Saved state at gesture start
+  const savedScale = useSharedValue(1);
+  const savedTx    = useSharedValue(0);
+  const savedTy    = useSharedValue(0);
+  // Pinch focal point (screen coords, captured at gesture start)
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
+  // Layout values accessible in worklets
+  const svMapW   = useSharedValue(0);
+  const svMapH   = useSharedValue(0);
+  const svWidth  = useSharedValue(width);
+  const svHeight = useSharedValue(height);
 
   if (!state) return null;
 
@@ -72,6 +101,107 @@ export default function WorldMapScreen() {
   // SVG → screen scale factors (for tap target positioning)
   const scaleX = mapW / SVG_W;
   const scaleY = mapH / SVG_H;
+
+  // Sync layout into shared values; reset zoom on orientation change
+  useEffect(() => {
+    svMapW.value  = mapW;
+    svMapH.value  = mapH;
+    svWidth.value  = width;
+    svHeight.value = height;
+    scale.value      = withSpring(1, { damping: 20 });
+    translateX.value = withSpring(0, { damping: 20 });
+    translateY.value = withSpring(0, { damping: 20 });
+  }, [mapW, mapH]);
+
+  // ── Clamp helper (worklet) ──────────────────────────────────────────────────
+  // Prevents panning beyond the map edges; allows all motion while zoomed.
+  function clampedTranslation(tx: number, ty: number, s: number): [number, number] {
+    "worklet";
+    const maxTx = Math.max(0, (svMapW.value * s - svWidth.value)  / 2);
+    const maxTy = Math.max(0, (svMapH.value * s - svHeight.value) / 2);
+    return [
+      Math.max(-maxTx, Math.min(maxTx, tx)),
+      Math.max(-maxTy, Math.min(maxTy, ty)),
+    ];
+  }
+
+  // ── Gestures ────────────────────────────────────────────────────────────────
+  const pinch = Gesture.Pinch()
+    .onStart((e) => {
+      savedScale.value = scale.value;
+      savedTx.value    = translateX.value;
+      savedTy.value    = translateY.value;
+      focalX.value     = e.focalX;
+      focalY.value     = e.focalY;
+    })
+    .onUpdate((e) => {
+      // Map center on screen (no transform)
+      const cx = svMapW.value / 2 + (svWidth.value - svMapW.value) / 2;
+      const cy = svMapH.value / 2 + (svHeight.value - svMapH.value) / 2;
+      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, savedScale.value * e.scale));
+      const d = newScale / savedScale.value;
+      // Zoom around focal point (focal stays fixed on screen)
+      const newTx = savedTx.value * d + (focalX.value - cx) * (1 - d);
+      const newTy = savedTy.value * d + (focalY.value - cy) * (1 - d);
+      const [tx, ty] = clampedTranslation(newTx, newTy, newScale);
+      scale.value      = newScale;
+      translateX.value = tx;
+      translateY.value = ty;
+    });
+
+  const pan = Gesture.Pan()
+    .minDistance(4)
+    .onStart(() => {
+      savedTx.value = translateX.value;
+      savedTy.value = translateY.value;
+    })
+    .onUpdate((e) => {
+      const [tx, ty] = clampedTranslation(
+        savedTx.value + e.translationX,
+        savedTy.value + e.translationY,
+        scale.value,
+      );
+      translateX.value = tx;
+      translateY.value = ty;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd((e) => {
+      const cx = svMapW.value / 2 + (svWidth.value - svMapW.value) / 2;
+      const cy = svMapH.value / 2 + (svHeight.value - svMapH.value) / 2;
+      if (scale.value > 1.5) {
+        // Reset to fit
+        scale.value      = withSpring(1,  { damping: 18 });
+        translateX.value = withSpring(0,  { damping: 18 });
+        translateY.value = withSpring(0,  { damping: 18 });
+      } else {
+        // Zoom ×2.5 around tap point
+        const targetScale = Math.min(MAX_SCALE, scale.value * 2.5);
+        const d = targetScale / scale.value;
+        const [tx, ty] = clampedTranslation(
+          translateX.value * d + (e.x - cx) * (1 - d),
+          translateY.value * d + (e.y - cy) * (1 - d),
+          targetScale,
+        );
+        scale.value      = withSpring(targetScale, { damping: 18 });
+        translateX.value = withSpring(tx, { damping: 18 });
+        translateY.value = withSpring(ty, { damping: 18 });
+      }
+    });
+
+  const combinedGesture = Gesture.Simultaneous(
+    Gesture.Race(doubleTap, pan),
+    pinch,
+  );
+
+  const animatedMapStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
 
   const relationMap = useMemo(
     () => Object.fromEntries(state.relations.map((r) => [r.countryId, r])),
@@ -125,8 +255,9 @@ export default function WorldMapScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* ── MAP LAYER ────────────────────────────────────────────────────────── */}
-      <View style={[styles.mapLayer, { top: mapTop, left: mapLeft }]}>
+      {/* ── MAP LAYER (gesture area) ─────────────────────────────────────────── */}
+      <GestureDetector gesture={combinedGesture}>
+      <Animated.View style={[styles.mapLayer, { top: mapTop, left: mapLeft }, animatedMapStyle]}>
         <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH}>
           <Defs>
             <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
@@ -290,7 +421,8 @@ export default function WorldMapScreen() {
             />
           );
         })}
-      </View>
+      </Animated.View>
+      </GestureDetector>
 
       {/* ── HUD OVERLAY ──────────────────────────────────────────────────────── */}
       <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
@@ -355,7 +487,7 @@ export default function WorldMapScreen() {
           />
         )}
 
-        {/* Bottom-right: hotspot count badge */}
+        {/* Bottom-left: hotspot badge */}
         {showHotspots && hotspots.length > 0 && (
           <View
             style={[styles.hotspotBadge, { bottom: (selected ? 200 : 16) + Math.max(insets.bottom, 4) }]}
@@ -365,6 +497,43 @@ export default function WorldMapScreen() {
             <Text style={styles.hotspotBadgeText}>{hotspots.length} signaux</Text>
           </View>
         )}
+
+        {/* Zoom controls — bottom left, above hotspot badge */}
+        <ZoomControls
+          scale={scale}
+          onReset={() => {
+            scale.value      = withSpring(1,  { damping: 18 });
+            translateX.value = withSpring(0,  { damping: 18 });
+            translateY.value = withSpring(0,  { damping: 18 });
+          }}
+          onZoomIn={() => {
+            const cx = svMapW.value / 2 + (svWidth.value - svMapW.value) / 2;
+            const cy = svMapH.value / 2 + (svHeight.value - svMapH.value) / 2;
+            const newS = Math.min(MAX_SCALE, scale.value * 1.6);
+            const d = newS / scale.value;
+            const [tx, ty] = clampedTranslation(
+              translateX.value * d + (cx - cx) * (1 - d),
+              translateY.value * d + (cy - cy) * (1 - d),
+              newS,
+            );
+            scale.value      = withSpring(newS, { damping: 18 });
+            translateX.value = withSpring(tx,   { damping: 18 });
+            translateY.value = withSpring(ty,   { damping: 18 });
+          }}
+          onZoomOut={() => {
+            const newS = Math.max(MIN_SCALE, scale.value / 1.6);
+            const d = newS / scale.value;
+            const [tx, ty] = clampedTranslation(
+              translateX.value * d,
+              translateY.value * d,
+              newS,
+            );
+            scale.value      = withSpring(newS, { damping: 18 });
+            translateX.value = withSpring(tx,   { damping: 18 });
+            translateY.value = withSpring(ty,   { damping: 18 });
+          }}
+          bottom={(selected ? 200 : 60) + Math.max(insets.bottom, 4)}
+        />
       </View>
     </View>
   );
@@ -377,6 +546,41 @@ function HudStat({ value, label, color }: { value: string; label: string; color:
       <Text style={styles.hudStatLabel}>{label}</Text>
     </View>
   );
+}
+
+interface ZoomControlsProps {
+  scale: SharedValue<number>;
+  bottom: number;
+  onReset: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+}
+function ZoomControls({ scale, bottom, onReset, onZoomIn, onZoomOut }: ZoomControlsProps) {
+  return (
+    <View style={[styles.zoomControls, { bottom }]} pointerEvents="box-none">
+      <View style={styles.zoomPanel} pointerEvents="auto">
+        <Pressable onPress={onZoomIn} style={({ pressed }) => [styles.zoomBtn, { opacity: pressed ? 0.6 : 1 }]}>
+          <MaterialCommunityIcons name="plus" size={16} color={PALETTE.textHigh} />
+        </Pressable>
+        <Pressable onPress={onReset} style={({ pressed }) => [styles.zoomReset, { opacity: pressed ? 0.6 : 1 }]}>
+          <ScaleLabel scale={scale} />
+          <MaterialCommunityIcons name="fullscreen-exit" size={11} color={PALETTE.textLow} />
+        </Pressable>
+        <Pressable onPress={onZoomOut} style={({ pressed }) => [styles.zoomBtn, { opacity: pressed ? 0.6 : 1 }]}>
+          <MaterialCommunityIcons name="minus" size={16} color={PALETTE.textHigh} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ScaleLabel({ scale }: { scale: SharedValue<number> }) {
+  const [display, setDisplay] = useState("1.0×");
+  useAnimatedReaction(
+    () => scale.value,
+    (s) => { runOnJS(setDisplay)(`${s.toFixed(1)}×`); },
+  );
+  return <Text style={styles.zoomResetText}>{display}</Text>;
 }
 
 const styles = StyleSheet.create({
@@ -479,6 +683,46 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: FONT.bold,
     color: "#ff6040",
+    letterSpacing: 0.5,
+  },
+
+  // ── Zoom controls ──────────────────────────────────────────────────────────
+  zoomControls: {
+    position: "absolute",
+    right: 10,
+    alignItems: "flex-end",
+  },
+  zoomPanel: {
+    backgroundColor: "rgba(4,9,20,0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(74,159,255,0.2)",
+    borderRadius: 8,
+    overflow: "hidden",
+    shadowColor: "#4a9fff",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  zoomBtn: {
+    width: 36,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomReset: {
+    width: 36,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(74,159,255,0.2)",
+    gap: 1,
+  },
+  zoomResetText: {
+    fontSize: 8,
+    fontFamily: FONT.bold,
+    color: PALETTE.gold,
     letterSpacing: 0.5,
   },
 });
