@@ -57,6 +57,37 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
 const MIN_SCALE = 1;
 const MAX_SCALE = 6;
 
+// Grandes puissances visibles dès le zoom moyen
+const MAJOR_POWERS = new Set<CountryId>([
+  "usa", "china", "russia", "india", "uk", "france", "germany", "brazil",
+]);
+
+// Noms courts pour labels carte (sans emoji)
+const LABEL_NAMES: Partial<Record<CountryId, string>> = {
+  usa:         "USA",
+  china:       "CHINE",
+  russia:      "RUSSIE",
+  india:       "INDE",
+  uk:          "R.-UNI",
+  france:      "FRANCE",
+  germany:     "ALLEMAGNE",
+  brazil:      "BRÉSIL",
+  japan:       "JAPON",
+  turkey:      "TÜRKIYE",
+  iran:        "IRAN",
+  israel:      "ISRAËL",
+  south_korea: "COR. SUD",
+  italy:       "ITALIE",
+  saudi_arabia:"ARABIE S.",
+  australia:   "AUSTRALIE",
+  canada:      "CANADA",
+  north_korea: "COR. NORD",
+  nigeria:     "NIGERIA",
+  pakistan:    "PAKISTAN",
+};
+
+type LabelMode = "none" | "major" | "all";
+
 type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 export default function WorldMapScreen() {
@@ -68,6 +99,7 @@ export default function WorldMapScreen() {
   const [selected, setSelected]         = useState<CountryId | null>(null);
   const [activeLayer, setActiveLayer]   = useState<ExtMapLayerId>("diplomacy");
   const [showHotspots, setShowHotspots] = useState(true);
+  const [labelMode, setLabelMode]       = useState<LabelMode>("none");
 
   // ── Zoom / pan shared values ────────────────────────────────────────────────
   const scale      = useSharedValue(1);
@@ -112,6 +144,15 @@ export default function WorldMapScreen() {
     translateX.value = withSpring(0, { damping: 20 });
     translateY.value = withSpring(0, { damping: 20 });
   }, [mapW, mapH]);
+
+  // Mise à jour des labels selon le niveau de zoom
+  useAnimatedReaction(
+    () => scale.value,
+    (s) => {
+      const mode: LabelMode = s < 1.8 ? "none" : s < 3.5 ? "major" : "all";
+      runOnJS(setLabelMode)(mode);
+    },
+  );
 
   // ── Clamp helper (worklet) ──────────────────────────────────────────────────
   // Prevents panning beyond the map edges; allows all motion while zoomed.
@@ -338,22 +379,24 @@ export default function WorldMapScreen() {
             );
           })()}
 
-          {/* Flag emoji labels */}
-          {GAME_ENTRIES.map(([code, entry]) => {
-            const cid  = ALPHA2_TO_CID.get(code)!;
-            const flag = COUNTRIES[cid]?.flag ?? "";
+          {/* Labels pays — apparaissent selon le niveau de zoom */}
+          {labelMode !== "none" && GAME_ENTRIES.map(([code, entry]) => {
+            const cid = ALPHA2_TO_CID.get(code)!;
+            if (labelMode === "major" && !MAJOR_POWERS.has(cid)) return null;
             const isSelected = selected === cid;
+            const label = LABEL_NAMES[cid] ?? cid.toUpperCase();
             return (
               <SvgText
-                key={`fl-${code}`}
-                x={entry.cx} y={entry.cy + 6}
-                fill={isSelected ? PALETTE.gold : "#9aafc4"}
-                fontSize={13}
-                fontWeight="700"
+                key={`lbl-${code}`}
+                x={entry.cx}
+                y={entry.cy + 5}
+                fill={isSelected ? PALETTE.gold : "#6a8099"}
+                fontSize={labelMode === "all" ? 10 : 12}
+                fontWeight="600"
                 textAnchor="middle"
-                opacity={0.95}
+                opacity={isSelected ? 1 : 0.8}
               >
-                {flag}
+                {label}
               </SvgText>
             );
           })}
