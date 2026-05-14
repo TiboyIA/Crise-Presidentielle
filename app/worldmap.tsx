@@ -503,7 +503,17 @@ export default function WorldMapScreen() {
       <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
 
         {/* Top command bar */}
-        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10) + 4 }]} pointerEvents="none">
+        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10) + 4 }]} pointerEvents="box-none">
+          {/* Back button */}
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}
+            pointerEvents="auto"
+          >
+            <MaterialCommunityIcons name="arrow-left" size={16} color={PALETTE.textMid} />
+          </Pressable>
+
           {/* Left: player identity */}
           <View style={styles.topLeft}>
             <Text style={styles.topFlag}>{playerCountry?.flag ?? ""}</Text>
@@ -677,6 +687,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(74,159,255,0.2)",
     gap: 8,
+  },
+  backBtn: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.1)",
+    marginRight: 4,
   },
   topLeft: {
     flexDirection: "row",
