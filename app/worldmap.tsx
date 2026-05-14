@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
 import { COUNTRIES } from "@/data/countries";
-import { ISO_TO_COUNTRY_ID, GAME_ISO_SET } from "@/data/isoCountryMap";
+import { ALPHA2_TO_COUNTRY_ID, GAME_ALPHA2_SET } from "@/data/isoCountryMap";
 import {
   computeCountryRender,
   generateHotspots,
@@ -27,58 +27,31 @@ import {
   MAP_LAYERS,
 } from "@/logic/hotspotEngine";
 import type { MapLayerId } from "@/logic/hotspotEngine";
-import { feature as topoFeature } from "topojson-client";
-import type { Topology, Objects } from "topojson-specification";
-import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
 import { Badge, Panel, PrimaryButton, ScreenHeader } from "@/components/ui";
 import { FONT, PALETTE, RADIUS, STATUS_COLORS } from "@/constants/uiTokens";
 import type { CountryId, OperationType, RelationStatus } from "@/types/strategy";
 
-// ── Natural Earth topology (110m resolution) ──────────────────────────────────
+// ── SVG World Map paths (Natural Earth quality, 243 countries) ───────────────
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const topoData = require("world-atlas/countries-110m.json") as unknown as Topology<Objects>;
-const WORLD_FEATURES: Feature[] = (topoFeature(topoData, (topoData as any).objects.countries) as unknown as FeatureCollection).features;
+const SVG_WORLD = require("@/data/svgWorldPaths.json") as Record<string, { d: string; cx: number; cy: number }>;
 
-// Equirectangular projection — no distortion, correct proportions for political maps
-function project(lon: number, lat: number, w: number, h: number): [number, number] {
-  return [((lon + 180) / 360) * w, ((90 - lat) / 180) * h];
-}
+const SVG_W = 1000;
+const SVG_H = 507.209;
 
-function ringToPath(ring: number[][], w: number, h: number): string {
-  if (!ring.length) return "";
-  const pts = ring.map(([lon, lat]) => { const [x, y] = project(lon, lat, w, h); return `${x.toFixed(1)},${y.toFixed(1)}`; });
-  return `M${pts[0]}L${pts.slice(1).join("L")}Z`;
-}
+type SvgEntry = { d: string; cx: number; cy: number };
 
-function geometryToPath(geom: Geometry | null | undefined, w: number, h: number): string {
-  if (!geom) return "";
-  if (geom.type === "Polygon") return (geom.coordinates as number[][][]).map((r) => ringToPath(r, w, h)).join("");
-  if (geom.type === "MultiPolygon") return (geom.coordinates as number[][][][]).flatMap((p) => p.map((r) => ringToPath(r, w, h))).join("");
-  return "";
-}
+// Pre-built lookup tables (computed once at module load)
+const ALL_ENTRIES = Object.entries(SVG_WORLD) as [string, SvgEntry][];
+const BG_ENTRIES  = ALL_ENTRIES.filter(([code]) => !GAME_ALPHA2_SET.has(code));
+const GAME_ENTRIES = ALL_ENTRIES.filter(([code]) => GAME_ALPHA2_SET.has(code));
 
-function featureCentroid(f: Feature, w: number, h: number): [number, number] {
-  const geom = f.geometry;
-  if (!geom) return [w / 2, h / 2];
-  const firstRing: number[][] =
-    geom.type === "Polygon" ? (geom.coordinates[0] as number[][]) :
-    geom.type === "MultiPolygon" ? ((geom.coordinates as number[][][][]).reduce((a, b) => a[0].length > b[0].length ? a : b, [[]])[0] ?? []) : [];
-  let lonSum = 0, latSum = 0, n = 0;
-  for (const [lon, lat] of firstRing) { lonSum += lon; latSum += lat; n++; }
-  if (!n) return [w / 2, h / 2];
-  return project(lonSum / n, latSum / n, w, h);
-}
-
-function featureBBox(f: Feature, w: number, h: number): { cx: number; cy: number; bw: number; bh: number } {
-  const geom = f.geometry;
-  if (!geom) return { cx: w / 2, cy: h / 2, bw: 40, bh: 40 };
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const scan = (ring: number[][]) => { for (const [lon, lat] of ring) { const [x, y] = project(lon, lat, w, h); if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; } };
-  if (geom.type === "Polygon") (geom.coordinates as number[][][]).forEach(scan);
-  else if (geom.type === "MultiPolygon") (geom.coordinates as number[][][][]).forEach((p) => p.forEach(scan));
-  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, bw: Math.max(34, maxX - minX), bh: Math.max(34, maxY - minY) };
-}
+// alpha-2 code → CountryId for quick rendering loop
+const ALPHA2_TO_CID = new Map(GAME_ENTRIES.map(([code, _]) => [code, ALPHA2_TO_COUNTRY_ID[code]]));
+// CountryId → SVG entry
+const COUNTRY_SVG = new Map<string, SvgEntry>(
+  GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
+);
 
 const REGIONS = ["Europe", "Amériques", "Asie", "Moyen-Orient"];
 
@@ -147,25 +120,11 @@ export default function WorldMapScreen() {
   const selectedCountry  = selected ? COUNTRIES[selected] : null;
   const selectedRelation = selected ? relationMap[selected] : null;
 
-  // ── Topology-derived paths, centroids, bboxes (recompute on resize) ──
-  const { pathMap, centroidMap, gameFeatures } = useMemo(() => {
-    const pathMap    = new Map<number, string>();
-    const centroidMap = new Map<CountryId, [number, number]>();
-    const gameFeatures: { f: Feature; cid: CountryId }[] = [];
+  // Scale factors: SVG coord (0-1000 × 0-507) → screen pixels
+  const scaleX = mapW / SVG_W;
+  const scaleY = mapH / SVG_H;
 
-    for (const f of WORLD_FEATURES) {
-      const isoId = Number(f.id);
-      pathMap.set(isoId, geometryToPath(f.geometry as Geometry, mapW, mapH));
-      const cid = ISO_TO_COUNTRY_ID[isoId];
-      if (cid) {
-        centroidMap.set(cid, featureCentroid(f, mapW, mapH));
-        gameFeatures.push({ f, cid });
-      }
-    }
-    return { pathMap, centroidMap, gameFeatures };
-  }, [mapW, mapH]);
-
-  const playerCentroid = centroidMap.get(state.countryId) ?? [mapW / 2, mapH / 2] as [number, number];
+  const playerEntry = COUNTRY_SVG.get(state.countryId);
 
   const allyCountryIds = state.relations
     .filter((r) => (r.status === "allied" || r.status === "friendly") && r.countryId !== state.countryId)
@@ -192,7 +151,8 @@ export default function WorldMapScreen() {
   // ── MAP SVG ──────────────────────────────────────────────────────────
   const MapSvg = (
     <View style={[styles.mapContainer, { width: mapW, height: mapH }]}>
-      <Svg width={mapW} height={mapH} style={StyleSheet.absoluteFill}>
+      {/* viewBox auto-scales all SVG paths from 0-1000×0-507 to mapW×mapH */}
+      <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH} style={StyleSheet.absoluteFill}>
         <Defs>
           <RadialGradient id="ocean" cx="50%" cy="50%" rx="80%" ry="80%">
             <Stop offset="0%"   stopColor="#0c1a30" stopOpacity={1} />
@@ -214,47 +174,46 @@ export default function WorldMapScreen() {
         </Defs>
 
         {/* Ocean background */}
-        <Rect x={0} y={0} width={mapW} height={mapH} fill="url(#ocean)" />
+        <Rect x={0} y={0} width={SVG_W} height={SVG_H} fill="url(#ocean)" />
 
         {/* Faint strategic grid */}
         {[15, 30, 45, 60, 75, 90].map((pct) => (
-          <Line key={`h${pct}`} x1={0} y1={(pct / 100) * mapH} x2={mapW} y2={(pct / 100) * mapH}
+          <Line key={`h${pct}`} x1={0} y1={(pct / 100) * SVG_H} x2={SVG_W} y2={(pct / 100) * SVG_H}
             stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
         ))}
         {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((pct) => (
-          <Line key={`v${pct}`} x1={(pct / 100) * mapW} y1={0} x2={(pct / 100) * mapW} y2={mapH}
+          <Line key={`v${pct}`} x1={(pct / 100) * SVG_W} y1={0} x2={(pct / 100) * SVG_W} y2={SVG_H}
             stroke="#162033" strokeWidth={0.4} strokeDasharray="3,8" opacity={0.55} />
         ))}
 
         {/* Non-game world countries (geographic background) */}
         <G>
-          {WORLD_FEATURES.filter((f) => !GAME_ISO_SET.has(Number(f.id))).map((f) => {
-            const d = pathMap.get(Number(f.id));
-            if (!d) return null;
-            return <Path key={String(f.id)} d={d} fill="#0c1c30" stroke="#172234" strokeWidth={0.35} opacity={0.8} />;
-          })}
+          {BG_ENTRIES.map(([code, entry]) => (
+            <Path key={code} d={entry.d} fill="#0c1c30" stroke="#172234" strokeWidth={0.35} opacity={0.8} />
+          ))}
         </G>
 
-        {/* Player glow (radial halo) */}
-        <Circle
-          cx={playerCentroid[0]} cy={playerCentroid[1]}
-          r={Math.max(28, mapW * 0.05)}
-          fill="url(#player-glow)"
-        />
+        {/* Player glow (radial halo) — in SVG coords */}
+        {playerEntry && (
+          <Circle
+            cx={playerEntry.cx} cy={playerEntry.cy}
+            r={SVG_W * 0.05}
+            fill="url(#player-glow)"
+          />
+        )}
 
-        {/* Game countries — real Natural Earth shapes, colored by layer */}
+        {/* Game countries — SVG World Map shapes, colored by layer */}
         <G>
-          {gameFeatures.map(({ f, cid }) => {
+          {GAME_ENTRIES.map(([code, entry]) => {
+            const cid = ALPHA2_TO_CID.get(code)!;
             const country = COUNTRIES[cid];
             const dimmed = activeRegion !== null && country?.region !== activeRegion;
             const isSelected = selected === cid;
             const r = renderForCountry(cid);
-            const d = pathMap.get(Number(f.id));
-            if (!d) return null;
             return (
               <Path
-                key={String(f.id)}
-                d={d}
+                key={code}
+                d={entry.d}
                 fill={r.fill}
                 stroke={r.stroke}
                 strokeWidth={isSelected ? 2 : cid === state.countryId ? 1.6 : 0.9}
@@ -264,28 +223,27 @@ export default function WorldMapScreen() {
           })}
         </G>
 
-        {/* Selected country glow ring */}
-        {selected && centroidMap.has(selected) && (() => {
-          const [cx, cy] = centroidMap.get(selected)!;
+        {/* Selected country glow ring — in SVG coords */}
+        {selected && COUNTRY_SVG.has(selected) && (() => {
+          const e = COUNTRY_SVG.get(selected)!;
           return (
-            <Circle cx={cx} cy={cy} r={Math.max(20, mapW * 0.035)}
+            <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.035}
               fill="none" stroke={PALETTE.gold} strokeWidth={1.2} strokeDasharray="3,4" opacity={0.85} />
           );
         })()}
 
-        {/* Country flag labels */}
-        {gameFeatures.map(({ f, cid }) => {
+        {/* Country flag labels — in SVG coords */}
+        {GAME_ENTRIES.map(([code, entry]) => {
+          const cid = ALPHA2_TO_CID.get(code)!;
           const country = COUNTRIES[cid];
           const dimmed = activeRegion !== null && country?.region !== activeRegion;
           if (dimmed) return null;
-          const centroid = centroidMap.get(cid);
-          if (!centroid) return null;
           return (
             <SvgText
-              key={`lbl-${cid}`}
-              x={centroid[0]} y={centroid[1] + 5}
+              key={`lbl-${code}`}
+              x={entry.cx} y={entry.cy + 5}
               fill="#aeb9d4"
-              fontSize={Math.max(8, mapW * 0.014)}
+              fontSize={14}
               fontWeight="700"
               textAnchor="middle"
               opacity={0.95}
@@ -295,46 +253,44 @@ export default function WorldMapScreen() {
           );
         })}
 
-        {/* Strategic lines: player → allies/enemies */}
-        {(activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && (
+        {/* Strategic lines: player → allies/enemies — in SVG coords */}
+        {playerEntry && (activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && (
           <>
             {activeLayer !== "threat" && allyCountryIds.map((cid) => {
               const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
               if (dimmed) return null;
-              const ally = centroidMap.get(cid);
-              if (!ally) return null;
+              const e = COUNTRY_SVG.get(cid);
+              if (!e) return null;
               return (
                 <Line key={`ally-${cid}`}
-                  x1={playerCentroid[0]} y1={playerCentroid[1]} x2={ally[0]} y2={ally[1]}
+                  x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
                   stroke="url(#alliance-line)" strokeWidth={1.2} strokeOpacity={0.55} />
               );
             })}
             {activeLayer !== "alliances" && enemyCountryIds.map((cid) => {
               const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
               if (dimmed) return null;
-              const enemy = centroidMap.get(cid);
-              if (!enemy) return null;
+              const e = COUNTRY_SVG.get(cid);
+              if (!e) return null;
               return (
                 <Line key={`tension-${cid}`}
-                  x1={playerCentroid[0]} y1={playerCentroid[1]} x2={enemy[0]} y2={enemy[1]}
+                  x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
                   stroke="url(#tension-line)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.6} />
               );
             })}
           </>
         )}
 
-        {/* Hotspot markers — positioned by centroid of their country */}
+        {/* Hotspot markers — in SVG coords */}
         {showHotspots && hotspots.map((h) => {
           const dimmed = activeRegion !== null && COUNTRIES[h.countryId]?.region !== activeRegion;
           if (dimmed) return null;
-          const pos = centroidMap.get(h.countryId as CountryId);
-          if (!pos) return null;
+          const e = COUNTRY_SVG.get(h.countryId);
+          if (!e) return null;
           const color = getHotspotColor(h.type);
           const radius = h.severity === "critical" ? 5 : h.severity === "high" ? 4 : 3;
-          const offsetX = (h.x - 50) * mapW * 0.003;
-          const offsetY = (h.y - 50) * mapH * 0.003;
-          const hx = pos[0] + offsetX;
-          const hy = pos[1] + offsetY;
+          const hx = e.cx + (h.x - 50) * SVG_W * 0.003;
+          const hy = e.cy + (h.y - 50) * SVG_H * 0.003;
           return (
             <G key={h.id}>
               <Circle cx={hx} cy={hy} r={radius + 4} fill={color} opacity={0.18} />
@@ -344,20 +300,23 @@ export default function WorldMapScreen() {
         })}
       </Svg>
 
-      {/* Pressable tap targets — sized from real bounding boxes */}
-      {gameFeatures.map(({ f, cid }) => {
+      {/* Pressable tap targets — centered at screen-space centroid */}
+      {GAME_ENTRIES.map(([code, entry]) => {
+        const cid = ALPHA2_TO_CID.get(code)!;
         const isPlayer = cid === state.countryId;
         const dimmed = activeRegion !== null && COUNTRIES[cid]?.region !== activeRegion;
-        const { cx, cy, bw, bh } = featureBBox(f, mapW, mapH);
+        const screenCx = entry.cx * scaleX;
+        const screenCy = entry.cy * scaleY;
+        const tapW = 52, tapH = 40;
         return (
           <Pressable
-            key={`btn-${cid}`}
+            key={`btn-${code}`}
             onPress={() => !dimmed && !isPlayer && setSelected(cid)}
             disabled={isPlayer || dimmed}
             style={({ pressed }) => [
               styles.nodeBtn,
               {
-                left: cx - bw / 2, top: cy - bh / 2, width: bw, height: bh,
+                left: screenCx - tapW / 2, top: screenCy - tapH / 2, width: tapW, height: tapH,
                 opacity: dimmed ? 0.2 : pressed ? 0.5 : 1,
               },
             ]}

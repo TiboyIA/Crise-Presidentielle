@@ -1,6 +1,6 @@
 import type { CountryId } from "@/types/strategy";
 
-// ISO 3166-1 numeric → game CountryId
+// ISO 3166-1 numeric → game CountryId (used by topojson world-atlas)
 export const ISO_TO_COUNTRY_ID: Record<number, CountryId> = {
   250: "france",
   840: "usa",
@@ -25,3 +25,29 @@ export const ISO_TO_COUNTRY_ID: Record<number, CountryId> = {
 };
 
 export const GAME_ISO_SET = new Set(Object.keys(ISO_TO_COUNTRY_ID).map(Number));
+
+// ISO 3166-1 alpha-2 → game CountryId (used by SVG World Map)
+export const ALPHA2_TO_COUNTRY_ID: Record<string, CountryId> = {
+  FR: "france",
+  US: "usa",
+  CN: "china",
+  RU: "russia",
+  DE: "germany",
+  GB: "uk",
+  IN: "india",
+  JP: "japan",
+  BR: "brazil",
+  TR: "turkey",
+  IR: "iran",
+  IL: "israel",
+  KR: "south_korea",
+  IT: "italy",
+  SA: "saudi_arabia",
+  AU: "australia",
+  CA: "canada",
+  KP: "north_korea",
+  NG: "nigeria",
+  PK: "pakistan",
+};
+
+export const GAME_ALPHA2_SET = new Set(Object.keys(ALPHA2_TO_COUNTRY_ID));
