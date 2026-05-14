@@ -120,15 +120,12 @@ export default function WorldMapScreen() {
 
   if (!state) return null;
 
-  const isLandscape = width > height;
-
-  // Map fills screen width (portrait) or screen height (landscape)
-  const mapW = isLandscape ? Math.round(height * SVG_W / SVG_H) : width;
-  const mapH = isLandscape ? height : Math.round(width * SVG_H / SVG_W);
-
-  // Center the map on screen
-  const mapLeft = isLandscape ? Math.round((width - mapW) / 2) : 0;
-  const mapTop  = isLandscape ? 0 : Math.round((height - mapH) / 2);
+  // Cover : la carte remplit tout l'écran (rogner plutôt que laisser des bandes)
+  const coverScale = Math.max(width / SVG_W, height / SVG_H);
+  const mapW    = Math.round(SVG_W * coverScale);
+  const mapH    = Math.round(SVG_H * coverScale);
+  const mapLeft = Math.round((width  - mapW) / 2);
+  const mapTop  = Math.round((height - mapH) / 2);
 
   // SVG → screen scale factors (for tap target positioning)
   const scaleX = mapW / SVG_W;
