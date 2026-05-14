@@ -106,7 +106,8 @@ export default function WorldMapScreen() {
   const [selected, setSelected]         = useState<CountryId | null>(null);
   const [activeLayer, setActiveLayer]   = useState<ExtMapLayerId>("diplomacy");
   const [showHotspots, setShowHotspots] = useState(true);
-  const [labelMode, setLabelMode]       = useState<LabelMode>("none");
+  const [labelMode, setLabelMode]           = useState<LabelMode>("none");
+  const [hotspotMode, setHotspotMode]       = useState<"critical" | "high" | "all">("critical");
 
   // ── Zoom / pan shared values ────────────────────────────────────────────────
   const scale      = useSharedValue(1);
@@ -153,11 +154,13 @@ export default function WorldMapScreen() {
   useAnimatedReaction(
     () => scale.value,
     (s) => {
-      const mode: LabelMode =
+      const lm: LabelMode =
         s < 1.5 ? "none" :
         s < 2.5 ? "tier1" :
         s < 4.0 ? "tier2" : "all";
-      runOnJS(setLabelMode)(mode);
+      runOnJS(setLabelMode)(lm);
+      const hm = s < 2.0 ? "critical" : s < 4.0 ? "high" : "all";
+      runOnJS(setHotspotMode)(hm as "critical" | "high" | "all");
     },
   );
 
@@ -257,6 +260,13 @@ export default function WorldMapScreen() {
   );
 
   const hotspots = useMemo(() => generateHotspots(state), [state]);
+
+  const visibleHotspots = useMemo(() => {
+    if (!showHotspots) return [];
+    if (hotspotMode === "all") return hotspots;
+    if (hotspotMode === "high") return hotspots.filter((h) => h.severity === "critical" || h.severity === "high");
+    return hotspots.filter((h) => h.severity === "critical");
+  }, [hotspots, showHotspots, hotspotMode]);
 
   const playerEntry   = COUNTRY_SVG.get(state.countryId);
   const playerCountry = COUNTRIES[state.countryId];
@@ -457,8 +467,8 @@ export default function WorldMapScreen() {
             </G>
           )}
 
-          {/* Hotspot markers */}
-          {showHotspots && hotspots.map((h) => {
+          {/* Hotspot markers — filtrés par sévérité selon le zoom */}
+          {visibleHotspots.map((h) => {
             const e = COUNTRY_SVG.get(h.countryId);
             if (!e) return null;
             const color  = getHotspotColor(h.type);
@@ -573,13 +583,13 @@ export default function WorldMapScreen() {
         )}
 
         {/* Bottom-left: hotspot badge */}
-        {showHotspots && hotspots.length > 0 && (
+        {visibleHotspots.length > 0 && (
           <View
             style={[styles.hotspotBadge, { bottom: (selected ? 200 : 16) + Math.max(insets.bottom, 4) }]}
             pointerEvents="none"
           >
             <MaterialCommunityIcons name="map-marker-radius" size={10} color="#ff6040" />
-            <Text style={styles.hotspotBadgeText}>{hotspots.length} signaux</Text>
+            <Text style={styles.hotspotBadgeText}>{visibleHotspots.length} signaux</Text>
           </View>
         )}
 
