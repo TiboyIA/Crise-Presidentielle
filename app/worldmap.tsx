@@ -10,7 +10,6 @@ import Svg, {
   RadialGradient,
   Rect,
   Stop,
-  Text as SvgText,
 } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -58,21 +57,34 @@ const CID_TO_ALPHA2 = new Map(Object.entries(ALPHA2_TO_COUNTRY_ID).map(([a2, cid
 const MIN_SCALE = 1;
 const MAX_SCALE = 12;
 
-// Niveau 1 — 9 grandes puissances, visibles dès le premier zoom
+// Tier 1 — grandes puissances, labels dès zoom 2.0
 const TIER1 = new Set<CountryId>([
   "usa", "china", "russia", "france", "germany", "india", "japan", "brazil", "uk",
 ]);
 
-// Niveau 2 — puissances secondaires, zoom ×2+
+// Tier 2 — puissances secondaires, labels dès zoom 3.5
 const TIER2 = new Set<CountryId>([
   "turkey", "iran", "israel", "south_korea", "italy", "saudi_arabia",
   "australia", "canada", "north_korea", "nigeria", "pakistan",
 ]);
 
-// Tap target de base selon la superficie géographique du pays
+// Petits pays : label décalé à côté + point au centre, seulement à zoom ≥ 3.5
+const LABEL_SMALL = new Set<CountryId>([
+  "israel", "south_korea", "north_korea", "japan", "italy",
+]);
+
+// Offsets en pixels écran depuis la position de la capitale
+const LABEL_OFFSETS: Partial<Record<CountryId, { dx: number; dy: number }>> = {
+  israel:      { dx:  28, dy: -14 },
+  south_korea: { dx:  24, dy:  -4 },
+  north_korea: { dx:  22, dy: -14 },
+  japan:       { dx:  26, dy: -10 },
+  italy:       { dx:  14, dy:  12 },
+  uk:          { dx:  -4, dy:  -8 },
+};
+
 const TAP_LARGE  = new Set<CountryId>(["usa", "russia", "china", "brazil", "australia", "canada", "india"]);
 const TAP_MEDIUM = new Set<CountryId>(["france", "germany", "uk", "saudi_arabia", "nigeria", "turkey", "iran", "pakistan"]);
-// Petit (36px) : israel, south_korea, japan, italy, north_korea
 
 function tapBaseForCountry(cid: CountryId): number {
   if (TAP_LARGE.has(cid))  return 60;
@@ -80,36 +92,128 @@ function tapBaseForCountry(cid: CountryId): number {
   return 36;
 }
 
-// Noms courts pour labels carte (sans emoji)
 const LABEL_NAMES: Partial<Record<CountryId, string>> = {
-  usa:         "USA",
-  china:       "CHINE",
-  russia:      "RUSSIE",
-  india:       "INDE",
-  uk:          "R.-UNI",
-  france:      "FRANCE",
-  germany:     "ALLEMAGNE",
-  brazil:      "BRÉSIL",
-  japan:       "JAPON",
-  turkey:      "TÜRKIYE",
-  iran:        "IRAN",
-  israel:      "ISRAËL",
-  south_korea: "COR. SUD",
-  italy:       "ITALIE",
-  saudi_arabia:"ARABIE S.",
-  australia:   "AUSTRALIE",
-  canada:      "CANADA",
-  north_korea: "COR. NORD",
-  nigeria:     "NIGERIA",
-  pakistan:    "PAKISTAN",
+  usa:          "USA",
+  china:        "CHINE",
+  russia:       "RUSSIE",
+  india:        "INDE",
+  uk:           "R.-UNI",
+  france:       "FRANCE",
+  germany:      "ALLEMAGNE",
+  brazil:       "BRÉSIL",
+  japan:        "JAPON",
+  turkey:       "TÜRKIYE",
+  iran:         "IRAN",
+  israel:       "ISRAËL",
+  south_korea:  "COR. SUD",
+  italy:        "ITALIE",
+  saudi_arabia: "ARABIE S.",
+  australia:    "AUSTRALIE",
+  canada:       "CANADA",
+  north_korea:  "COR. NORD",
+  nigeria:      "NIGERIA",
+  pakistan:     "PAKISTAN",
 };
 
-// none → tier1 → tier2 → all
-type LabelMode = "none" | "tier1" | "tier2" | "all";
+type LabelMode = "none" | "tier1" | "tier2";
 
 type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
-// Tap target for a game country — position follows the SVG G transform on the UI thread.
+// ── Worklet partagé : SVG → coordonnées écran ─────────────────────────────────
+function svgToScreen(
+  cx: number, cy: number,
+  s: number, tx: number, ty: number,
+  W: number, H: number,
+): [number, number] {
+  "worklet";
+  const coverS = W > 0 ? Math.max(W / SVG_W, H / SVG_H) : 1;
+  const mW = SVG_W * coverS;
+  const mH = SVG_H * coverS;
+  const gs = coverS * s;
+  const gx = tx + mW / 2 * (1 - s);
+  const gy = ty + mH / 2 * (1 - s);
+  return [
+    (W - mW) / 2 + gx + cx * gs,
+    (H - mH) / 2 + gy + cy * gs,
+  ];
+}
+
+// ── CountryMapLabel ───────────────────────────────────────────────────────────
+// Label overlay React Native — taille fixe à l'écran, suit le zoom/pan via
+// le même calcul de transform que CountryTapTarget.
+const LABEL_W = 72;
+const LABEL_H = 14;
+
+function CountryMapLabel({
+  entry, cid, isSelected, isTier1,
+  scale, translateX, translateY, svWidth, svHeight,
+  dx, dy,
+}: {
+  entry: SvgEntry;
+  cid: CountryId;
+  isSelected: boolean;
+  isTier1: boolean;
+  scale: SharedValue<number>;
+  translateX: SharedValue<number>;
+  translateY: SharedValue<number>;
+  svWidth: SharedValue<number>;
+  svHeight: SharedValue<number>;
+  dx: number;
+  dy: number;
+}) {
+  const hasDot = dx !== 0 || dy !== 0;
+  const color  = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#6a8aa8";
+  const label  = LABEL_NAMES[cid] ?? cid.toUpperCase();
+
+  const labelStyle = useAnimatedStyle(() => {
+    const [sx, sy] = svgToScreen(
+      entry.cx, entry.cy,
+      scale.value, translateX.value, translateY.value,
+      svWidth.value, svHeight.value,
+    );
+    return {
+      position: "absolute" as const,
+      left:  sx + dx - LABEL_W / 2,
+      top:   sy + dy - LABEL_H / 2,
+      width: LABEL_W,
+    };
+  });
+
+  const dotStyle = useAnimatedStyle(() => {
+    if (!hasDot) {
+      return { position: "absolute" as const, opacity: 0, left: 0, top: 0, width: 0, height: 0 };
+    }
+    const [sx, sy] = svgToScreen(
+      entry.cx, entry.cy,
+      scale.value, translateX.value, translateY.value,
+      svWidth.value, svHeight.value,
+    );
+    return {
+      position: "absolute" as const,
+      left:         sx - 2.5,
+      top:          sy - 2.5,
+      width:        5,
+      height:       5,
+      borderRadius: 2.5,
+    };
+  });
+
+  return (
+    <>
+      {hasDot && (
+        <Animated.View
+          style={[styles.labelDot, { backgroundColor: color }, dotStyle]}
+          pointerEvents="none"
+        />
+      )}
+      <Animated.View style={labelStyle} pointerEvents="none">
+        <Text style={[styles.labelText, { color }]}>{label}</Text>
+      </Animated.View>
+    </>
+  );
+}
+
+// ── CountryTapTarget ──────────────────────────────────────────────────────────
 function CountryTapTarget({
   entry, cid, selected, tapBase, scale, translateX, translateY, svWidth, svHeight, onPress,
 }: {
@@ -125,21 +229,12 @@ function CountryTapTarget({
   onPress: () => void;
 }) {
   const style = useAnimatedStyle(() => {
-    const s  = scale.value;
-    const tx = translateX.value;
-    const ty = translateY.value;
-    const W  = svWidth.value;
-    const H  = svHeight.value;
-    const coverS = W > 0 ? Math.max(W / SVG_W, H / SVG_H) : 1;
-    const mW = SVG_W * coverS;
-    const mH = SVG_H * coverS;
-    const gs = coverS * s;
-    const gx = tx + mW / 2 * (1 - s);
-    const gy = ty + mH / 2 * (1 - s);
-    const screenX = (W - mW) / 2 + gx + entry.cx * gs;
-    const screenY = (H - mH) / 2 + gy + entry.cy * gs;
-    // Au zoom élevé les pays sont visuellement grands → tap peut rétrécir
-    const tap = Math.max(28, tapBase / Math.max(1, s));
+    const [screenX, screenY] = svgToScreen(
+      entry.cx, entry.cy,
+      scale.value, translateX.value, translateY.value,
+      svWidth.value, svHeight.value,
+    );
+    const tap = Math.max(28, tapBase / Math.max(1, scale.value));
     return {
       position: "absolute" as const,
       left: screenX - tap / 2,
@@ -158,6 +253,7 @@ function CountryTapTarget({
   );
 }
 
+// ── WorldMapScreen ────────────────────────────────────────────────────────────
 export default function WorldMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -167,37 +263,31 @@ export default function WorldMapScreen() {
   const [selected, setSelected]         = useState<CountryId | null>(null);
   const [activeLayer, setActiveLayer]   = useState<ExtMapLayerId>("diplomacy");
   const [showHotspots, setShowHotspots] = useState(true);
-  const [labelMode, setLabelMode]           = useState<LabelMode>("none");
-  const [hotspotMode, setHotspotMode]       = useState<"critical" | "high" | "all">("critical");
+  const [labelMode, setLabelMode]       = useState<LabelMode>("none");
+  const [hotspotMode, setHotspotMode]   = useState<"critical" | "high" | "all">("critical");
 
-  // ── Zoom / pan shared values ────────────────────────────────────────────────
+  // ── Zoom / pan shared values ──────────────────────────────────────────────
   const scale      = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  // Saved state at gesture start
   const savedScale = useSharedValue(1);
   const savedTx    = useSharedValue(0);
   const savedTy    = useSharedValue(0);
-  // Pinch focal point (screen coords, captured at gesture start)
-  const focalX = useSharedValue(0);
-  const focalY = useSharedValue(0);
-  // Layout values accessible in worklets
-  const svMapW   = useSharedValue(0);
-  const svMapH   = useSharedValue(0);
-  const svWidth  = useSharedValue(width);
-  const svHeight = useSharedValue(height);
+  const focalX     = useSharedValue(0);
+  const focalY     = useSharedValue(0);
+  const svMapW     = useSharedValue(0);
+  const svMapH     = useSharedValue(0);
+  const svWidth    = useSharedValue(width);
+  const svHeight   = useSharedValue(height);
 
   if (!state) return null;
 
-  // Cover : la carte remplit tout l'écran (rogner plutôt que laisser des bandes)
   const coverScale = Math.max(width / SVG_W, height / SVG_H);
   const mapW    = Math.round(SVG_W * coverScale);
   const mapH    = Math.round(SVG_H * coverScale);
   const mapLeft = Math.round((width  - mapW) / 2);
   const mapTop  = Math.round((height - mapH) / 2);
 
-
-  // Sync layout into shared values; reset zoom on orientation change
   useEffect(() => {
     svMapW.value   = mapW;
     svMapH.value   = mapH;
@@ -207,7 +297,6 @@ export default function WorldMapScreen() {
     const initScale = 1.4;
     const entry = COUNTRY_SVG.get(state.countryId);
     if (entry) {
-      // Translate to center player country at initScale (transform applied around screen center)
       const rawTx = (SVG_W / 2 - entry.cx) * coverScale * initScale;
       const rawTy = (SVG_H / 2 - entry.cy) * coverScale * initScale;
       const maxTx = Math.max(0, mapW * initScale - width)  / 2;
@@ -222,22 +311,20 @@ export default function WorldMapScreen() {
     }
   }, [mapW, mapH]);
 
-  // Mise à jour des labels selon le niveau de zoom
+  // Labels : zoom 2–3.5 → tier1, 3.5–5 → tier2, hors plage → aucun
   useAnimatedReaction(
     () => scale.value,
     (s) => {
       const lm: LabelMode =
-        s < 1.5 ? "none" :
-        s < 2.5 ? "tier1" :
-        s < 4.0 ? "tier2" : "all";
+        s < 2.0 ? "none" :
+        s < 3.5 ? "tier1" :
+        s < 5.0 ? "tier2" : "none";
       runOnJS(setLabelMode)(lm);
       const hm = s < 2.0 ? "critical" : s < 4.0 ? "high" : "all";
       runOnJS(setHotspotMode)(hm as "critical" | "high" | "all");
     },
   );
 
-  // ── Clamp helper (worklet) ──────────────────────────────────────────────────
-  // Prevents panning beyond the map edges; allows all motion while zoomed.
   function clampedTranslation(tx: number, ty: number, s: number): [number, number] {
     "worklet";
     const maxTx = Math.max(0, (svMapW.value * s - svWidth.value)  / 2);
@@ -248,7 +335,7 @@ export default function WorldMapScreen() {
     ];
   }
 
-  // ── Gestures ────────────────────────────────────────────────────────────────
+  // ── Gestures ──────────────────────────────────────────────────────────────
   const pinch = Gesture.Pinch()
     .onStart((e) => {
       savedScale.value = scale.value;
@@ -258,12 +345,10 @@ export default function WorldMapScreen() {
       focalY.value     = e.focalY;
     })
     .onUpdate((e) => {
-      // Map center on screen (no transform)
       const cx = svMapW.value / 2 + (svWidth.value - svMapW.value) / 2;
       const cy = svMapH.value / 2 + (svHeight.value - svMapH.value) / 2;
       const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, savedScale.value * e.scale));
       const d = newScale / savedScale.value;
-      // Zoom around focal point (focal stays fixed on screen)
       const newTx = savedTx.value * d + (focalX.value - cx) * (1 - d);
       const newTy = savedTy.value * d + (focalY.value - cy) * (1 - d);
       const [tx, ty] = clampedTranslation(newTx, newTy, newScale);
@@ -294,12 +379,10 @@ export default function WorldMapScreen() {
       const cx = svMapW.value / 2 + (svWidth.value - svMapW.value) / 2;
       const cy = svMapH.value / 2 + (svHeight.value - svMapH.value) / 2;
       if (scale.value > 1.5) {
-        // Reset to fit
         scale.value      = withSpring(1,  { damping: 18 });
         translateX.value = withSpring(0,  { damping: 18 });
         translateY.value = withSpring(0,  { damping: 18 });
       } else {
-        // Zoom ×2.5 around tap point
         const targetScale = Math.min(MAX_SCALE, scale.value * 2.5);
         const d = targetScale / scale.value;
         const [tx, ty] = clampedTranslation(
@@ -318,7 +401,6 @@ export default function WorldMapScreen() {
     pinch,
   );
 
-  // CSS transform sur le conteneur SVG — UI thread via Reanimated (smooth 60fps)
   const animatedMapStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
@@ -370,15 +452,14 @@ export default function WorldMapScreen() {
     );
   }
 
-  // Legend vertical span: from below top bar to above country panel (if open)
   const topBarH     = insets.top + 56;
   const panelOffset = selected ? 200 : 24;
-  const legendTop    = topBarH + 8;
+  const legendTop   = topBarH + 8;
   const legendBottom = panelOffset;
 
   return (
     <View style={styles.root}>
-      {/* Ocean gradient fills entire screen */}
+      {/* Ocean gradient */}
       <LinearGradient
         colors={["#040b18", "#030710", "#040b18"]}
         start={{ x: 0.5, y: 0 }}
@@ -386,9 +467,11 @@ export default function WorldMapScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* ── MAP LAYER (gesture area plein écran) ──────────────────────────────── */}
+      {/* ── MAP + GESTURES ───────────────────────────────────────────────── */}
       <GestureDetector gesture={combinedGesture}>
       <View style={StyleSheet.absoluteFillObject}>
+
+        {/* SVG map layer */}
         <Animated.View style={[styles.mapLayer, { top: mapTop, left: mapLeft }, animatedMapStyle]}>
         <Svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width={mapW} height={mapH}>
           <Defs>
@@ -398,19 +481,20 @@ export default function WorldMapScreen() {
               <Stop offset="100%" stopColor="#020609" stopOpacity={1} />
             </RadialGradient>
             <SvgGradient id="gAlliance" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%"   stopColor={STATUS_COLORS.allied}  stopOpacity={0.8} />
+              <Stop offset="0%"   stopColor={STATUS_COLORS.allied}  stopOpacity={0.6} />
               <Stop offset="100%" stopColor={STATUS_COLORS.allied}  stopOpacity={0} />
             </SvgGradient>
             <SvgGradient id="gTension" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%"   stopColor={STATUS_COLORS.hostile} stopOpacity={0.8} />
+              <Stop offset="0%"   stopColor={STATUS_COLORS.hostile} stopOpacity={0.6} />
               <Stop offset="100%" stopColor={STATUS_COLORS.hostile} stopOpacity={0} />
             </SvgGradient>
+            {/* Lueur joueur — discrète, remplacée visuellement par contour doré */}
             <RadialGradient id="playerGlow" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.55} />
+              <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.10} />
               <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
             </RadialGradient>
             <RadialGradient id="selectedGlow" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.18} />
+              <Stop offset="0%"   stopColor={PALETTE.gold} stopOpacity={0.15} />
               <Stop offset="100%" stopColor={PALETTE.gold} stopOpacity={0} />
             </RadialGradient>
           </Defs>
@@ -418,7 +502,7 @@ export default function WorldMapScreen() {
           {/* Ocean */}
           <Rect x={0} y={0} width={SVG_W} height={SVG_H} fill="url(#ocean)" />
 
-          {/* Strategic grid */}
+          {/* Grille stratégique */}
           {[20, 40, 60, 80].map((p) => (
             <Line key={`h${p}`} x1={0} y1={(p / 100) * SVG_H} x2={SVG_W} y2={(p / 100) * SVG_H}
               stroke="#1a2d45" strokeWidth={0.4} strokeDasharray="4,12" opacity={0.45} />
@@ -428,32 +512,25 @@ export default function WorldMapScreen() {
               stroke="#1a2d45" strokeWidth={0.4} strokeDasharray="4,12" opacity={0.45} />
           ))}
 
-          {/* Background countries */}
+          {/* Pays de fond */}
           <G>
             {BG_ENTRIES.map(([code, entry]) => (
               <Path key={code} d={entry.d} fill="#0d1e35" stroke="#162740" strokeWidth={0.3} opacity={0.9} />
             ))}
           </G>
 
-          {/* Player country glow halo */}
+          {/* Halo joueur — petit et discret */}
           {playerEntry && (
-            <Circle cx={playerEntry.cx} cy={playerEntry.cy} r={SVG_W * 0.048} fill="url(#playerGlow)" />
+            <Circle cx={playerEntry.cx} cy={playerEntry.cy} r={SVG_W * 0.025} fill="url(#playerGlow)" />
           )}
 
-          {/* Game countries — double bordure : passe sombre épaisse + passe colorée fine */}
-          {/* Passe 1 : contour sombre séparateur */}
+          {/* Pays du jeu — passe séparateur sombre */}
           <G>
             {GAME_ENTRIES.map(([code, entry]) => (
-              <Path
-                key={`sep-${code}`}
-                d={entry.d}
-                fill="none"
-                stroke="#02050a"
-                strokeWidth={1.8}
-              />
+              <Path key={`sep-${code}`} d={entry.d} fill="none" stroke="#02050a" strokeWidth={1.8} />
             ))}
           </G>
-          {/* Passe 2 : fill + contour coloré selon la couche */}
+          {/* Pays du jeu — fill + contour coloré */}
           <G>
             {GAME_ENTRIES.map(([code, entry]) => {
               const cid = ALPHA2_TO_CID.get(code)!;
@@ -465,83 +542,51 @@ export default function WorldMapScreen() {
                   key={`fill-${code}`}
                   d={entry.d}
                   fill={r.fill}
-                  stroke={isSelected ? "#f8d36a" : r.stroke}
-                  strokeWidth={isSelected ? 1.6 : isPlayer ? 1.0 : 0.7}
+                  stroke={isSelected ? "#f8d36a" : isPlayer ? PALETTE.gold + "88" : r.stroke}
+                  strokeWidth={isSelected ? 1.6 : isPlayer ? 1.2 : 0.7}
                 />
               );
             })}
           </G>
 
-          {/* Selected country: glow + dashed ring */}
+          {/* Pays sélectionné — halo + anneau pointillé */}
           {selected && COUNTRY_SVG.has(selected) && (() => {
             const e = COUNTRY_SVG.get(selected)!;
             return (
               <G key="sel-ring">
-                <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.042} fill="url(#selectedGlow)" />
-                <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.036}
-                  fill="none" stroke={PALETTE.gold} strokeWidth={1.6} strokeDasharray="4,5" opacity={0.9} />
+                <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.038} fill="url(#selectedGlow)" />
+                <Circle cx={e.cx} cy={e.cy} r={SVG_W * 0.032}
+                  fill="none" stroke={PALETTE.gold} strokeWidth={1.4} strokeDasharray="4,5" opacity={0.85} />
               </G>
             );
           })()}
 
-          {/* Labels pays — 3 niveaux selon zoom */}
-          {labelMode !== "none" && GAME_ENTRIES.map(([code, entry]) => {
-            const cid = ALPHA2_TO_CID.get(code)!;
-            const isTier1    = TIER1.has(cid);
-            const isTier2    = TIER2.has(cid);
-            const isSelected = selected === cid;
-
-            // Filtre par niveau
-            if (labelMode === "tier1" && !isTier1) return null;
-            if (labelMode === "tier2" && !isTier1 && !isTier2) return null;
-
-            const label = LABEL_NAMES[cid] ?? cid.toUpperCase();
-            const fontSize = isTier1 ? (labelMode === "tier1" ? 8 : 7) : 6;
-            const fill     = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#5a7590";
-            const opacity  = isSelected ? 1 : isTier1 ? 0.9 : 0.75;
-
-            return (
-              <SvgText
-                key={`lbl-${code}`}
-                x={entry.cx}
-                y={entry.cy}
-                dy={fontSize * 0.35}
-                fill={fill}
-                fontSize={fontSize}
-                fontWeight="700"
-                textAnchor="middle"
-                opacity={opacity}
-              >
-                {label}
-              </SvgText>
-            );
-          })}
-
-          {/* Strategic lines: player → allies / enemies */}
-          {playerEntry && (activeLayer === "diplomacy" || activeLayer === "alliances" || activeLayer === "threat") && (
+          {/* Lignes stratégiques — alliances seulement sur la couche "alliances",
+              tensions seulement sur la couche "threat" */}
+          {playerEntry && (activeLayer === "alliances" || activeLayer === "threat") && (
             <G>
-              {activeLayer !== "threat" && allyIds.map((cid) => {
+              {activeLayer === "alliances" && allyIds.map((cid) => {
                 const e = COUNTRY_SVG.get(cid);
                 if (!e) return null;
                 return (
                   <Line key={`al-${cid}`}
                     x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
-                    stroke="url(#gAlliance)" strokeWidth={1.2} strokeOpacity={0.65} />
+                    stroke="url(#gAlliance)" strokeWidth={1.0} strokeOpacity={0.25} />
                 );
               })}
-              {activeLayer !== "alliances" && enemyIds.map((cid) => {
+              {activeLayer === "threat" && enemyIds.map((cid) => {
                 const e = COUNTRY_SVG.get(cid);
                 if (!e) return null;
                 return (
                   <Line key={`en-${cid}`}
                     x1={playerEntry.cx} y1={playerEntry.cy} x2={e.cx} y2={e.cy}
-                    stroke="url(#gTension)" strokeWidth={1} strokeDasharray="5,5" strokeOpacity={0.7} />
+                    stroke="url(#gTension)" strokeWidth={0.8} strokeDasharray="5,5" strokeOpacity={0.25} />
                 );
               })}
             </G>
           )}
 
-          {/* Hotspot markers — filtrés par sévérité selon le zoom */}
+          {/* Hotspot markers */}
           {visibleHotspots.map((h) => {
             const e = COUNTRY_SVG.get(h.countryId);
             if (!e) return null;
@@ -551,7 +596,7 @@ export default function WorldMapScreen() {
             const hy = e.cy + (h.y - 50) * SVG_H * 0.003;
             return (
               <G key={h.id}>
-                <Circle cx={hx} cy={hy} r={radius + 5} fill={color} opacity={0.14} />
+                <Circle cx={hx} cy={hy} r={radius + 5} fill={color} opacity={0.12} />
                 <Circle cx={hx} cy={hy} r={radius}     fill={color} stroke="#000" strokeWidth={0.4} />
               </G>
             );
@@ -560,7 +605,7 @@ export default function WorldMapScreen() {
         </Svg>
         </Animated.View>
 
-        {/* Tap targets animés — position absolue sur l'écran, miroir du transform CSS */}
+        {/* Tap targets animés */}
         {GAME_ENTRIES.map(([code, entry]) => {
           const cid = ALPHA2_TO_CID.get(code)!;
           if (cid === state.countryId) return null;
@@ -580,15 +625,55 @@ export default function WorldMapScreen() {
             />
           );
         })}
+
+        {/* Labels overlay — taille fixe, aucun pointer event */}
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          {GAME_ENTRIES.map(([code, entry]) => {
+            const cid        = ALPHA2_TO_CID.get(code)!;
+            const isSelected = selected === cid;
+            const isTier1    = TIER1.has(cid);
+            const isTier2    = TIER2.has(cid);
+            const isSmall    = LABEL_SMALL.has(cid);
+
+            // Visibilité : pays sélectionné toujours affiché ;
+            // petits pays seulement à tier2 ; sinon selon le mode courant
+            const isVisible = isSelected || (
+              isSmall
+                ? labelMode === "tier2"
+                : labelMode === "tier1"  ? isTier1
+                : labelMode === "tier2"  ? (isTier1 || isTier2)
+                : false
+            );
+            if (!isVisible) return null;
+
+            const off = LABEL_OFFSETS[cid] ?? { dx: 0, dy: 0 };
+            return (
+              <CountryMapLabel
+                key={`lbl-${code}`}
+                entry={entry}
+                cid={cid}
+                isSelected={isSelected}
+                isTier1={isTier1}
+                scale={scale}
+                translateX={translateX}
+                translateY={translateY}
+                svWidth={svWidth}
+                svHeight={svHeight}
+                dx={off.dx}
+                dy={off.dy}
+              />
+            );
+          })}
+        </View>
+
       </View>
       </GestureDetector>
 
-      {/* ── HUD OVERLAY ──────────────────────────────────────────────────────── */}
+      {/* ── HUD OVERLAY ──────────────────────────────────────────────────── */}
       <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
 
         {/* Top command bar */}
         <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10) + 4 }]} pointerEvents="box-none">
-          {/* Back button */}
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
@@ -598,7 +683,6 @@ export default function WorldMapScreen() {
             <MaterialCommunityIcons name="arrow-left" size={16} color={PALETTE.textMid} />
           </Pressable>
 
-          {/* Left: player identity */}
           <View style={styles.topLeft}>
             <View style={styles.topFlagBox}>
               <Text style={styles.topFlagCode}>{CID_TO_ALPHA2.get(state.countryId) ?? "—"}</Text>
@@ -609,13 +693,11 @@ export default function WorldMapScreen() {
             </View>
           </View>
 
-          {/* Center: mandate day */}
           <View style={styles.topCenter}>
             <Text style={styles.topDay}>J·{state.mandateDay}</Text>
             <Text style={styles.topDayLabel}>MANDAT</Text>
           </View>
 
-          {/* Right: quick stats */}
           <View style={styles.topRight}>
             <HudStat
               value={`${state.nationalIndicators.popularity}%`}
@@ -628,7 +710,7 @@ export default function WorldMapScreen() {
           </View>
         </View>
 
-        {/* Floating layer legend — right side */}
+        {/* Légende couches */}
         <FloatingMapLegend
           activeLayer={activeLayer}
           onLayerChange={setActiveLayer}
@@ -637,7 +719,7 @@ export default function WorldMapScreen() {
           style={{ top: legendTop, bottom: legendBottom }}
         />
 
-        {/* Country command panel — slides up from bottom */}
+        {/* Panneau pays sélectionné */}
         {selected && selectedCountry && selectedRelation && (
           <CountryCommandPanel
             country={selectedCountry}
@@ -658,7 +740,7 @@ export default function WorldMapScreen() {
           />
         )}
 
-        {/* Bottom-left: hotspot badge */}
+        {/* Badge hotspots */}
         {visibleHotspots.length > 0 && (
           <View
             style={[styles.hotspotBadge, { bottom: (selected ? 200 : 16) + Math.max(insets.bottom, 4) }]}
@@ -669,7 +751,7 @@ export default function WorldMapScreen() {
           </View>
         )}
 
-        {/* Zoom controls — bottom left, above hotspot badge */}
+        {/* Contrôles zoom */}
         <ZoomControls
           scale={scale}
           onReset={() => {
@@ -710,6 +792,7 @@ export default function WorldMapScreen() {
   );
 }
 
+// ── Sous-composants HUD ───────────────────────────────────────────────────────
 function HudStat({ value, label, color }: { value: string; label: string; color: string }) {
   return (
     <View style={styles.hudStat}>
@@ -754,6 +837,7 @@ function ScaleLabel({ scale }: { scale: SharedValue<number> }) {
   return <Text style={styles.zoomResetText}>{display}</Text>;
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -763,7 +847,19 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
 
-  // ── Top command bar ────────────────────────────────────────────────────────
+  // Labels overlay
+  labelText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    letterSpacing: 0.8,
+    textAlign: "center",
+  },
+  labelDot: {
+    position: "absolute",
+    opacity: 0.85,
+  },
+
+  // ── Top command bar ─────────────────────────────────────────────────────
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -862,7 +958,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // ── Hotspot badge ──────────────────────────────────────────────────────────
+  // ── Hotspot badge ───────────────────────────────────────────────────────
   hotspotBadge: {
     position: "absolute",
     left: 14,
@@ -883,7 +979,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── Zoom controls ──────────────────────────────────────────────────────────
+  // ── Zoom controls ───────────────────────────────────────────────────────
   zoomControls: {
     position: "absolute",
     right: 10,
