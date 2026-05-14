@@ -35,6 +35,7 @@ import { computeCountryRenderExt } from "@/data/countryStatus";
 import { FONT, PALETTE, STATUS_COLORS } from "@/constants/uiTokens";
 import type { ExtMapLayerId } from "@/data/mapLayers";
 import type { CountryId, OperationType } from "@/types/strategy";
+import { COUNTRY_LABEL_ANCHORS } from "@/data/mapLabelAnchors";
 
 // ── SVG World Map data ─────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -68,20 +69,6 @@ const TIER2 = new Set<CountryId>([
   "australia", "canada", "north_korea", "nigeria", "pakistan",
 ]);
 
-// Petits pays : label décalé à côté + point au centre, seulement à zoom ≥ 3.5
-const LABEL_SMALL = new Set<CountryId>([
-  "israel", "south_korea", "north_korea", "japan", "italy",
-]);
-
-// Offsets en pixels écran depuis la position de la capitale
-const LABEL_OFFSETS: Partial<Record<CountryId, { dx: number; dy: number }>> = {
-  israel:      { dx:  28, dy: -14 },
-  south_korea: { dx:  24, dy:  -4 },
-  north_korea: { dx:  22, dy: -14 },
-  japan:       { dx:  26, dy: -10 },
-  italy:       { dx:  14, dy:  12 },
-  uk:          { dx:  -4, dy:  -8 },
-};
 
 const TAP_LARGE  = new Set<CountryId>(["usa", "russia", "china", "brazil", "australia", "canada", "india"]);
 const TAP_MEDIUM = new Set<CountryId>(["france", "germany", "uk", "saudi_arabia", "nigeria", "turkey", "iran", "pakistan"]);
@@ -147,7 +134,6 @@ const LABEL_H = 14;
 function CountryMapLabel({
   entry, cid, isSelected, isTier1,
   scale, translateX, translateY, svWidth, svHeight,
-  dx, dy,
 }: {
   entry: SvgEntry;
   cid: CountryId;
@@ -158,16 +144,21 @@ function CountryMapLabel({
   translateY: SharedValue<number>;
   svWidth: SharedValue<number>;
   svHeight: SharedValue<number>;
-  dx: number;
-  dy: number;
 }) {
-  const hasDot = dx !== 0 || dy !== 0;
-  const color  = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#6a8aa8";
-  const label  = LABEL_NAMES[cid] ?? cid.toUpperCase();
+  // Ancre manuelle si définie, sinon fallback sur entry.cx/cy
+  const anchor  = COUNTRY_LABEL_ANCHORS[cid];
+  const svgX    = anchor?.x  ?? entry.cx;
+  const svgY    = anchor?.y  ?? entry.cy;
+  const dx      = anchor?.dx ?? 0;
+  const dy      = anchor?.dy ?? 0;
+  const hasDot  = anchor?.callout ?? false;
+
+  const color = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#6a8aa8";
+  const label = LABEL_NAMES[cid] ?? cid.toUpperCase();
 
   const labelStyle = useAnimatedStyle(() => {
     const [sx, sy] = svgToScreen(
-      entry.cx, entry.cy,
+      svgX, svgY,
       scale.value, translateX.value, translateY.value,
       svWidth.value, svHeight.value,
     );
@@ -184,7 +175,7 @@ function CountryMapLabel({
       return { position: "absolute" as const, opacity: 0, left: 0, top: 0, width: 0, height: 0 };
     }
     const [sx, sy] = svgToScreen(
-      entry.cx, entry.cy,
+      svgX, svgY,
       scale.value, translateX.value, translateY.value,
       svWidth.value, svHeight.value,
     );
@@ -626,27 +617,27 @@ export default function WorldMapScreen() {
           );
         })}
 
-        {/* Labels overlay — taille fixe, aucun pointer event */}
+        {/* Labels overlay — taille fixe à l'écran, aucun pointer event */}
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           {GAME_ENTRIES.map(([code, entry]) => {
             const cid        = ALPHA2_TO_CID.get(code)!;
             const isSelected = selected === cid;
             const isTier1    = TIER1.has(cid);
             const isTier2    = TIER2.has(cid);
-            const isSmall    = LABEL_SMALL.has(cid);
+            const isCallout  = COUNTRY_LABEL_ANCHORS[cid]?.callout ?? false;
 
-            // Visibilité : pays sélectionné toujours affiché ;
-            // petits pays seulement à tier2 ; sinon selon le mode courant
+            // Pays sélectionné → toujours visible.
+            // Callout (petits pays) → seulement à tier2 (zoom ≥ 3.5).
+            // Autres → selon appartenance tier1 / tier2 et le mode courant.
             const isVisible = isSelected || (
-              isSmall
+              isCallout
                 ? labelMode === "tier2"
-                : labelMode === "tier1"  ? isTier1
-                : labelMode === "tier2"  ? (isTier1 || isTier2)
+                : labelMode === "tier1" ? isTier1
+                : labelMode === "tier2" ? (isTier1 || isTier2)
                 : false
             );
             if (!isVisible) return null;
 
-            const off = LABEL_OFFSETS[cid] ?? { dx: 0, dy: 0 };
             return (
               <CountryMapLabel
                 key={`lbl-${code}`}
@@ -659,8 +650,6 @@ export default function WorldMapScreen() {
                 translateY={translateY}
                 svWidth={svWidth}
                 svHeight={svHeight}
-                dx={off.dx}
-                dy={off.dy}
               />
             );
           })}
