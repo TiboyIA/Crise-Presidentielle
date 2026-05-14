@@ -57,9 +57,15 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
 const MIN_SCALE = 1;
 const MAX_SCALE = 12;
 
-// Grandes puissances visibles dès le zoom moyen
-const MAJOR_POWERS = new Set<CountryId>([
-  "usa", "china", "russia", "india", "uk", "france", "germany", "brazil",
+// Niveau 1 — 9 grandes puissances, visibles dès le premier zoom
+const TIER1 = new Set<CountryId>([
+  "usa", "china", "russia", "france", "germany", "india", "japan", "brazil", "uk",
+]);
+
+// Niveau 2 — puissances secondaires, zoom ×2+
+const TIER2 = new Set<CountryId>([
+  "turkey", "iran", "israel", "south_korea", "italy", "saudi_arabia",
+  "australia", "canada", "north_korea", "nigeria", "pakistan",
 ]);
 
 // Noms courts pour labels carte (sans emoji)
@@ -86,7 +92,8 @@ const LABEL_NAMES: Partial<Record<CountryId, string>> = {
   pakistan:    "PAKISTAN",
 };
 
-type LabelMode = "none" | "major" | "all";
+// none → tier1 → tier2 → all
+type LabelMode = "none" | "tier1" | "tier2" | "all";
 
 type McName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -146,7 +153,10 @@ export default function WorldMapScreen() {
   useAnimatedReaction(
     () => scale.value,
     (s) => {
-      const mode: LabelMode = s < 1.8 ? "none" : s < 3.5 ? "major" : "all";
+      const mode: LabelMode =
+        s < 1.5 ? "none" :
+        s < 2.5 ? "tier1" :
+        s < 4.0 ? "tier2" : "all";
       runOnJS(setLabelMode)(mode);
     },
   );
@@ -390,22 +400,33 @@ export default function WorldMapScreen() {
             );
           })()}
 
-          {/* Labels pays — apparaissent selon le niveau de zoom */}
+          {/* Labels pays — 3 niveaux selon zoom */}
           {labelMode !== "none" && GAME_ENTRIES.map(([code, entry]) => {
             const cid = ALPHA2_TO_CID.get(code)!;
-            if (labelMode === "major" && !MAJOR_POWERS.has(cid)) return null;
+            const isTier1    = TIER1.has(cid);
+            const isTier2    = TIER2.has(cid);
             const isSelected = selected === cid;
+
+            // Filtre par niveau
+            if (labelMode === "tier1" && !isTier1) return null;
+            if (labelMode === "tier2" && !isTier1 && !isTier2) return null;
+
             const label = LABEL_NAMES[cid] ?? cid.toUpperCase();
+            // Tier 1 : texte plus grand et plus lumineux
+            const fontSize = isTier1 ? (labelMode === "tier1" ? 13 : 11) : 9;
+            const fill     = isSelected ? PALETTE.gold : isTier1 ? "#8aacc8" : "#5a7590";
+            const opacity  = isSelected ? 1 : isTier1 ? 0.9 : 0.75;
+
             return (
               <SvgText
                 key={`lbl-${code}`}
                 x={entry.cx}
                 y={entry.cy + 5}
-                fill={isSelected ? PALETTE.gold : "#6a8099"}
-                fontSize={labelMode === "all" ? 10 : 12}
-                fontWeight="600"
+                fill={fill}
+                fontSize={fontSize}
+                fontWeight="700"
                 textAnchor="middle"
-                opacity={isSelected ? 1 : 0.8}
+                opacity={opacity}
               >
                 {label}
               </SvgText>
