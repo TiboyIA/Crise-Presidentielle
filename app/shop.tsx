@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { isPackFree, useEntitlements } from "@/lib/entitlements";
 import { purchasePack } from "@/lib/purchases";
+import { GameSecurityService } from "@/services/GameSecurityService";
 import type { EventPack } from "@/data/events";
 import {
   SHOP_BULLET_THUMBS,
@@ -122,19 +123,33 @@ export default function ShopScreen() {
     async (pack: EventPack) => {
       setPurchasing(pack);
       try {
-        if (Platform.OS === "web") {
-          // Web/Replit preview: stub purchase for testing purposes.
-          await new Promise<void>((resolve) => setTimeout(resolve, 350));
-          await grantLocal(pack);
-          return;
-        }
-        // Native: real RevenueCat purchase. refresh() syncs state from RC.
-        await purchasePack(pack);
-        await refresh();
-      } catch (e: unknown) {
-        // PURCHASE_CANCELLED is not an error — user tapped back.
-        const code = (e as { userCancelled?: boolean })?.userCancelled;
-        if (!code) {
+        const result = await GameSecurityService.dispatch(
+          { type: "purchase_pack", payload: { pack } },
+          async () => {
+            if (Platform.OS === "web") {
+              // Web/Replit preview: stub purchase for testing purposes.
+              await new Promise<void>((resolve) => setTimeout(resolve, 350));
+              await grantLocal(pack);
+              return;
+            }
+            // Native: real RevenueCat purchase. refresh() syncs state from RC.
+            try {
+              await purchasePack(pack);
+              await refresh();
+            } catch (e: unknown) {
+              // PURCHASE_CANCELLED is not an error — user tapped back. Swallow
+              // it so dispatch doesn't surface a spurious error.
+              const cancelled = (e as { userCancelled?: boolean })?.userCancelled;
+              if (!cancelled) throw e;
+            }
+          },
+        );
+        if (result.rateLimited) {
+          Alert.alert(
+            "Veuillez patienter",
+            "Attendez quelques secondes avant de réessayer.",
+          );
+        } else if (!result.ok && result.error) {
           Alert.alert(
             "Achat impossible",
             "Une erreur est survenue. Vérifiez votre connexion et réessayez.",
