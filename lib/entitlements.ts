@@ -13,33 +13,31 @@ import {
   fetchCustomerInfo,
   initPurchases,
   packsFromCustomerInfo,
+  packsFromEntitlementIds,
 } from "@/lib/purchases";
 
 /**
- * v1.2 — Entitlements (DLC packs) with RevenueCat sync.
+ * v1.3 — Entitlements (DLC packs) with server-side source of truth.
  *
  * Source of truth priority:
- *   1. RevenueCat customer info (real purchases, production)
- *   2. AsyncStorage (local debug grants, offline cache)
- *   3. FREE_PACKS (always unlocked)
+ *   1. Backend player-entitlements (updated by RevenueCat webhook — server decides)
+ *   2. RevenueCat SDK (optimistic, for the brief window between purchase and webhook)
+ *   3. AsyncStorage (local debug grants only — never used for real purchase decisions)
+ *   4. FREE_PACKS (always unlocked)
+ *
+ * The backend MUST be the authority on whether a player is premium.
+ * The app never decides unilaterally.
  *
  * Public surface:
- *   - <EntitlementsProvider>   : wraps the app, initializes RevenueCat
- *   - useEntitlements()        : { unlockedPacks, hasPack, grantLocal, revokeLocal, refresh }
+ *   - setEntitlementToken(token)   : called by AuthContext on auth state change
+ *   - <EntitlementsProvider>       : wraps the app, initializes RevenueCat
+ *   - useEntitlements()            : { unlockedPacks, hasPack, grantLocal, revokeLocal, refresh }
  */
 
 const STORAGE_KEY = "etat_de_crise_entitlements_v1";
 
 export const ALL_PACKS: readonly EventPack[] = ["climate"] as const;
 
-/**
- * Packs offered for free with the base game (gift to launch v1.1).
- * Future packs that are NOT in this set will require a real purchase
- * once the RevenueCat SDK is wired in.
- *
- * Players always have access to free packs even if their stored
- * entitlements are empty (e.g. fresh install, storage wiped).
- */
 export const FREE_PACKS: ReadonlySet<EventPack> = new Set<EventPack>([
   "climate",
 ]);
@@ -47,6 +45,40 @@ export const FREE_PACKS: ReadonlySet<EventPack> = new Set<EventPack>([
 export function isPackFree(pack: EventPack): boolean {
   return FREE_PACKS.has(pack);
 }
+
+// ── Module-level auth token (set by AuthContext on auth state change) ──────────
+
+let _entitlementToken: string | null = null;
+
+export function setEntitlementToken(token: string | null): void {
+  _entitlementToken = token;
+}
+
+// ── Backend entitlements fetch ────────────────────────────────────────────────
+
+async function fetchBackendEntitlements(): Promise<string[] | null> {
+  const token = _entitlementToken;
+  if (!token) return null;
+  const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  if (!supabaseUrl || !anonKey) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/player-entitlements`, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "apikey": anonKey,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { entitlements?: unknown };
+    if (!Array.isArray(data.entitlements)) return null;
+    return (data.entitlements as unknown[]).filter((e): e is string => typeof e === "string");
+  } catch {
+    return null;
+  }
+}
+
+// ── AsyncStorage helpers ──────────────────────────────────────────────────────
 
 interface StoredState {
   packs: EventPack[];
@@ -71,38 +103,28 @@ async function writeStored(state: StoredState): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Non-fatal: entitlements will be re-fetched from RevenueCat at next launch.
+    // Non-fatal: entitlements will be re-fetched from backend/RevenueCat at next launch.
   }
+}
+
+// ── Context ───────────────────────────────────────────────────────────────────
+
+function mergeWithFree(stored: ReadonlyArray<EventPack>): ReadonlySet<EventPack> {
+  const merged = new Set<EventPack>(stored);
+  for (const p of FREE_PACKS) merged.add(p);
+  return merged;
 }
 
 interface EntitlementsContextValue {
   loaded: boolean;
   unlockedPacks: ReadonlySet<EventPack>;
   hasPack: (pack: EventPack) => boolean;
-  /**
-   * Grant a pack locally (used by the in-game shop's stub purchase
-   * flow today, and by the debug screen). Once RevenueCat is wired
-   * in, real purchases will call this AND post to RevenueCat.
-   */
   grantLocal: (pack: EventPack) => Promise<void>;
   revokeLocal: (pack: EventPack) => Promise<void>;
-  /** Re-read from storage (and from RevenueCat once wired). */
   refresh: () => Promise<void>;
 }
 
 const EntitlementsContext = createContext<EntitlementsContextValue | null>(null);
-
-/**
- * Merge stored (paid) packs with the always-on free packs so consumers
- * (catalog filter, shop badges) get a single source of truth.
- */
-function mergeWithFree(
-  stored: ReadonlyArray<EventPack>,
-): ReadonlySet<EventPack> {
-  const merged = new Set<EventPack>(stored);
-  for (const p of FREE_PACKS) merged.add(p);
-  return merged;
-}
 
 export function EntitlementsProvider({
   children,
@@ -122,8 +144,6 @@ export function EntitlementsProvider({
     };
   }, []);
 
-  // All AsyncStorage read-modify-write happens on this serial queue
-  // so concurrent grants/revokes/refreshes never lose updates.
   const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
   const enqueue = useCallback((fn: () => Promise<void>) => {
     const next = mutationQueueRef.current.then(fn, fn);
@@ -134,17 +154,22 @@ export function EntitlementsProvider({
   const refresh = useCallback(
     () =>
       enqueue(async () => {
-        const [stored, customerInfo] = await Promise.all([
+        const [stored, customerInfo, backendIds] = await Promise.all([
           readStored(),
           fetchCustomerInfo(),
+          fetchBackendEntitlements(),
         ]);
         if (!mountedRef.current) return;
-        // RevenueCat is the source of truth for paid packs.
-        // Merge: RC packs + local debug grants + free packs.
-        const rcPacks = customerInfo ? packsFromCustomerInfo(customerInfo) : [];
-        const allPaid = Array.from(
-          new Set<EventPack>([...stored.packs, ...rcPacks]),
-        );
+
+        // Backend (server-side webhook state) is the source of truth for real purchases.
+        // RC SDK is the optimistic fallback for the brief window between purchase and webhook.
+        // We union both so a just-purchased pack shows immediately even before the webhook fires.
+        const rcPacks      = customerInfo ? packsFromCustomerInfo(customerInfo) : [];
+        const backendPacks = backendIds !== null ? packsFromEntitlementIds(backendIds) : [];
+        const realPacks    = Array.from(new Set<EventPack>([...backendPacks, ...rcPacks]));
+
+        // Local debug grants (grantLocal) sit on top of real purchases.
+        const allPaid = Array.from(new Set<EventPack>([...stored.packs, ...realPacks]));
         setPacks(mergeWithFree(allPaid));
         setLoaded(true);
       }),
@@ -159,7 +184,6 @@ export function EntitlementsProvider({
   const grantLocal = useCallback(
     (pack: EventPack) =>
       enqueue(async () => {
-        // Free packs are always granted; no point persisting them.
         if (FREE_PACKS.has(pack)) {
           if (mountedRef.current) {
             const stored = await readStored();
@@ -182,7 +206,6 @@ export function EntitlementsProvider({
   const revokeLocal = useCallback(
     (pack: EventPack) =>
       enqueue(async () => {
-        // Free packs cannot be revoked (they are always part of the game).
         if (FREE_PACKS.has(pack)) {
           if (mountedRef.current) {
             const stored = await readStored();
@@ -225,10 +248,6 @@ export function useEntitlements(): EntitlementsContextValue {
   return ctx;
 }
 
-/**
- * Helper for non-React code (e.g. one-shot scripts). Returns the
- * effective set of unlocked packs (persisted paid + free defaults).
- */
 export async function readUnlockedPacks(): Promise<ReadonlySet<EventPack>> {
   const stored = await readStored();
   return mergeWithFree(stored.packs);

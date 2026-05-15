@@ -9,6 +9,11 @@ const PACK_TO_ENTITLEMENT: Record<EventPack, string> = {
   climate: "climate_pack",
 };
 
+// Reverse mapping used by the entitlements layer to convert backend responses.
+const ENTITLEMENT_TO_PACK: Partial<Record<string, EventPack>> = Object.fromEntries(
+  (Object.entries(PACK_TO_ENTITLEMENT) as [EventPack, string][]).map(([pack, id]) => [id, pack]),
+);
+
 let initialized = false;
 
 /**
@@ -45,6 +50,37 @@ export function initPurchases(): void {
   initialized = true;
 }
 
+/**
+ * Identify the RevenueCat user as the authenticated Supabase user.
+ * Must be called after auth + initPurchases() so that RevenueCat webhook
+ * events carry the Supabase UID as app_user_id — enabling the backend to
+ * link purchases to the correct player row.
+ */
+export async function loginRevenueCat(userId: string): Promise<void> {
+  if (!initialized || Platform.OS === "web") return;
+  const Purchases = getPurchases();
+  if (!Purchases) return;
+  try {
+    await Purchases.logIn(userId);
+  } catch (e) {
+    console.warn("[RevenueCat] logIn failed:", e);
+  }
+}
+
+/**
+ * Reset RevenueCat to an anonymous identity (call on sign-out).
+ */
+export async function logoutRevenueCat(): Promise<void> {
+  if (!initialized || Platform.OS === "web") return;
+  const Purchases = getPurchases();
+  if (!Purchases) return;
+  try {
+    await Purchases.logOut();
+  } catch (e) {
+    console.warn("[RevenueCat] logOut failed:", e);
+  }
+}
+
 export async function fetchCustomerInfo(): Promise<CustomerInfo | null> {
   if (!initialized || Platform.OS === "web") return null;
   try {
@@ -55,10 +91,21 @@ export async function fetchCustomerInfo(): Promise<CustomerInfo | null> {
   }
 }
 
+/** Convert RevenueCat CustomerInfo → list of unlocked packs. */
 export function packsFromCustomerInfo(info: CustomerInfo): EventPack[] {
   return (Object.entries(PACK_TO_ENTITLEMENT) as [EventPack, string][])
     .filter(([, id]) => info.entitlements.active[id] !== undefined)
     .map(([pack]) => pack);
+}
+
+/**
+ * Convert a list of entitlement IDs (from the backend player-entitlements
+ * endpoint) to our internal EventPack list.
+ */
+export function packsFromEntitlementIds(entitlementIds: string[]): EventPack[] {
+  return entitlementIds
+    .map((id) => ENTITLEMENT_TO_PACK[id])
+    .filter((p): p is EventPack => p !== undefined);
 }
 
 /**

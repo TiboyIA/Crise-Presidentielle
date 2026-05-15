@@ -5,6 +5,8 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { setAccessToken, registerDevice, syncOnLaunch } from "@/services/SyncService";
 import { retryPendingSubmission } from "@/services/RankedService";
+import { setEntitlementToken } from "@/lib/entitlements";
+import { loginRevenueCat, logoutRevenueCat } from "@/lib/purchases";
 import { loadStrategy, saveStrategy } from "@/storage/strategyStorage";
 import Constants from "expo-constants";
 
@@ -87,8 +89,10 @@ const AuthContext = createContext<AuthState>({
   linkWithApple: noop,
 });
 
-async function onAuthenticated(token: string): Promise<void> {
+async function onAuthenticated(token: string, userId: string): Promise<void> {
   setAccessToken(token);
+  setEntitlementToken(token);
+  loginRevenueCat(userId); // fire-and-forget — links RC anonymous ID → Supabase UID
 
   const appVersion = (Constants.expoConfig?.version ?? "0.0.0") as string;
   registerDevice(token, appVersion); // fire-and-forget
@@ -129,13 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sb.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setState((s) => ({ ...s, user: session.user, accessToken: session.access_token, isReady: true, isEnabled: true, ...deriveLinked(session.user) }));
-        onAuthenticated(session.access_token);
+        onAuthenticated(session.access_token, session.user.id);
         return;
       }
       const { data, error } = await sb.auth.signInAnonymously();
       if (!error && data.session) {
         setState((s) => ({ ...s, user: data.session!.user, accessToken: data.session!.access_token, isReady: true, isEnabled: true, ...deriveLinked(data.session!.user) }));
-        onAuthenticated(data.session.access_token);
+        onAuthenticated(data.session.access_token, data.session.user.id);
       } else {
         setState((s) => ({ ...s, user: null, accessToken: null, isReady: true, isEnabled: true, ...deriveLinked(null) }));
       }
@@ -144,6 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
       const token = session?.access_token ?? null;
       setAccessToken(token);
+      setEntitlementToken(token);
+      if (!token) logoutRevenueCat();
       setState((s) => ({
         ...s,
         user: session?.user ?? null,
