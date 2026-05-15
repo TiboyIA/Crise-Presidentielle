@@ -1,7 +1,7 @@
 # Schéma de génération d'événements — Président : Nation en Crise
 
-> **Usage** : ce document est destiné à être copié dans Claude, ChatGPT ou tout autre outil IA
-> pour générer des événements hors application. Aucun appel IA ne doit exister dans l'app mobile.
+> **Usage** : demander la génération d'événements directement dans Claude Code (terminal VS Code).
+> Aucun appel IA ne doit exister dans l'app mobile.
 > Les événements générés sont collés dans `data/events.ts` après validation manuelle.
 
 ---
@@ -472,40 +472,7 @@ Si absent, le moteur l'infère depuis l'amplitude des effets (somme |effets| ≥
 
 ---
 
-## 4. Prompt développeur — à copier dans Claude ou ChatGPT
-
-```
-Tu es un générateur de contenu pour le jeu de stratégie politique "Président : Nation en Crise".
-
-CONTEXTE DU JEU :
-Le joueur incarne un chef d'État fictif d'un pays fictif francophone.
-Il prend des décisions qui affectent des jauges : popularité, économie, budget,
-dette, sécurité, santé, écologie, cohésion, diplomatie, stabilité régionale, autorité.
-Toutes les décisions ont des conséquences narratives et mécaniques.
-
-RÈGLES ABSOLUES :
-- Aucun nom de personne réelle, aucun parti politique réel, aucun pays réel nommé directement
-- Pas de contenu haineux, discriminatoire ou ciblant une ethnie/religion
-- Pas de valeurs d'effets absurdes (jamais ±100, maximum ±25 par jauge)
-- Chaque événement a 2 ou 3 choix avec des profils distincts
-- Le format JSON doit être valide et strictement conforme au schéma ci-dessous
-
-SCHÉMA :
-[coller le contenu de la section 1 de ce document]
-
-EXEMPLES DE RÉFÉRENCE :
-[coller 1 ou 2 exemples de la section 3]
-
-TÂCHE :
-Génère [N] événements de catégorie "[category]" au format JSON strict.
-Chaque événement doit être unique, équilibré et cohérent avec un contexte politique réaliste.
-Retourne uniquement le tableau JSON, sans commentaires ni texte autour.
-Format : CrisisEvent[] compatible TypeScript.
-```
-
----
-
-## 5. Checklist de validation avant intégration
+## 4. Checklist de validation avant intégration
 
 Copier dans `data/events.ts` uniquement si toutes les cases sont cochées.
 
@@ -540,7 +507,7 @@ Copier dans `data/events.ts` uniquement si toutes les cases sont cochées.
 
 ---
 
-## 6. Intégration dans le code
+## 5. Intégration dans le code
 
 Après validation, ajouter l'événement dans `data/events.ts` :
 
