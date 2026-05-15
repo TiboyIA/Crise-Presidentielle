@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
   useCallback,
@@ -35,6 +36,37 @@ import {
  */
 
 const STORAGE_KEY = "etat_de_crise_entitlements_v1";
+const SECURE_CACHE_KEY = "entitlements_verified_cache_v1";
+const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
+
+interface VerifiedCache {
+  packs: EventPack[];
+  verifiedAt: number;
+}
+
+async function writeVerifiedCache(packs: EventPack[]): Promise<void> {
+  try {
+    const payload: VerifiedCache = { packs, verifiedAt: Date.now() };
+    await SecureStore.setItemAsync(SECURE_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // Non-fatal — cache best-effort
+  }
+}
+
+async function readVerifiedCache(): Promise<EventPack[]> {
+  try {
+    const raw = await SecureStore.getItemAsync(SECURE_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Partial<VerifiedCache>;
+    if (!Array.isArray(parsed.packs) || typeof parsed.verifiedAt !== "number") return [];
+    if (Date.now() - parsed.verifiedAt > GRACE_PERIOD_MS) return [];
+    return parsed.packs.filter((p): p is EventPack =>
+      (ALL_PACKS as readonly string[]).includes(p),
+    );
+  } catch {
+    return [];
+  }
+}
 
 export const ALL_PACKS: readonly EventPack[] = ["climate"] as const;
 
@@ -161,12 +193,22 @@ export function EntitlementsProvider({
         ]);
         if (!mountedRef.current) return;
 
-        // Backend (server-side webhook state) is the source of truth for real purchases.
-        // RC SDK is the optimistic fallback for the brief window between purchase and webhook.
-        // We union both so a just-purchased pack shows immediately even before the webhook fires.
         const rcPacks      = customerInfo ? packsFromCustomerInfo(customerInfo) : [];
         const backendPacks = backendIds !== null ? packsFromEntitlementIds(backendIds) : [];
-        const realPacks    = Array.from(new Set<EventPack>([...backendPacks, ...rcPacks]));
+        const serverOnline = customerInfo !== null || backendIds !== null;
+
+        let realPacks: EventPack[];
+
+        if (serverOnline) {
+          // Serveur accessible — union backend + RC, puis mise à jour du cache 30j
+          realPacks = Array.from(new Set<EventPack>([...backendPacks, ...rcPacks]));
+          if (realPacks.length > 0) {
+            void writeVerifiedCache(realPacks);
+          }
+        } else {
+          // Serveur inaccessible — grâce offline 30 jours
+          realPacks = await readVerifiedCache();
+        }
 
         // Local debug grants (grantLocal) sit on top of real purchases.
         const allPaid = Array.from(new Set<EventPack>([...stored.packs, ...realPacks]));
