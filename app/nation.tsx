@@ -85,9 +85,20 @@ export default function NationScreen() {
         <LinearGradient colors={["rgba(6,8,18,0.05)", "rgba(6,8,18,0.55)", "rgba(10,12,20,0.95)"]} locations={[0, 0.5, 1]} style={styles.heroGrad}>
           <View style={[styles.heroInner, { paddingHorizontal: hPad }]}>
             <View style={styles.heroTop}>
-              <View style={{ gap: 2 }}>
-                <Text style={styles.kicker}>PRÉSIDENCE · MANDAT EN COURS</Text>
-                <Text style={styles.mandateDay}>Jour {state.mandateDay}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Pressable
+                  onPress={() => router.replace("/")}
+                  style={({ pressed }) => [styles.homeBtn, { opacity: pressed ? 0.6 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retour au menu principal"
+                >
+                  <MaterialCommunityIcons name="home-outline" size={13} color="rgba(255,255,255,0.55)" />
+                  <Text style={styles.homeBtnText}>MENU</Text>
+                </Pressable>
+                <View style={{ gap: 2 }}>
+                  <Text style={styles.kicker}>PRÉSIDENCE · MANDAT EN COURS</Text>
+                  <Text style={styles.mandateDay}>Jour {state.mandateDay}</Text>
+                </View>
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Badge label={`Saison ${state.stats.season}`} tone="gold" size="xs" />
@@ -502,6 +513,8 @@ const styles = StyleSheet.create({
   mandateDay: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1 },
   briefingBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: PALETTE.gold + "55", backgroundColor: "rgba(201,168,76,0.08)" },
   briefingBtnText: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
+  homeBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", backgroundColor: "rgba(255,255,255,0.06)" },
+  homeBtnText: { fontSize: 9, fontFamily: FONT.bold, color: "rgba(255,255,255,0.55)", letterSpacing: 1.5 },
   heroRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   flagFrame: {
     width: 64, height: 64, borderRadius: 6,
