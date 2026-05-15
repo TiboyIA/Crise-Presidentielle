@@ -45,7 +45,9 @@ export async function loadGame(): Promise<GameState | null> {
       // migration if the user closes the app before the next save tick.
       AsyncStorage.setItem(SAVE_KEY, json).catch(() => {});
     }
-    return JSON.parse(json) as GameState;
+    const raw: unknown = JSON.parse(json);
+    if (!raw || typeof raw !== "object" || typeof (raw as Record<string, unknown>).turn !== "number") return null;
+    return raw as GameState;
   } catch (e) {
     console.warn("Load failed:", e);
     return null;
