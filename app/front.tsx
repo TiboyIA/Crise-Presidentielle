@@ -30,7 +30,7 @@ import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useGame } from "@/context/GameContext";
-import { formatMandateLabel, turnToMonth } from "@/logic/timeEngine";
+import { formatGameDayLabel, turnToGameDay } from "@/logic/timeEngine";
 import {
   computeThreatLevel,
   threatColor,
@@ -237,7 +237,7 @@ export default function FrontScreen() {
                     <Text
                       style={[styles.opMeta, { color: colors.mutedForeground }]}
                     >
-                      {formatMandateLabel(turnToMonth(op.turn))} · sévérité{" "}
+                      {formatGameDayLabel(turnToGameDay(op.turn))} · sévérité{" "}
                       {op.severity}
                     </Text>
                   </View>

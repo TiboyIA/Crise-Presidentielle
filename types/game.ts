@@ -557,6 +557,30 @@ export interface GameOverResult {
   triggeredElection?: boolean;
 }
 
+/**
+ * Horloge de simulation — vocabulaire visible Saison / Jour / Heure.
+ * Calculée depuis gameTime.currentMonth (mapping 1:1 mois → jour de jeu).
+ * Voir logic/simulationClock.ts pour les constantes et fonctions de formatage.
+ */
+export interface SimulationClock {
+  /** Numéro de saison en cours (1..5 pour un mandat de 60 jours / 5 saisons). */
+  seasonNumber: number;
+  /** Jour absolu en cours dans le mandat (1..60, = currentMonth interne). */
+  currentGameDay: number;
+  /** Sous-progression du jour courant en heures jeu (0..23). */
+  currentGameHour: number;
+  /** Ratio heures jeu / heure réelle (4 par défaut). */
+  gameHoursPerRealHour: number;
+  /** Jour de jeu du prochain événement majeur. */
+  nextEventGameDay: number;
+  /** Jour de jeu du prochain sondage (optionnel). */
+  nextPollGameDay?: number;
+  /** Jour de jeu de la prochaine crise majeure programmée (optionnel). */
+  nextMajorCrisisGameDay?: number;
+  /** Jour de jeu du prochain bilan (trimestriel ou annuel). */
+  nextReportGameDay?: number;
+}
+
 export interface GameState {
   president: President | null;
   gauges: Gauges;
@@ -639,6 +663,12 @@ export interface GameState {
    */
   gameTime?: GameTime;
   /**
+   * Horloge de simulation — vocabulaire Saison / Jour / Heure.
+   * Calculée dynamiquement depuis gameTime.currentMonth (1:1 mapping).
+   * Optionnel : absent dans les vieilles saves, calculé à l'affichage.
+   */
+  simulationClock?: SimulationClock;
+  /**
    * LOT 15 — File des événements MINEURS en attente de traitement
    * sur le dashboard. Affichés via `MinorEventCard`. N'interrompent
    * pas le temps. Auto-expirés après quelques mois.
@@ -691,6 +721,10 @@ export interface TechResearchInProgress {
   startedTurn: number;
   /** Tour auquel le projet sera marqué comme acquis (>= startedTurn + duration). */
   completedTurn: number;
+  /** Jour de jeu (simulationClock) auquel la recherche a démarré. Migration progressive. */
+  startedAtGameDay?: number;
+  /** Jour de jeu (simulationClock) auquel la recherche sera acquise. Migration progressive. */
+  completedAtGameDay?: number;
 }
 
 export interface TechState {

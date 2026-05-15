@@ -29,8 +29,8 @@ import { MandateReportModal } from "@/components/MandateReportModal";
 import { QuarterReportToast } from "@/components/QuarterReportToast";
 import {
   INITIAL_GAME_TIME,
-  formatMandateLabel,
-  turnToMonth,
+  formatGameDayLabel,
+  turnToGameDay,
 } from "@/logic/timeEngine";
 import { MetaStatsCard } from "@/components/MetaStatsCard";
 import { ResourceStrip } from "@/components/ResourceStrip";
@@ -295,7 +295,7 @@ export default function DashboardScreen() {
       const node = TECH_TREE[ip.id];
       const turnsLeft = Math.max(0, ip.completedTurn - state.turn);
       const monthsLeft = turnsLeft * 3;
-      return `${node.label} — ${monthsLeft} mois restant${monthsLeft > 1 ? "s" : ""}`;
+      return `${node.label} — ${monthsLeft > 0 ? `${monthsLeft} jour${monthsLeft > 1 ? "s" : ""} de jeu` : "terminé"}`;
     }
     return `${techState.researched.length} / 10 technologies acquises`;
   })();
@@ -319,7 +319,7 @@ export default function DashboardScreen() {
       <HudHeader
         presidentName={state.president.name}
         party={state.president.party}
-        month={state.gameTime?.currentMonth ?? turnToMonth(state.turn)}
+        gameDay={state.gameTime?.currentMonth ?? turnToGameDay(state.turn)}
         onOpenJournal={() => router.push("/journal")}
         onGoHome={() => router.replace("/")}
         onReset={handleReset}
@@ -327,9 +327,9 @@ export default function DashboardScreen() {
 
       {state.gameTime ? (
         <TimeBar
-          month={state.gameTime.currentMonth}
+          gameDay={state.gameTime.currentMonth}
           week={state.gameTime.weekInMonth ?? 1}
-          nextEventMonth={state.gameTime.nextEventMonth}
+          nextEventGameDay={state.gameTime.nextEventMonth}
           speed={state.gameTime.speed}
           blocked={!!state.currentEvent || !!state.gameTime.pendingReport}
           onSetSpeed={setSpeed}
@@ -353,8 +353,8 @@ export default function DashboardScreen() {
         {state.minorEventQueue && state.minorEventQueue.length > 0 ? (
           <MinorEventCard
             entry={state.minorEventQueue[0]}
-            currentMonth={
-              state.gameTime?.currentMonth ?? turnToMonth(state.turn)
+            currentGameDay={
+              state.gameTime?.currentMonth ?? turnToGameDay(state.turn)
             }
             onResolve={resolveMinorEvent}
             onDismiss={dismissMinorEvent}
@@ -644,7 +644,7 @@ export default function DashboardScreen() {
               <Text
                 style={[styles.lastDecisionLabel, { color: colors.mutedForeground }]}
               >
-                DERNIÈRE DÉCISION — {formatMandateLabel(turnToMonth(lastEntry.turn)).toUpperCase()}
+                DERNIÈRE DÉCISION — {formatGameDayLabel(turnToGameDay(lastEntry.turn)).toUpperCase()}
               </Text>
             </View>
             <Text style={[styles.lastEvent, { color: colors.foreground }]}>

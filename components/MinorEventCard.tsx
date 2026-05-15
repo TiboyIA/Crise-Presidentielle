@@ -16,8 +16,8 @@ import type { MinorEventEntry } from "@/types/game";
 interface Props {
   /** Première (et seule visible) carte de la file mineure. */
   entry: MinorEventEntry;
-  /** Mois courant — sert à grimer "expire dans X mois". */
-  currentMonth: number;
+  /** Jour de jeu courant — sert à grimer "expire dans X jours de jeu". */
+  currentGameDay: number;
   /** Résout en appliquant le premier choix actif (effets allégés). */
   onResolve: (eventId: string, choiceId: string) => void;
   /** Retire la carte sans appliquer d'effet. */
@@ -37,7 +37,7 @@ interface Props {
  * carte standard avec accent or sur la bordure pour signaler qu'il y
  * a une décision optionnelle en attente.
  */
-function MinorEventCardImpl({ entry, currentMonth, onResolve, onDismiss }: Props) {
+function MinorEventCardImpl({ entry, currentGameDay, onResolve, onDismiss }: Props) {
   const colors = useColors();
   const event = useMemo(() => getEventById(entry.eventId), [entry.eventId]);
   // Animation d'apparition discrète (slide-down + fade) pour ne pas
@@ -67,7 +67,7 @@ function MinorEventCardImpl({ entry, currentMonth, onResolve, onDismiss }: Props
 
   const firstChoice = event.choices[0];
   const categoryImage = EVENT_CATEGORY_IMAGES[event.category];
-  const monthsLeft = Math.max(0, entry.expiresMonth - currentMonth);
+  const daysLeft = Math.max(0, entry.expiresMonth - currentGameDay);
 
   const animatedStyle = {
     opacity: enter,
@@ -93,7 +93,7 @@ function MinorEventCardImpl({ entry, currentMonth, onResolve, onDismiss }: Props
       ]}
       accessible
       accessibilityRole="summary"
-      accessibilityLabel={`Événement mineur : ${event.title}. Expire dans ${monthsLeft} mois.`}
+      accessibilityLabel={`Événement mineur : ${event.title}. Expire dans ${daysLeft} jours de jeu.`}
     >
       {categoryImage ? (
         <Image
@@ -117,7 +117,11 @@ function MinorEventCardImpl({ entry, currentMonth, onResolve, onDismiss }: Props
             style={[styles.expiry, { color: colors.mutedForeground }]}
             numberOfLines={1}
           >
-            {monthsLeft > 0 ? `Expire dans ${monthsLeft} mois` : "Dernier mois"}
+            {daysLeft > 0
+              ? daysLeft === 1
+                ? "Expire dans 1 jour de jeu"
+                : `Expire dans ${daysLeft} jours de jeu`
+              : "Expire aujourd'hui"}
           </Text>
         </View>
 

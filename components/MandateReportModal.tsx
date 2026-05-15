@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { formatMandateLabel } from "@/logic/timeEngine";
+import { formatGameDayLabel } from "@/logic/timeEngine";
 import { INVERTED_GAUGES } from "@/logic/gameEngine";
 import type { Gauges, MandateReport } from "@/types/game";
 
@@ -45,8 +45,8 @@ export function MandateReportModal({ report, onDismiss }: Props) {
   if (!report || report.kind !== "year") return null;
 
   const isYearly = true;
-  const title = isYearly ? "Bilan annuel" : "Bilan trimestriel";
-  const subtitle = formatMandateLabel(report.month);
+  const title = isYearly ? "Bilan de saison" : "Bilan intermédiaire";
+  const subtitle = formatGameDayLabel(report.month);
 
   // Calcule les deltas et trie les jauges par |delta| décroissant pour
   // mettre en avant les évolutions marquantes (pas spammer le joueur
@@ -81,7 +81,7 @@ export function MandateReportModal({ report, onDismiss }: Props) {
           ]}
         >
           <Text style={[styles.kind, { color: colors.mutedForeground }]}>
-            {isYearly ? "FIN D'ANNÉE" : "FIN DE TRIMESTRE"}
+            {isYearly ? "FIN DE SAISON" : "BILAN"}
           </Text>
           <Text style={[styles.title, { color: colors.foreground }]}>
             {title}

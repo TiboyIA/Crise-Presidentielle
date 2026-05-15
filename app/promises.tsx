@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useGame } from "@/context/GameContext";
-import { formatMandateLabel, turnToMonth } from "@/logic/timeEngine";
+import { formatGameDayLabel, turnToGameDay } from "@/logic/timeEngine";
 import ScreenHeroHeader from "@/components/ScreenHeroHeader";
 import {
   PROMISES_EMPTY,
@@ -215,7 +215,7 @@ export default function PromisesScreen() {
                                 { color: colors.mutedForeground },
                               ]}
                             >
-                              Résolu au {formatMandateLabel(turnToMonth(p.resolvedTurn))}
+                              Résolu au {formatGameDayLabel(turnToGameDay(p.resolvedTurn))}
                             </Text>
                           ) : null}
                         </View>

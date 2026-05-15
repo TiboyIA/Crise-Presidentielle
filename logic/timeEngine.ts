@@ -25,6 +25,12 @@ import type {
   EventNotification,
   TimeSpeed,
 } from "@/types/game";
+import {
+  computeGameDayDisplay,
+  formatGameDayLabel as _formatGameDayLabel,
+  formatGameDayShort as _formatGameDayShort,
+  GAME_HOURS_PER_REAL_HOUR,
+} from "@/logic/simulationClock";
 // NB : on inline volontairement les valeurs neutres ici pour garder ce
 // module 100 % pur (aucun import depuis `gameEngine`, qui transite par
 // l'alias `@/...` non résolu hors d'Expo). Les vraies jauges initiales
@@ -482,6 +488,55 @@ export function purgeExpiredQueues(
       notifFiltered.length === notifIn.length ? notifIn : notifFiltered,
   };
 }
+
+// ── Couche de compatibilité Saison / Jour ─────────────────────────────────────
+// Ces fonctions exposent le vocabulaire "jour / saison" à partir du
+// compteur interne `month` (1..60). Elles délèguent à simulationClock.ts
+// et permettent aux composants de migrer progressivement sans dupliquer la
+// logique de conversion.
+
+/**
+ * Alias de `computeGameDayDisplay` depuis simulationClock.
+ * Exposé ici pour que les imports depuis `timeEngine` restent valides
+ * pendant la migration.
+ */
+export { computeGameDayDisplay };
+
+/**
+ * Libellé long "Saison X — Jour Y" (remplace `formatMandateLabel`).
+ * Le paramètre `month` correspond au `currentMonth` interne (1..60),
+ * directement mappé sur le jour de jeu (1:1).
+ */
+export function formatGameDayLabel(month: number): string {
+  return _formatGameDayLabel(month);
+}
+
+/**
+ * Libellé court "S2 J3" (remplace `formatMandateShort`).
+ */
+export function formatGameDayShort(month: number): string {
+  return _formatGameDayShort(month);
+}
+
+/**
+ * Libellé court incluant le sous-jour (ancienne semaine).
+ * "S1 J3 — Sous-jour 2/4" — gardé pour compatibilité de débogage.
+ */
+export function formatGameDayWithSubday(month: number, week: number): string {
+  const safeWeek = Math.max(1, Math.min(WEEKS_PER_MONTH, Math.floor(week) || 1));
+  return `${_formatGameDayShort(month)} — Sous-jour ${safeWeek}/${WEEKS_PER_MONTH}`;
+}
+
+/**
+ * Conversion tour de décision → jour de jeu (identique à `turnToMonth`,
+ * renommé progressivement pour correspondre au nouveau vocabulaire).
+ */
+export function turnToGameDay(turn: number): number {
+  return turnToMonth(turn);
+}
+
+/** @internal Ratio exposé pour les composants de débogage. */
+export { GAME_HOURS_PER_REAL_HOUR };
 
 function clampMonth(value: unknown, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;

@@ -17,7 +17,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useGame, Gauges } from "@/context/GameContext";
-import { formatMandateLabel, turnToMonth } from "@/logic/timeEngine";
+import { formatGameDayLabel, turnToGameDay } from "@/logic/timeEngine";
 import { GAUGE_LABELS } from "@/logic/gameEngine";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -121,8 +121,8 @@ export default function GameOverScreen() {
       const message = [
         `🇫🇷 ÉTAT DE CRISE — ${headline}`,
         "",
-        `${verdict} ${presidentLabel}, ${formatMandateLabel(
-          state.gameTime?.currentMonth ?? turnToMonth(state.turn),
+        `${verdict} ${presidentLabel}, ${formatGameDayLabel(
+          state.gameTime?.currentMonth ?? turnToGameDay(state.turn),
         ).toLowerCase()}.`,
         `Popularité ${popularity} · Économie ${economy} · Sécurité ${security} · Écologie ${ecology}`,
         `${state.log.length} décisions historiques.`,
@@ -239,8 +239,8 @@ export default function GameOverScreen() {
           ]}
         >
           <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>
-            BILAN FINAL — {formatMandateLabel(
-              state.gameTime?.currentMonth ?? turnToMonth(state.turn),
+            BILAN FINAL — {formatGameDayLabel(
+              state.gameTime?.currentMonth ?? turnToGameDay(state.turn),
             ).toUpperCase()}
           </Text>
           <View style={styles.statsGrid}>

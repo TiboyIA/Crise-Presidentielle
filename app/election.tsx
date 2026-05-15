@@ -29,7 +29,7 @@ import {
   STRATEGY_META,
 } from "@/lib/finalDebate";
 import { generateFinalDebateAttacks } from "@/lib/aiFinalDebate";
-import { formatMandateLabel, turnToMonth } from "@/logic/timeEngine";
+import { formatGameDayLabel, turnToGameDay } from "@/logic/timeEngine";
 import { ELECTION_IMAGES, STRATEGY_IMAGES } from "@/data/electionImages";
 import type {
   FinalDebateAttack,
@@ -651,7 +651,7 @@ export default function ElectionScreen() {
                           { color: colors.mutedForeground },
                         ]}
                       >
-                        DÉCISION {idx + 1} · {formatMandateLabel(turnToMonth(decision.turn)).toUpperCase()}
+                        DÉCISION {idx + 1} · {formatGameDayLabel(turnToGameDay(decision.turn)).toUpperCase()}
                       </Text>
                       {(decision.hadScandal || decision.hadBrokenPromise) && (
                         <View

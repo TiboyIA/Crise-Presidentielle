@@ -42,7 +42,7 @@ const STEPS: Step[] = [
     label: "ÉTAPE 2 / 3",
     title: "Chaque choix a des conséquences cachées",
     body:
-      "Sauver une entreprise rassure aujourd'hui, mais creuse la dette demain. Un choix peut déclencher un scandale ou une crise plusieurs mois plus tard.",
+      "Sauver une entreprise rassure aujourd'hui, mais creuse la dette demain. Un choix peut déclencher un scandale ou une crise plusieurs jours de jeu plus tard.",
   },
   {
     key: "election",
@@ -50,7 +50,7 @@ const STEPS: Step[] = [
     label: "ÉTAPE 3 / 3",
     title: "Survis jusqu'à l'élection",
     body:
-      "60 mois. À la fin du mandat, le peuple juge tes promesses tenues, tes scandales, et te dit s'il te renouvelle… ou pas.",
+      "60 jours de jeu. 5 saisons. À la fin du mandat, le peuple juge tes promesses tenues, tes scandales, et te dit s'il te renouvelle… ou pas.",
   },
 ];
 

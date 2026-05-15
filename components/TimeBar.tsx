@@ -2,20 +2,23 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import { WEEKS_PER_MONTH, TICK_MS_BY_SPEED } from "@/logic/timeEngine";
 import {
-  TOTAL_MONTHS,
-  WEEKS_PER_MONTH,
-  formatMandateLabel,
-} from "@/logic/timeEngine";
+  TOTAL_GAME_DAYS,
+  computeGameDayDisplay,
+  formatGameDayLabel,
+  formatCountdownDays,
+  formatCountdownRealTime,
+} from "@/logic/simulationClock";
 import type { TimeSpeed } from "@/types/game";
 
 interface Props {
-  /** Mois courant 1..60. */
-  month: number;
-  /** Semaine courante dans le mois (1..4). LOT 17. */
+  /** Jour de jeu courant 1..60 (= currentMonth interne). */
+  gameDay: number;
+  /** Sous-progression du jour (ancienne semaine dans le mois, 1..4). */
   week: number;
-  /** Mois auquel le prochain événement est programmé. */
-  nextEventMonth: number;
+  /** Jour de jeu auquel le prochain événement est programmé. */
+  nextEventGameDay: number;
   /** Vitesse actuelle (0=pause, 0.5/1/2/4 jouée). */
   speed: TimeSpeed;
   /** True si un événement OU un bilan modal bloque les contrôles. */
@@ -24,8 +27,6 @@ interface Props {
   onSkip: () => void;
 }
 
-// LOT 17 — Ajout du bouton x0.5 (lent) entre pause et x1, pour
-// donner au joueur une vraie option "observer le pays tranquillement".
 const SPEED_BUTTONS: Array<{ value: TimeSpeed; label: string; aria: string }> = [
   { value: 0, label: "‖", aria: "Mettre en pause" },
   { value: 0.5, label: "▶ ½", aria: "Vitesse lente x0.5" },
@@ -35,22 +36,30 @@ const SPEED_BUTTONS: Array<{ value: TimeSpeed; label: string; aria: string }> = 
 ];
 
 export function TimeBar({
-  month,
+  gameDay,
   week,
-  nextEventMonth,
+  nextEventGameDay,
   speed,
   blocked,
   onSetSpeed,
   onSkip,
 }: Props) {
   const colors = useColors();
-  const monthsToNext = Math.max(0, nextEventMonth - month);
-  const isAtEnd = month >= TOTAL_MONTHS;
-  // LOT 17 — Largeur de la jauge intra-mois (0..1) : la progression
-  // est continue (semaine N en cours = N/4 du mois écoulé). Affichage
-  // purement visuel, sans interaction.
+  const { seasonNumber, dayInSeason } = computeGameDayDisplay(gameDay);
+  const daysToNext = Math.max(0, nextEventGameDay - gameDay);
+  const isAtEnd = gameDay >= TOTAL_GAME_DAYS;
+
+  // Sous-progression du jour courant (0..1) — pour la barre visuelle.
   const safeWeek = Math.max(1, Math.min(WEEKS_PER_MONTH, Math.floor(week) || 1));
-  const weekProgress = safeWeek / WEEKS_PER_MONTH;
+  const dayProgress = safeWeek / WEEKS_PER_MONTH;
+
+  // Compte à rebours réel estimé (basé sur la vitesse du ticker).
+  const tickMs = speed > 0 ? TICK_MS_BY_SPEED[speed as Exclude<TimeSpeed, 0>] : 0;
+  const realtimeLabel =
+    speed === 0
+      ? "⏸ Mis en pause"
+      : (formatCountdownRealTime(daysToNext, tickMs, WEEKS_PER_MONTH) ??
+         formatCountdownDays(daysToNext));
 
   return (
     <View
@@ -62,17 +71,15 @@ export function TimeBar({
       <View style={styles.row}>
         <View style={styles.labelStack}>
           <Text style={[styles.label, { color: colors.mutedForeground }]}>
-            {formatMandateLabel(month).toUpperCase()}
+            {formatGameDayLabel(gameDay).toUpperCase()}
           </Text>
-          <Text style={[styles.weekLabel, { color: colors.mutedForeground }]}>
-            {`Semaine ${safeWeek}/${WEEKS_PER_MONTH}`}
+          <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>
+            {`Saison ${seasonNumber} · Jour ${dayInSeason} sur ${TOTAL_GAME_DAYS}`}
           </Text>
         </View>
         <View style={styles.spacer} />
         {SPEED_BUTTONS.map((btn) => {
           const active = speed === btn.value;
-          // Quand un event/report bloque, seul le bouton pause reste
-          // visuellement actif (et il l'est de fait, vu que speed=0).
           const disabled = blocked && btn.value !== 0;
           return (
             <Pressable
@@ -107,23 +114,23 @@ export function TimeBar({
           );
         })}
       </View>
+
+      {/* Barre de progression intra-jour */}
       <View
-        style={[
-          styles.weekTrack,
-          { backgroundColor: colors.border },
-        ]}
-        accessibilityLabel={`Progression du mois : semaine ${safeWeek} sur ${WEEKS_PER_MONTH}`}
+        style={[styles.dayTrack, { backgroundColor: colors.border }]}
+        accessibilityLabel={`Progression du jour : partie ${safeWeek} sur ${WEEKS_PER_MONTH}`}
       >
         <View
           style={[
-            styles.weekFill,
+            styles.dayFill,
             {
               backgroundColor: colors.primary,
-              width: `${Math.round(weekProgress * 100)}%`,
+              width: `${Math.round(dayProgress * 100)}%`,
             },
           ]}
         />
       </View>
+
       <Pressable
         onPress={onSkip}
         disabled={blocked || isAtEnd}
@@ -148,9 +155,7 @@ export function TimeBar({
         </Text>
         <View style={styles.spacer} />
         <Text style={[styles.skipMeta, { color: colors.mutedForeground }]}>
-          {monthsToNext === 0
-            ? "imminent"
-            : `dans ${monthsToNext} mois`}
+          {daysToNext === 0 ? "imminent" : realtimeLabel}
         </Text>
       </Pressable>
     </View>
@@ -181,19 +186,19 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     gap: 1,
   },
-  weekLabel: {
+  subLabel: {
     fontSize: 10,
     fontFamily: "Inter_500Medium",
     letterSpacing: 0.6,
     opacity: 0.8,
   },
-  weekTrack: {
+  dayTrack: {
     height: 3,
     borderRadius: 2,
     overflow: "hidden",
     width: "100%",
   },
-  weekFill: {
+  dayFill: {
     height: "100%",
     borderRadius: 2,
   },

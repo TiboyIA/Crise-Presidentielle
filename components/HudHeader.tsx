@@ -2,13 +2,13 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { TOTAL_MONTHS, formatMandate } from "@/logic/timeEngine";
+import { TOTAL_GAME_DAYS, computeGameDayDisplay } from "@/logic/simulationClock";
 
 interface Props {
   presidentName: string;
   party: string;
-  /** Mois courant 1..60 (issu de `state.gameTime.currentMonth`). */
-  month: number;
+  /** Jour de jeu courant 1..60 (issu de `state.gameTime.currentMonth`). */
+  gameDay: number;
   onOpenJournal: () => void;
   onGoHome: () => void;
   onReset: () => void;
@@ -17,13 +17,13 @@ interface Props {
 export function HudHeader({
   presidentName,
   party,
-  month,
+  gameDay,
   onOpenJournal,
   onGoHome,
   onReset,
 }: Props) {
   const colors = useColors();
-  const { year, monthInYear } = formatMandate(month);
+  const { seasonNumber, dayInSeason } = computeGameDayDisplay(gameDay);
   return (
     <View style={[styles.container, { borderBottomColor: colors.border }]}>
       <View style={styles.row}>
@@ -82,10 +82,10 @@ export function HudHeader({
         </View>
         <View style={styles.timeBox}>
           <Text style={[styles.timeLabel, { color: colors.mutedForeground }]}>
-            ANNÉE {year} · MOIS {monthInYear}
+            SAISON {seasonNumber} · JOUR {dayInSeason}
           </Text>
           <Text style={[styles.timeValue, { color: colors.foreground }]}>
-            Mois {month} / {TOTAL_MONTHS}
+            Jour {gameDay} / {TOTAL_GAME_DAYS}
           </Text>
         </View>
       </View>

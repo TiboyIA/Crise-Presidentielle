@@ -168,3 +168,84 @@ export function formatRealMs(ms: number): string {
 export function formatRemainingGameHours(gameHoursRemaining: number): string {
   return formatRealMs(gameHoursToRealMs(Math.max(0, gameHoursRemaining)));
 }
+
+// ── Système Jour / Saison ─────────────────────────────────────────────────────
+
+/**
+ * Nombre de jours de jeu par saison (= ancienne "année" du mandat, 12 mois).
+ * Mandat complet : 5 saisons × 12 jours = 60 jours de jeu.
+ */
+export const DAYS_PER_SEASON = 12;
+
+/** Durée d'une saison (alias explicite pour les constantes de config). */
+export const DEFAULT_SEASON_LENGTH_DAYS = DAYS_PER_SEASON;
+
+/** Durée totale du mandat en jours de jeu (= ancien TOTAL_MONTHS = 60). */
+export const TOTAL_GAME_DAYS = 60;
+
+/**
+ * Décompose un numéro de jour absolu (1..60) en saison + jour dans la saison.
+ *
+ * Correspondance directe avec l'ancienne numérotation mois → jour :
+ *   ancien "Année 1 — Mois 3"  ↔  "Saison 1 — Jour 3"
+ *   ancien "Année 2 — Mois 1"  ↔  "Saison 2 — Jour 1"
+ */
+export function computeGameDayDisplay(gameDay: number): {
+  seasonNumber: number;
+  dayInSeason: number;
+} {
+  const d = Math.max(1, Math.min(TOTAL_GAME_DAYS, Math.floor(gameDay)));
+  return {
+    seasonNumber: Math.floor((d - 1) / DAYS_PER_SEASON) + 1,
+    dayInSeason: ((d - 1) % DAYS_PER_SEASON) + 1,
+  };
+}
+
+/**
+ * Libellé long pour les écrans principaux.
+ * Exemple : gameDay=15 → "SAISON 2 — JOUR 3"
+ */
+export function formatGameDayLabel(gameDay: number): string {
+  const { seasonNumber, dayInSeason } = computeGameDayDisplay(gameDay);
+  return `Saison ${seasonNumber} — Jour ${dayInSeason}`;
+}
+
+/**
+ * Libellé compact pour les bandeaux secondaires.
+ * Exemple : gameDay=15 → "S2 J3"
+ */
+export function formatGameDayShort(gameDay: number): string {
+  const { seasonNumber, dayInSeason } = computeGameDayDisplay(gameDay);
+  return `S${seasonNumber} J${dayInSeason}`;
+}
+
+/**
+ * Compte à rebours en jours de jeu pour l'affichage des événements futurs.
+ * Exemple : 0 → "imminent" | 1 → "dans 1 jour de jeu" | 5 → "dans 5 jours de jeu"
+ */
+export function formatCountdownDays(gameDaysRemaining: number): string {
+  if (gameDaysRemaining <= 0) return "imminent";
+  const d = Math.ceil(gameDaysRemaining);
+  return d === 1 ? "dans 1 jour de jeu" : `dans ${d} jours de jeu`;
+}
+
+/**
+ * Compte à rebours réel estimé basé sur la vitesse du ticker (tick-based).
+ *
+ * Paramètres :
+ *   gameDaysRemaining — jours de jeu restants (peut être fractionnaire)
+ *   tickMsPerWeek     — TICK_MS_BY_SPEED[speed] (ms par semaine/tick)
+ *   weeksPerDay       — généralement WEEKS_PER_MONTH = 4
+ *
+ * Si speed est 0 (pause) ou gameDaysRemaining ≤ 0, retourne null.
+ */
+export function formatCountdownRealTime(
+  gameDaysRemaining: number,
+  tickMsPerWeek: number,
+  weeksPerDay: number,
+): string | null {
+  if (gameDaysRemaining <= 0) return null;
+  if (tickMsPerWeek <= 0) return null; // paused
+  const ms = gameDaysRemaining * tickMsPerWeek * weeksPerDay;
+  return formatRealMs(ms);
+}
