@@ -162,6 +162,7 @@ import {
 import { inferEventSeverity } from "@/logic/eventSeverity";
 import type { EventSeverity } from "@/logic/eventSeverity";
 import type { EventNotification, MinorEventEntry } from "@/types/game";
+import { logAutoResumePrevented, logTimeAdvance } from "@/logic/timeGuard";
 
 // Re-export the centralized types so existing imports
 // `from "@/context/GameContext"` keep working.
@@ -1780,15 +1781,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // ─── Module 8 — Reprogrammation de l'horloge ──────────────────
       // La décision est instantanée (currentMonth ne bouge pas), mais
       // on programme le prochain événement à +MONTHS_PER_DECISION.
-      // On reprend la lecture à la vitesse précédente (speedBeforePause)
-      // pour conserver la sensation de simulation en continu — sauf si
-      // le joueur n'avait jamais relâché la pause (speedBeforePause=1
-      // par défaut, le ticker prend juste le relais).
+      // UX : après une décision, le temps reste en PAUSE (speed=0).
+      // Le joueur doit appuyer explicitement sur Play pour reprendre.
+      // Raison : l'auto-reprise était perçue comme "chaque toucher fait
+      // avancer le temps" — expérience très inconfortable.
       // Convergence horloge / moteur : quand l'élection finale est
       // déclenchée par `state.turn === maxTurns` (côté moteur), on
       // pousse l'horloge fictive sur le mois 60 pour que les écrans
-      // d'élection / game-over affichent un mandat complet "Année 5
-      // — Mois 12 du mandat" plutôt qu'un Mois 58 incohérent.
+      // d'élection / game-over affichent un mandat complet.
       const isElectionEnd =
         finalGameOver.isOver && finalGameOver.triggeredElection === true;
       // LOT 15 + LOT 16 — Une décision résolue était forcément un
@@ -1820,7 +1820,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               resolveMonth,
               newLastRare,
             ),
-            speed: finalGameOver.isOver ? 0 : prev.gameTime.speedBeforePause,
+            // Toujours pause après une décision — l'auto-resume a été supprimé
+            // pour éviter que chaque choix soit perçu comme "le temps avance".
+            speed: 0,
           }
         : prev.gameTime;
 
@@ -1902,6 +1904,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (speed !== 0 && (prev.currentEvent || blockingReport)) {
         return prev;
       }
+      if (__DEV__ && speed > 0) {
+        console.log("[TIME_ADVANCE] explicit_play — setSpeed →", speed);
+      }
       const speedBeforePause: Exclude<TimeSpeed, 0> =
         speed === 0 ? prev.gameTime.speedBeforePause : speed;
       return {
@@ -1922,8 +1927,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           // Snapshot reset : le prochain bilan comparera les jauges
           // par rapport au moment où le joueur a fermé celui-ci.
           lastSnapshotGauges: { ...prev.gauges },
-          // Reprise auto à la vitesse précédente (sauf game-over).
-          speed: prev.gameOver.isOver ? 0 : prev.gameTime.speedBeforePause,
+          // Toujours pause après fermeture d'un bilan — l'auto-resume a été
+          // supprimé. Le joueur reprend manuellement via Play.
+          speed: 0,
         },
       };
     });
@@ -2039,6 +2045,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
       // 4e semaine atteinte → on bascule au mois suivant et on
       // remet le sous-compteur à 1.
+      logTimeAdvance(
+        "explicit_play",
+        prev.gameTime.currentMonth,
+        Math.min(TOTAL_MONTHS, prev.gameTime.currentMonth + 1),
+        "advanceOneMonth/setInterval",
+      );
       const nextMonth = Math.min(
         TOTAL_MONTHS,
         prev.gameTime.currentMonth + 1,
@@ -2185,6 +2197,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return prev;
       }
       let m = prev.gameTime.currentMonth;
+      const skipStartMonth = m;
       let lastQ = prev.gameTime.lastReportedQuarter;
       let lastY = prev.gameTime.lastReportedYear;
       let pendingReport: MandateReport | null =
@@ -2322,6 +2335,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // et le useEffect "draw" déclenchera le tirage juste après.
       // Un éventuel toast trimestriel collecté est conservé pour
       // s'afficher en parallèle de l'EventModal qui suit.
+      logTimeAdvance("explicit_skip", skipStartMonth, m, "skipToNextEvent");
       return {
         ...prev,
         gameTime: {

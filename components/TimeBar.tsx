@@ -131,10 +131,39 @@ export function TimeBar({
         />
       </View>
 
+      {/* Badge de statut temps — très visible pour éviter la confusion */}
+      <View
+        style={[
+          styles.statusBadge,
+          {
+            backgroundColor:
+              speed === 0 ? colors.muted : colors.primary + "22",
+            borderColor:
+              speed === 0 ? colors.border : colors.primary,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.statusDot,
+            { backgroundColor: speed === 0 ? colors.mutedForeground : colors.primary },
+          ]}
+        />
+        <Text
+          style={[
+            styles.statusText,
+            { color: speed === 0 ? colors.mutedForeground : colors.primary },
+          ]}
+        >
+          {speed === 0 ? "⏸ Le temps est en pause" : `▶ Le temps avance (×${speed})`}
+        </Text>
+      </View>
+
       <Pressable
         onPress={onSkip}
         disabled={blocked || isAtEnd}
-        accessibilityLabel="Avancer au prochain événement"
+        accessibilityLabel="Sauter jusqu'au prochain événement"
+        accessibilityHint="Avance volontairement le temps jusqu'au prochain briefing."
         style={({ pressed }) => [
           styles.skipBtn,
           {
@@ -145,13 +174,13 @@ export function TimeBar({
         ]}
       >
         <Feather
-          name="fast-forward"
+          name="skip-forward"
           size={14}
           color={colors.foreground}
           style={{ marginRight: 8 }}
         />
         <Text style={[styles.skipLabel, { color: colors.foreground }]}>
-          Avancer au prochain événement
+          Sauter jusqu'au prochain événement
         </Text>
         <View style={styles.spacer} />
         <Text style={[styles.skipMeta, { color: colors.mutedForeground }]}>
@@ -230,5 +259,24 @@ const styles = StyleSheet.create({
   skipMeta: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.5,
   },
 });

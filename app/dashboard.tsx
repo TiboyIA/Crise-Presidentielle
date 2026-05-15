@@ -155,19 +155,14 @@ export default function DashboardScreen() {
     }
   }, [state.gameOver.isOver, state.gameOver.triggeredElection, router]);
 
-  const handleNextCrisis = () => {
+  // Ouvre le briefing disponible — JAMAIS de saut de temps.
+  // Cette fonction est appelée UNIQUEMENT quand canDrawNow=true,
+  // c'est-à-dire quand l'horloge a déjà atteint nextEventMonth.
+  const handleDrawAvailable = () => {
     if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
-    // Module 8 — Avec la couche temps, on saute jusqu'au prochain
-    // événement programmé plutôt que de tirer immédiatement. Si la
-    // couche n'est pas initialisée (état dégradé), fallback sur
-    // l'ancien comportement de tirage forcé.
-    if (state.gameTime) {
-      skipToNextEvent();
-    } else {
-      drawNextEvent();
-    }
+    drawNextEvent();
   };
 
   const handleSelectRegion = useCallback(
@@ -368,7 +363,12 @@ export default function DashboardScreen() {
 
         <CrisisChyron
           currentEvent={state.currentEvent}
-          onTriggerNext={handleNextCrisis}
+          canDrawNow={
+            !state.currentEvent &&
+            !!state.gameTime &&
+            state.gameTime.currentMonth >= state.gameTime.nextEventMonth
+          }
+          onDrawNow={handleDrawAvailable}
           isAILoading={aiLoading}
         />
 
@@ -865,27 +865,32 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
-        <Pressable
-          onPress={handleNextCrisis}
-          style={({ pressed }) => [
-            styles.crisisBtn,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <Image
-            source={DASHBOARD_ACTION_IMAGES.criseSuivante}
-            style={styles.crisisBtnThumb}
-            resizeMode="contain"
-          />
-          <Text
-            style={[styles.crisisBtnText, { color: colors.primaryForeground }]}
+        {/* Bouton visible uniquement quand un briefing est disponible sans sauter du temps */}
+        {!state.currentEvent &&
+          !!state.gameTime &&
+          state.gameTime.currentMonth >= state.gameTime.nextEventMonth ? (
+          <Pressable
+            onPress={handleDrawAvailable}
+            style={({ pressed }) => [
+              styles.crisisBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
           >
-            CRISE SUIVANTE
-          </Text>
-        </Pressable>
+            <Image
+              source={DASHBOARD_ACTION_IMAGES.criseSuivante}
+              style={styles.crisisBtnThumb}
+              resizeMode="contain"
+            />
+            <Text
+              style={[styles.crisisBtnText, { color: colors.primaryForeground }]}
+            >
+              OUVRIR LE BRIEFING
+            </Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={handleAICrisis}

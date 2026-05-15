@@ -14,11 +14,18 @@ import type { CrisisEvent } from "@/data/events";
 
 interface Props {
   currentEvent: CrisisEvent | null;
-  onTriggerNext: () => void;
+  /**
+   * True quand le briefing est prêt à être ouvert sans sauter du temps
+   * (currentMonth >= nextEventMonth). Le bouton "Ouvrir le briefing"
+   * n'apparaît QUE dans ce cas — jamais pour sauter du temps.
+   */
+  canDrawNow: boolean;
+  /** Appelé UNIQUEMENT pour ouvrir un briefing déjà disponible. */
+  onDrawNow: () => void;
   isAILoading?: boolean;
 }
 
-function CrisisChyronImpl({ currentEvent, onTriggerNext, isAILoading }: Props) {
+function CrisisChyronImpl({ currentEvent, canDrawNow, onDrawNow, isAILoading }: Props) {
   const colors = useColors();
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -49,21 +56,131 @@ function CrisisChyronImpl({ currentEvent, onTriggerNext, isAILoading }: Props) {
   });
 
   const isActive = !!currentEvent;
-  const accent = isActive ? colors.danger : colors.warning;
-  const label = isActive ? "CRISE EN COURS" : "EN ATTENTE D'UNE CRISE";
-  const title = isActive
-    ? currentEvent.title
-    : "Salle de crise opérationnelle";
-  const subtitle = isActive
-    ? currentEvent.context
-    : "Tirez la prochaine décision pour recevoir un briefing.";
 
+  // ── État 1 : crise en cours ──────────────────────────────────────────
+  if (isActive) {
+    return (
+      <View
+        style={[
+          styles.wrap,
+          {
+            borderLeftColor: colors.danger,
+            backgroundColor: colors.card,
+            borderTopColor: colors.border,
+            borderRightColor: colors.border,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Animated.View
+            style={[
+              styles.liveDot,
+              { backgroundColor: colors.danger, opacity: dotOpacity },
+            ]}
+          />
+          <Text style={[styles.liveLabel, { color: colors.danger }]}>
+            CRISE EN COURS
+          </Text>
+          <View style={[styles.sourceBadge, { borderColor: colors.border }]}>
+            <Text
+              style={[styles.sourceText, { color: colors.mutedForeground }]}
+              numberOfLines={1}
+            >
+              {currentEvent.source}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
+          {currentEvent.title}
+        </Text>
+
+        <Text
+          style={[styles.subtitle, { color: colors.mutedForeground }]}
+          numberOfLines={3}
+        >
+          {currentEvent.context}
+        </Text>
+
+        <View style={styles.activePill}>
+          <Feather name="alert-triangle" size={12} color={colors.danger} />
+          <Text style={[styles.activePillText, { color: colors.danger }]}>
+            La fenêtre de décision est ouverte
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ── État 2 : briefing disponible (aucun saut de temps) ──────────────
+  if (canDrawNow) {
+    return (
+      <View
+        style={[
+          styles.wrap,
+          {
+            borderLeftColor: colors.warning,
+            backgroundColor: colors.card,
+            borderTopColor: colors.border,
+            borderRightColor: colors.border,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Animated.View
+            style={[
+              styles.liveDot,
+              { backgroundColor: colors.warning, opacity: dotOpacity },
+            ]}
+          />
+          <Text style={[styles.liveLabel, { color: colors.warning }]}>
+            BRIEFING DISPONIBLE
+          </Text>
+        </View>
+
+        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
+          Salle de crise opérationnelle
+        </Text>
+
+        <Text
+          style={[styles.subtitle, { color: colors.mutedForeground }]}
+          numberOfLines={2}
+        >
+          Un dossier est prêt pour votre décision.
+        </Text>
+
+        <Pressable
+          onPress={onDrawNow}
+          disabled={isAILoading}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir le prochain briefing"
+          accessibilityHint="Ouvre le dossier de crise disponible sans sauter du temps."
+          style={({ pressed }) => [
+            styles.cta,
+            {
+              backgroundColor: colors.warning,
+              opacity: isAILoading ? 0.55 : pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Feather name="file-text" size={14} color="#fff" style={{ marginRight: 4 }} />
+          <Text style={styles.ctaText}>Ouvrir le briefing</Text>
+          <Feather name="chevron-right" size={16} color="#fff" />
+        </Pressable>
+      </View>
+    );
+  }
+
+  // ── État 3 : en attente — PAS de bouton de saut de temps ────────────
   return (
     <View
       style={[
         styles.wrap,
+        styles.wrapIdle,
         {
-          borderLeftColor: accent,
+          borderLeftColor: colors.border,
           backgroundColor: colors.card,
           borderTopColor: colors.border,
           borderRightColor: colors.border,
@@ -75,62 +192,25 @@ function CrisisChyronImpl({ currentEvent, onTriggerNext, isAILoading }: Props) {
         <Animated.View
           style={[
             styles.liveDot,
-            { backgroundColor: accent, opacity: dotOpacity },
+            { backgroundColor: colors.mutedForeground, opacity: dotOpacity },
           ]}
         />
-        <Text style={[styles.liveLabel, { color: accent }]}>{label}</Text>
-        {currentEvent ? (
-          <View style={[styles.sourceBadge, { borderColor: colors.border }]}>
-            <Text
-              style={[styles.sourceText, { color: colors.mutedForeground }]}
-              numberOfLines={1}
-            >
-              {currentEvent.source}
-            </Text>
-          </View>
-        ) : null}
+        <Text style={[styles.liveLabel, { color: colors.mutedForeground }]}>
+          EN ATTENTE D'UN ÉVÉNEMENT
+        </Text>
       </View>
 
-      <Text
-        style={[styles.title, { color: colors.foreground }]}
-        numberOfLines={2}
-      >
-        {title}
+      <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>
+        Salle de crise opérationnelle
       </Text>
 
       <Text
         style={[styles.subtitle, { color: colors.mutedForeground }]}
-        numberOfLines={3}
+        numberOfLines={2}
       >
-        {subtitle}
+        Le prochain événement arrivera avec le temps. Utilisez ▶ pour laisser
+        la simulation avancer.
       </Text>
-
-      {isActive ? (
-        <View style={styles.activePill}>
-          <Feather name="alert-triangle" size={12} color={accent} />
-          <Text style={[styles.activePillText, { color: accent }]}>
-            La fenêtre de décision est ouverte
-          </Text>
-        </View>
-      ) : (
-        <Pressable
-          onPress={onTriggerNext}
-          disabled={isAILoading}
-          accessibilityRole="button"
-          accessibilityLabel="Déclencher la prochaine crise"
-          accessibilityHint="Tire un événement aléatoire pour ouvrir la fenêtre de décision."
-          style={({ pressed }) => [
-            styles.cta,
-            {
-              backgroundColor: accent,
-              opacity: isAILoading ? 0.55 : pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <Text style={styles.ctaText}>DÉCLENCHER</Text>
-          <Feather name="chevron-right" size={16} color="#fff" />
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -147,6 +227,9 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 8,
     marginTop: 4,
+  },
+  wrapIdle: {
+    opacity: 0.75,
   },
   headerRow: {
     flexDirection: "row",
@@ -205,7 +288,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 4,
@@ -215,6 +298,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 });
