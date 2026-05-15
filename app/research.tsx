@@ -17,7 +17,7 @@
  * faisabilité (budget, doublon, conflit). Un toast court explique
  * un éventuel refus.
  */
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Platform,
@@ -92,6 +92,8 @@ export default function ResearchScreen() {
   const router = useRouter();
   const { state, startTechResearch } = useGame();
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   const tech: TechState = state.tech ?? {
     researched: [],
@@ -113,9 +115,10 @@ export default function ResearchScreen() {
     const result = startTechResearch(id);
     if (!result.ok) {
       setToast(refusalLabel(result.reason, result.missing));
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       // LOT 18.2 — Toast plus long quand on détaille le manque,
       // pour que le joueur ait le temps de lire la liste.
-      setTimeout(() => setToast(null), 3600);
+      toastTimerRef.current = setTimeout(() => setToast(null), 3600);
       return;
     }
     if (Platform.OS !== "web") {
@@ -124,7 +127,8 @@ export default function ResearchScreen() {
       ).catch(() => {});
     }
     setToast("Recherche lancée");
-    setTimeout(() => setToast(null), 1800);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 1800);
   }
 
   return (

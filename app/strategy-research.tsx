@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -35,6 +35,8 @@ export default function StrategyResearchScreen() {
   const { state, launchStrategyResearch } = useStrategy();
   const [activeCategory, setActiveCategory] = useState<StrategyResearchCategory | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   if (!state) return null;
 
@@ -56,7 +58,8 @@ export default function StrategyResearchScreen() {
     const result = launchStrategyResearch(id);
     const msg = result.success ? "Recherche lancée !" : (result.reason ?? "Impossible");
     setToast({ msg, ok: result.success });
-    setTimeout(() => setToast(null), 2500);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   }
 
   return (

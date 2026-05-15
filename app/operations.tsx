@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -22,6 +22,8 @@ export default function OperationsScreen() {
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId | null>(params.countryId ?? null);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [loading, setLoading] = useState<OperationType | null>(null);
+  const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (resultTimerRef.current) clearTimeout(resultTimerRef.current); }, []);
 
   if (!state) return null;
 
@@ -34,7 +36,8 @@ export default function OperationsScreen() {
     const res = launchOperation(type, selectedCountryId);
     setResult(res);
     setLoading(null);
-    setTimeout(() => setResult(null), 4000);
+    if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
+    resultTimerRef.current = setTimeout(() => setResult(null), 4000);
   };
 
   const ops = Object.values(OPERATIONS);

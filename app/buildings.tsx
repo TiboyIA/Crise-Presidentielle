@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
@@ -21,6 +21,8 @@ export default function BuildingsScreen() {
   const { state, upgradeBuilding } = useStrategy();
   const { hPad } = useResponsive();
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   if (!state) return null;
 
@@ -28,7 +30,8 @@ export default function BuildingsScreen() {
     const result = upgradeBuilding(id);
     if (!result.success) {
       setToast(result.reason ?? "Action impossible");
-      setTimeout(() => setToast(null), 3000);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
     }
   };
 
