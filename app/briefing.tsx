@@ -355,7 +355,7 @@ export default function BriefingScreen() {
               {state.news.pendingIds.length} événement{state.news.pendingIds.length > 1 ? "s" : ""} requiert votre décision dans le Journal de Crise.
             </Text>
             <Pressable
-              onPress={() => { router.back(); router.push("/journal-crise" as any); }}
+              onPress={() => router.replace("/journal-crise")}
               style={({ pressed }) => [styles.alertCta, { opacity: pressed ? 0.7 : 1 }]}
             >
               <Text style={styles.alertCtaText}>Voir le Journal →</Text>
@@ -380,7 +380,7 @@ export default function BriefingScreen() {
         {/* ACTIONS */}
         <View style={styles.actions}>
           <Pressable
-            onPress={() => { router.back(); router.push("/journal-crise" as any); }}
+            onPress={() => router.replace("/journal-crise")}
             style={({ pressed }) => [styles.ctaBtn, { opacity: pressed ? 0.8 : 1 }]}
           >
             <LinearGradient colors={["#c0392b", "#7b1e16"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ctaInner}>
