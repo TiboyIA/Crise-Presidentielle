@@ -34,11 +34,12 @@ function getPurchases(): any | null {
 
 export function initPurchases(): void {
   if (initialized || Platform.OS === "web") return;
-  const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
+  const apiKey =
+    Platform.OS === "ios"
+      ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY
+      : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
   if (!apiKey) {
-    console.warn(
-      "[RevenueCat] EXPO_PUBLIC_REVENUECAT_ANDROID_KEY not set — purchases disabled.",
-    );
+    console.warn("[RevenueCat] API key not set — purchases disabled.");
     return;
   }
   const Purchases = getPurchases();

@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
@@ -17,6 +18,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "android": {
         "buildType": "apk",
         "credentialsSource": "remote"
@@ -26,12 +28,13 @@
       }
     },
     "production": {
+      "autoIncrement": true,
+      "environment": "production",
       "android": {
         "buildType": "app-bundle",
         "credentialsSource": "remote"
       },
       "ios": {
-        "buildType": "archive",
         "credentialsSource": "remote"
       }
     }
