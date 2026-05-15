@@ -51,8 +51,8 @@ const NEUTRAL_GAUGES_FALLBACK: Gauges = {
   authority: 50,
 };
 
-/** Durée totale d'un mandat (5 ans × 12 mois). */
-export const TOTAL_MONTHS = 60;
+/** Durée totale du mandat en jours de jeu (1 saison réelle = 30 jours réels = 120 jours jeu). */
+export const TOTAL_MONTHS = 120;
 
 /** Mois écoulés en moyenne entre deux décisions du joueur. */
 export const MONTHS_PER_DECISION = 3;
@@ -260,8 +260,9 @@ export function turnToMonth(turn: number): number {
   return Math.max(1, Math.min(TOTAL_MONTHS, Math.floor(turn) * MONTHS_PER_DECISION));
 }
 
-/** État initial : mandat au mois 1, semaine 1, pause active,
- *  premier event au mois 1. */
+/** État initial : mandat au jour 1, pause active, premier event au jour 1.
+ *  `seasonStartedAtRealMs` est absent ici car il doit être fixé à Date.now()
+ *  au moment du lancement effectif de la partie (pas à la définition du module). */
 export const INITIAL_GAME_TIME: GameTime = {
   currentMonth: 1,
   weekInMonth: 1,
@@ -394,6 +395,14 @@ export function sanitizeGameTime(
         }
       : null;
 
+  // Timestamp réel du début de saison — préservé si valide, sinon undefined
+  // (le GameContext l'initialisera à Date.now() au premier tick).
+  const rawSeason = (r as Record<string, unknown>).seasonStartedAtRealMs;
+  const seasonStartedAtRealMs =
+    typeof rawSeason === "number" && Number.isFinite(rawSeason) && rawSeason > 0
+      ? rawSeason
+      : undefined;
+
   return {
     currentMonth,
     weekInMonth,
@@ -406,6 +415,7 @@ export function sanitizeGameTime(
     lastRareEventMonth,
     lastSnapshotGauges,
     pendingReport,
+    seasonStartedAtRealMs,
   };
 }
 

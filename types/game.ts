@@ -825,13 +825,17 @@ export interface GameTime {
   lastRareEventMonth?: number;
   /**
    * LOT 17 — Sous-compteur de SEMAINE dans le mois courant (1..4).
-   * Le ticker n'incrémente plus directement `currentMonth` à chaque
-   * battement : il avance d'abord `weekInMonth` jusqu'à 4, puis
-   * reset à 1 et incrémente le mois. Permet d'afficher une
-   * progression fine "A1 M3 — Sem 2/4" sans toucher au scheduler
-   * d'événements (qui reste basé sur `currentMonth` entier).
+   * Conservé pour compat des saves ; le nouveau système temps-réel
+   * l'ignore (progression calculée depuis seasonStartedAtRealMs).
    */
   weekInMonth?: number;
+  /**
+   * Timestamp réel (ms depuis epoch) du début de la saison / du mandat.
+   * Ancre du calcul temps-réel : chaque jour de jeu = 6 heures réelles.
+   * Initialisé à Date.now() au démarrage d'une nouvelle partie.
+   * Absent dans les vieilles saves (GameContext l'initialise au premier tick).
+   */
+  seasonStartedAtRealMs?: number;
 }
 
 /**

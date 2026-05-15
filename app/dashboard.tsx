@@ -72,7 +72,6 @@ export default function DashboardScreen() {
     resolveChoice,
     resetGame,
     injectCustomEvent,
-    setSpeed,
     skipToNextEvent,
     dismissReport,
     resolveMinorEvent,
@@ -323,11 +322,11 @@ export default function DashboardScreen() {
       {state.gameTime ? (
         <TimeBar
           gameDay={state.gameTime.currentMonth}
-          week={state.gameTime.weekInMonth ?? 1}
+          seasonStartedAtRealMs={
+            state.gameTime.seasonStartedAtRealMs ?? state.startedAt ?? Date.now()
+          }
           nextEventGameDay={state.gameTime.nextEventMonth}
-          speed={state.gameTime.speed}
           blocked={!!state.currentEvent || !!state.gameTime.pendingReport}
-          onSetSpeed={setSpeed}
           onSkip={skipToNextEvent}
         />
       ) : null}

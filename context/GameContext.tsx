@@ -148,7 +148,6 @@ import {
   MAX_NOTIFICATION_QUEUE_SIZE,
   MIN_MONTHS_BETWEEN_MAJOR,
   MIN_MONTHS_BETWEEN_RARE,
-  TICK_MS_BY_SPEED,
   WEEKS_PER_MONTH,
   TOTAL_MONTHS,
   detectDueReport,
@@ -158,7 +157,9 @@ import {
   purgeExpiredQueues,
   scheduleNextEventMonth,
   scheduleNextEventMonthBySeverity,
+  GAME_HOURS_PER_REAL_HOUR,
 } from "@/logic/timeEngine";
+import { computeSeasonClock, REAL_MS_PER_GAME_DAY } from "@/logic/simulationClock";
 import { inferEventSeverity } from "@/logic/eventSeverity";
 import type { EventSeverity } from "@/logic/eventSeverity";
 import type { EventNotification, MinorEventEntry } from "@/types/game";
@@ -697,9 +698,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         startedAt: Date.now(),
         // Module 8 — Démarre l'horloge au mois 1, en pause auto le
         // temps que le joueur traite la première crise.
+        // seasonStartedAtRealMs ancre le calcul temps-réel : chaque
+        // jour de jeu = 6 heures réelles (1h réelle = 4h jeu).
         gameTime: {
           ...INITIAL_GAME_TIME,
           lastSnapshotGauges: { ...INITIAL_GAUGES },
+          seasonStartedAtRealMs: Date.now(),
         },
         // LOT 18 — Réinitialise les ressources stockables à leurs
         // valeurs de départ pour chaque nouvelle partie.
@@ -2018,7 +2022,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // élection > bilan > avancement simple. Le tirage d'événement est
   // délégué au useEffect "draw on currentMonth >= nextEventMonth"
   // pour rester en dehors du setState (évite les double-render).
-  const advanceOneMonth = useCallback(() => {
+  //
+  // opts.realTime = true : ignore speed=0, vérifie que le temps réel
+  // a effectivement avancé d'un jour avant d'avancer le compteur.
+  const advanceOneMonth = useCallback((opts?: { realTime?: boolean }) => {
     setState((prev) => {
       if (!prev.president || prev.gameOver.isOver) return prev;
       if (prev.currentEvent) return prev;
@@ -2027,21 +2034,42 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (!prev.gameTime || prev.gameTime.pendingReport?.kind === "year") {
         return prev;
       }
-      if (prev.gameTime.speed === 0) return prev;
-      // LOT 17 — Le ticker bat désormais à la SEMAINE (4 semaines
-      // par mois). On n'incrémente le mois que quand la 4e semaine
-      // est terminée ; jusque-là, on bouge juste `weekInMonth` pour
-      // animer la barre de temps. L'event scheduler, lui, reste
-      // basé sur `currentMonth` entier (rien d'autre ne change).
-      const currentWeek = prev.gameTime.weekInMonth ?? 1;
-      if (currentWeek < WEEKS_PER_MONTH) {
-        return {
-          ...prev,
-          gameTime: {
-            ...prev.gameTime,
-            weekInMonth: currentWeek + 1,
-          },
-        };
+
+      if (opts?.realTime) {
+        // Migration : ancre absente (vieille save). On la positionne
+        // rétroactivement sur le jour courant pour que le rythme
+        // continue correctement sans sauter de jours.
+        if (!prev.gameTime.seasonStartedAtRealMs) {
+          const retroAnchor =
+            Date.now() - (prev.gameTime.currentMonth - 1) * REAL_MS_PER_GAME_DAY;
+          return {
+            ...prev,
+            gameTime: {
+              ...prev.gameTime,
+              seasonStartedAtRealMs: retroAnchor,
+            },
+          };
+        }
+        // Temps réel : on vérifie que l'horloge murale justifie l'avance.
+        const { absoluteGameDay } = computeSeasonClock(
+          prev.gameTime.seasonStartedAtRealMs,
+        );
+        // absoluteGameDay est 0-indexé ; currentMonth est 1-indexé.
+        const targetMonth = Math.min(TOTAL_MONTHS, absoluteGameDay + 1);
+        if (targetMonth <= prev.gameTime.currentMonth) return prev;
+      } else {
+        if (prev.gameTime.speed === 0) return prev;
+        // LOT 17 — progression hebdomadaire sub-jour (mode legacy tick).
+        const currentWeek = prev.gameTime.weekInMonth ?? 1;
+        if (currentWeek < WEEKS_PER_MONTH) {
+          return {
+            ...prev,
+            gameTime: {
+              ...prev.gameTime,
+              weekInMonth: currentWeek + 1,
+            },
+          };
+        }
       }
       // 4e semaine atteinte → on bascule au mois suivant et on
       // remet le sous-compteur à 1.
@@ -2355,28 +2383,45 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // ─── Module 8 — Tick d'horloge piloté par speed ────────────────────
-  // Un seul setInterval actif à la fois ; recalculé quand speed change
-  // (ou quand un event/bilan apparaît, ce qui clear l'interval).
+  // ─── Module 8 — Ticker temps réel (vérifie toutes les 30 s) ───────
+  // L'horloge avance désormais depuis l'ancre réelle `seasonStartedAtRealMs`,
+  // pas depuis une vitesse configurable. Le ticker vérifie périodiquement
+  // si un jour de jeu s'est écoulé en temps réel (1 jour jeu = 6h réelles).
   useEffect(() => {
     if (!loaded) return;
     if (!state.president) return;
     if (state.gameOver.isOver) return;
     if (state.currentEvent) return;
     if (!state.gameTime) return;
-    // Seul un bilan ANNUEL gèle le ticker. Le toast trimestriel ne
-    // bloque rien : c'est un simple feedback visuel non interactif.
     if (state.gameTime.pendingReport?.kind === "year") return;
-    if (state.gameTime.speed === 0) return;
-    const ms = TICK_MS_BY_SPEED[state.gameTime.speed];
-    const id = setInterval(() => advanceOneMonth(), ms);
+    const id = setInterval(() => advanceOneMonth({ realTime: true }), 30_000);
     return () => clearInterval(id);
   }, [
     loaded,
     state.president,
     state.gameOver.isOver,
     state.currentEvent,
-    state.gameTime?.speed,
+    state.gameTime?.pendingReport,
+    advanceOneMonth,
+  ]);
+
+  // ─── Module 8 — Rattrapage au démarrage / retour de veille ──────────
+  // Quand l'app s'ouvre (ou revient au premier plan), on vérifie
+  // immédiatement si le temps réel a avancé depuis la dernière session.
+  // Le hook se re-déclenche à chaque changement de currentMonth jusqu'à
+  // ce que l'horloge soit à jour (descente rapide sans attendre 30 s).
+  useEffect(() => {
+    if (!loaded || !state.president || state.gameOver.isOver) return;
+    if (!state.gameTime) return;
+    if (state.currentEvent) return;
+    if (state.gameTime.pendingReport?.kind === "year") return;
+    advanceOneMonth({ realTime: true });
+  }, [
+    loaded,
+    state.president,
+    state.gameOver.isOver,
+    state.currentEvent,
+    state.gameTime?.currentMonth,
     state.gameTime?.pendingReport,
     advanceOneMonth,
   ]);

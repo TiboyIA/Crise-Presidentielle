@@ -171,17 +171,31 @@ export function formatRemainingGameHours(gameHoursRemaining: number): string {
 
 // ── Système Jour / Saison ─────────────────────────────────────────────────────
 
+// ── Ratios saison réelle ──────────────────────────────────────────────────────
+
+/** Jours de jeu produits par jour réel (1 jour réel = 4 jours jeu). */
+export const GAME_DAYS_PER_REAL_DAY = 4;
+
+/** Durée d'une saison en jours réels (= 1 mois réel). */
+export const REAL_DAYS_PER_SEASON = 30;
+
+/** Durée d'une saison en jours de jeu (= GAME_DAYS_PER_REAL_DAY × REAL_DAYS_PER_SEASON). */
+export const GAME_DAYS_PER_SEASON = GAME_DAYS_PER_REAL_DAY * REAL_DAYS_PER_SEASON; // 120
+
+/** Durée réelle d'une saison en millisecondes (30 jours réels). */
+export const REAL_MS_PER_SEASON = REAL_DAYS_PER_SEASON * 24 * 60 * 60 * 1000; // 2 592 000 000 ms
+
 /**
- * Nombre de jours de jeu par saison (= ancienne "année" du mandat, 12 mois).
- * Mandat complet : 5 saisons × 12 jours = 60 jours de jeu.
+ * Nombre de jours de jeu par saison pour les calculs d'affichage.
+ * 1 saison = 30 jours réels = 120 jours de jeu = le mandat complet.
  */
-export const DAYS_PER_SEASON = 12;
+export const DAYS_PER_SEASON = GAME_DAYS_PER_SEASON; // 120
 
 /** Durée d'une saison (alias explicite pour les constantes de config). */
 export const DEFAULT_SEASON_LENGTH_DAYS = DAYS_PER_SEASON;
 
-/** Durée totale du mandat en jours de jeu (= ancien TOTAL_MONTHS = 60). */
-export const TOTAL_GAME_DAYS = 60;
+/** Durée totale du mandat en jours de jeu (= 1 saison réelle = 30 jours réels). */
+export const TOTAL_GAME_DAYS = GAME_DAYS_PER_SEASON; // 120
 
 /**
  * Décompose un numéro de jour absolu (1..60) en saison + jour dans la saison.
@@ -231,13 +245,7 @@ export function formatCountdownDays(gameDaysRemaining: number): string {
 
 /**
  * Compte à rebours réel estimé basé sur la vitesse du ticker (tick-based).
- *
- * Paramètres :
- *   gameDaysRemaining — jours de jeu restants (peut être fractionnaire)
- *   tickMsPerWeek     — TICK_MS_BY_SPEED[speed] (ms par semaine/tick)
- *   weeksPerDay       — généralement WEEKS_PER_MONTH = 4
- *
- * Si speed est 0 (pause) ou gameDaysRemaining ≤ 0, retourne null.
+ * @deprecated Utiliser formatSeasonCountdown() à la place pour le nouveau système.
  */
 export function formatCountdownRealTime(
   gameDaysRemaining: number,
@@ -245,7 +253,51 @@ export function formatCountdownRealTime(
   weeksPerDay: number,
 ): string | null {
   if (gameDaysRemaining <= 0) return null;
-  if (tickMsPerWeek <= 0) return null; // paused
+  if (tickMsPerWeek <= 0) return null;
   const ms = gameDaysRemaining * tickMsPerWeek * weeksPerDay;
   return formatRealMs(ms);
+}
+
+// ── Horloge temps réel — ancre saison ────────────────────────────────────────
+
+/**
+ * Calcule l'état courant de l'horloge de mandat depuis l'ancre réelle.
+ *
+ * Formule :
+ *   elapsedRealMs    = nowMs − seasonStartedAtRealMs
+ *   elapsedRealHours = elapsedRealMs / 3 600 000
+ *   elapsedGameHours = elapsedRealHours × GAME_HOURS_PER_REAL_HOUR (= 4)
+ *   absoluteGameDay  = floor(elapsedGameHours / 24)   ← 0-indexé
+ *   currentGameHour  = floor(elapsedGameHours % 24)   ← 0..23
+ *
+ * @param seasonStartedAtRealMs  Timestamp réel (ms) du début du mandat/saison.
+ */
+export function computeSeasonClock(seasonStartedAtRealMs: number): {
+  /** Jour de jeu absolu depuis le début du mandat (0-indexé). */
+  absoluteGameDay: number;
+  /** Heure de jeu dans le jour courant (0..23). */
+  currentGameHour: number;
+  /** Timestamp réel (ms) de fin de la saison courante. */
+  seasonEndsAtRealMs: number;
+} {
+  const nowMs = clockNow();
+  const elapsedRealMs = Math.max(0, nowMs - seasonStartedAtRealMs);
+  const elapsedRealHours = elapsedRealMs / 3_600_000;
+  const elapsedGameHours = elapsedRealHours * GAME_HOURS_PER_REAL_HOUR;
+  const absoluteGameDay = Math.floor(elapsedGameHours / 24);
+  const currentGameHour = Math.floor(elapsedGameHours % 24);
+  const seasonEndsAtRealMs = seasonStartedAtRealMs + REAL_MS_PER_SEASON;
+  return { absoluteGameDay, currentGameHour, seasonEndsAtRealMs };
+}
+
+/**
+ * Formate le compte à rebours jusqu'à la fin de la saison en cours.
+ * Exemple : "Fin de saison : dans 29j23h réels"
+ *
+ * @param seasonEndsAtRealMs  Timestamp réel (ms) de fin de saison (issu de computeSeasonClock).
+ */
+export function formatSeasonCountdown(seasonEndsAtRealMs: number): string {
+  const msRemaining = Math.max(0, seasonEndsAtRealMs - clockNow());
+  if (msRemaining <= 0) return "Fin de saison imminente";
+  return `Fin de saison : dans ${formatRealMs(msRemaining)} réels`;
 }

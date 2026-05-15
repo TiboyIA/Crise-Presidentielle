@@ -2,46 +2,33 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { WEEKS_PER_MONTH, TICK_MS_BY_SPEED } from "@/logic/timeEngine";
+import { TOTAL_GAME_DAYS } from "@/logic/simulationClock";
 import {
-  TOTAL_GAME_DAYS,
   computeGameDayDisplay,
   formatGameDayLabel,
-  formatCountdownDays,
-  formatCountdownRealTime,
+} from "@/logic/timeEngine";
+import {
+  computeSeasonClock,
+  formatSeasonCountdown,
 } from "@/logic/simulationClock";
-import type { TimeSpeed } from "@/types/game";
 
 interface Props {
-  /** Jour de jeu courant 1..60 (= currentMonth interne). */
+  /** Jour de jeu courant 1..120 (= currentMonth interne). */
   gameDay: number;
-  /** Sous-progression du jour (ancienne semaine dans le mois, 1..4). */
-  week: number;
+  /** Timestamp réel (ms) du début du mandat — ancre temps-réel. */
+  seasonStartedAtRealMs: number;
   /** Jour de jeu auquel le prochain événement est programmé. */
   nextEventGameDay: number;
-  /** Vitesse actuelle (0=pause, 0.5/1/2/4 jouée). */
-  speed: TimeSpeed;
   /** True si un événement OU un bilan modal bloque les contrôles. */
   blocked: boolean;
-  onSetSpeed: (s: TimeSpeed) => void;
   onSkip: () => void;
 }
 
-const SPEED_BUTTONS: Array<{ value: TimeSpeed; label: string; aria: string }> = [
-  { value: 0, label: "‖", aria: "Mettre en pause" },
-  { value: 0.5, label: "▶ ½", aria: "Vitesse lente x0.5" },
-  { value: 1, label: "▶", aria: "Vitesse x1" },
-  { value: 2, label: "▶▶", aria: "Vitesse x2" },
-  { value: 4, label: "▶▶▶", aria: "Vitesse x4" },
-];
-
 export function TimeBar({
   gameDay,
-  week,
+  seasonStartedAtRealMs,
   nextEventGameDay,
-  speed,
   blocked,
-  onSetSpeed,
   onSkip,
 }: Props) {
   const colors = useColors();
@@ -49,17 +36,15 @@ export function TimeBar({
   const daysToNext = Math.max(0, nextEventGameDay - gameDay);
   const isAtEnd = gameDay >= TOTAL_GAME_DAYS;
 
-  // Sous-progression du jour courant (0..1) — pour la barre visuelle.
-  const safeWeek = Math.max(1, Math.min(WEEKS_PER_MONTH, Math.floor(week) || 1));
-  const dayProgress = safeWeek / WEEKS_PER_MONTH;
+  // Calcul temps-réel depuis l'ancre de la saison.
+  const { currentGameHour, seasonEndsAtRealMs } =
+    computeSeasonClock(seasonStartedAtRealMs);
 
-  // Compte à rebours réel estimé (basé sur la vitesse du ticker).
-  const tickMs = speed > 0 ? TICK_MS_BY_SPEED[speed as Exclude<TimeSpeed, 0>] : 0;
-  const realtimeLabel =
-    speed === 0
-      ? "⏸ Mis en pause"
-      : (formatCountdownRealTime(daysToNext, tickMs, WEEKS_PER_MONTH) ??
-         formatCountdownDays(daysToNext));
+  // Progression intra-jour (0..1) basée sur l'heure de jeu courante.
+  const dayProgress = Math.max(0, Math.min(1, currentGameHour / 24));
+
+  // Libellé du compte à rebours prochain événement.
+  const skipMeta = daysToNext === 0 ? "imminent" : `dans ${daysToNext} jour${daysToNext > 1 ? "s" : ""} de jeu`;
 
   return (
     <View
@@ -78,47 +63,24 @@ export function TimeBar({
           </Text>
         </View>
         <View style={styles.spacer} />
-        {SPEED_BUTTONS.map((btn) => {
-          const active = speed === btn.value;
-          const disabled = blocked && btn.value !== 0;
-          return (
-            <Pressable
-              key={btn.value}
-              onPress={() => onSetSpeed(btn.value)}
-              disabled={disabled || isAtEnd}
-              accessibilityLabel={btn.aria}
-              style={({ pressed }) => [
-                styles.speedBtn,
-                {
-                  backgroundColor: active
-                    ? colors.primary
-                    : colors.background,
-                  borderColor: active ? colors.primary : colors.border,
-                  opacity: disabled || isAtEnd ? 0.35 : pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.speedLabel,
-                  {
-                    color: active
-                      ? colors.primaryForeground
-                      : colors.foreground,
-                  },
-                ]}
-              >
-                {btn.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {/* Compte à rebours fin de saison */}
+        <View
+          style={[
+            styles.countdownBadge,
+            { borderColor: colors.border, backgroundColor: colors.background },
+          ]}
+        >
+          <Feather name="clock" size={11} color={colors.mutedForeground} style={{ marginRight: 4 }} />
+          <Text style={[styles.countdownText, { color: colors.mutedForeground }]}>
+            {formatSeasonCountdown(seasonEndsAtRealMs)}
+          </Text>
+        </View>
       </View>
 
-      {/* Barre de progression intra-jour */}
+      {/* Barre de progression intra-jour (heure de jeu dans le jour courant) */}
       <View
         style={[styles.dayTrack, { backgroundColor: colors.border }]}
-        accessibilityLabel={`Progression du jour : partie ${safeWeek} sur ${WEEKS_PER_MONTH}`}
+        accessibilityLabel={`Progression du jour : heure ${currentGameHour} sur 24`}
       >
         <View
           style={[
@@ -129,34 +91,6 @@ export function TimeBar({
             },
           ]}
         />
-      </View>
-
-      {/* Badge de statut temps — très visible pour éviter la confusion */}
-      <View
-        style={[
-          styles.statusBadge,
-          {
-            backgroundColor:
-              speed === 0 ? colors.muted : colors.primary + "22",
-            borderColor:
-              speed === 0 ? colors.border : colors.primary,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: speed === 0 ? colors.mutedForeground : colors.primary },
-          ]}
-        />
-        <Text
-          style={[
-            styles.statusText,
-            { color: speed === 0 ? colors.mutedForeground : colors.primary },
-          ]}
-        >
-          {speed === 0 ? "⏸ Le temps est en pause" : `▶ Le temps avance (×${speed})`}
-        </Text>
       </View>
 
       <Pressable
@@ -184,7 +118,7 @@ export function TimeBar({
         </Text>
         <View style={styles.spacer} />
         <Text style={[styles.skipMeta, { color: colors.mutedForeground }]}>
-          {daysToNext === 0 ? "imminent" : realtimeLabel}
+          {skipMeta}
         </Text>
       </Pressable>
     </View>
@@ -231,18 +165,18 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 2,
   },
-  speedBtn: {
-    minWidth: 34,
-    height: 30,
+  countdownBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 4,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
   },
-  speedLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
+  countdownText: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.3,
   },
   skipBtn: {
     flexDirection: "row",
@@ -259,24 +193,5 @@ const styles = StyleSheet.create({
   skipMeta: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.5,
   },
 });
