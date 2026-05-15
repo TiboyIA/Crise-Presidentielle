@@ -126,6 +126,13 @@ function versionGte(a: string, b: string): boolean {
   return aPatch >= bPatch;
 }
 
+// ── Season helpers ────────────────────────────────────────────────────────────
+// Season = YYYYMM (e.g. 202605 for May 2026). Resets every calendar month.
+function currentSeason(): number {
+  const now = new Date();
+  return now.getUTCFullYear() * 100 + (now.getUTCMonth() + 1);
+}
+
 // ── Validation limits ─────────────────────────────────────────────────────────
 
 const MIN_ELAPSED_BETWEEN_EVENTS_MS = 500;
@@ -423,15 +430,34 @@ serve(async (req) => {
       ...(appVersion ? { app_version: appVersion } : {}),
     }).eq("id", runId);
 
-    await service.from("leaderboard_entries").insert({
-      run_id: runId,
-      player_id: user.id,
-      display_name: player?.display_name ?? "Président",
-      country_id: run.country_id,
-      doctrine: run.doctrine,
-      score,
-      mandate_days: mandateDays,
-    });
+    const season = currentSeason();
+
+    // Upsert: keep only best score per player per season
+    const { data: existing } = await service
+      .from("leaderboard_entries")
+      .select("id, score")
+      .eq("player_id", user.id)
+      .eq("season", season)
+      .maybeSingle();
+
+    if (!existing || score > existing.score) {
+      if (existing) {
+        await service.from("leaderboard_entries")
+          .update({ run_id: runId, display_name: player?.display_name ?? "Président", country_id: run.country_id, doctrine: run.doctrine, score, mandate_days: mandateDays })
+          .eq("id", existing.id);
+      } else {
+        await service.from("leaderboard_entries").insert({
+          run_id: runId,
+          player_id: user.id,
+          display_name: player?.display_name ?? "Président",
+          country_id: run.country_id,
+          doctrine: run.doctrine,
+          score,
+          mandate_days: mandateDays,
+          season,
+        });
+      }
+    }
 
     return new Response(
       JSON.stringify({ ok: true, score }),

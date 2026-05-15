@@ -6,23 +6,38 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function currentSeason(): number {
+  const now = new Date();
+  return now.getUTCFullYear() * 100 + (now.getUTCMonth() + 1);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   const url = new URL(req.url);
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 100);
   const offset = Math.max(0, parseInt(url.searchParams.get("offset") ?? "0"));
+  const seasonParam = url.searchParams.get("season");
+  const season = seasonParam ? parseInt(seasonParam) : currentSeason();
+  const countryFilter = url.searchParams.get("country_id");
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
   );
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("leaderboard_entries")
-    .select("id, display_name, country_id, doctrine, score, mandate_days, created_at")
+    .select("id, display_name, country_id, doctrine, score, mandate_days, created_at, season")
+    .eq("season", season)
     .order("score", { ascending: false })
     .range(offset, offset + limit - 1);
+
+  if (countryFilter) {
+    query = query.eq("country_id", countryFilter);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return new Response(
@@ -32,7 +47,7 @@ serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ entries: data ?? [], limit, offset }),
+    JSON.stringify({ entries: data ?? [], season, limit, offset }),
     { headers: { ...CORS, "Content-Type": "application/json" } },
   );
 });
