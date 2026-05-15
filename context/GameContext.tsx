@@ -15,7 +15,6 @@ import {
   pickRandomEvent,
 } from "@/data/events";
 import { useEntitlements } from "@/lib/entitlements";
-import { analyzeGameState } from "@/lib/crisisDirector";
 import { coerceStrategy } from "@/lib/finalDebate";
 import {
   HIDDEN_GAUGE_REVEAL_THRESHOLD,
@@ -928,13 +927,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
-      // Module IA 2: bias the catalog draw toward the categories the
-      // crisis director currently flags. Falls through to a uniform
-      // pick when no signal is active or the biased pool is empty.
-      const profile = analyzeGameState(prev);
       const candidate = pickRandomEvent(
         prev.seenEventIds,
-        profile.preferredCategories,
+        [],
         unlockedPacksRef.current,
       );
 

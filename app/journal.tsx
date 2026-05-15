@@ -1,11 +1,9 @@
-import React, { memo, useCallback, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   ListRenderItem,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -15,17 +13,13 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useGame, Gauges } from "@/context/GameContext";
-import { generateAIHeadline } from "@/lib/aiHeadlines";
 import { GAUGE_LABELS } from "@/logic/gameEngine";
 import { OPPOSITION_STANCE_LABELS } from "@/lib/oppositionReaction";
 import type { DecisionLogEntry } from "@/types/game";
 import ScreenHeroHeader from "@/components/ScreenHeroHeader";
 import {
   JOURNAL_HEADER,
-  MEDIA_LOGOS,
   OPPOSITION_EMBLEM,
-  getMediaLogoFromOutletName,
-  getToneVignette,
 } from "@/data/journalImages";
 
 type ColorPalette = ReturnType<typeof useColors>;
@@ -34,49 +28,7 @@ export default function JournalScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, attachHeadlineToEntry } = useGame();
-
-  // Per-entry generation state for the manual "Demander une réaction"
-  // backfill button. Failures here let the player rescue any decision
-  // whose auto-generation on the dashboard didn't succeed (rate limit,
-  // network, fast successive decisions, etc.).
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [errorByEntryId, setErrorByEntryId] = useState<Record<string, string>>(
-    {},
-  );
-
-  const requestHeadline = useCallback(
-    async (entry: {
-      id: string;
-      eventTitle: string;
-      choiceLabel: string;
-      consequence: string;
-    }) => {
-      if (loadingId) return;
-      setLoadingId(entry.id);
-      setErrorByEntryId((prev) => {
-        if (!prev[entry.id]) return prev;
-        const next = { ...prev };
-        delete next[entry.id];
-        return next;
-      });
-      try {
-        const headline = await generateAIHeadline({
-          eventTitle: entry.eventTitle,
-          choiceLabel: entry.choiceLabel,
-          consequence: entry.consequence,
-        });
-        attachHeadlineToEntry(entry.id, headline);
-      } catch (e) {
-        const msg =
-          e instanceof Error ? e.message : "Échec de la une médiatique.";
-        setErrorByEntryId((prev) => ({ ...prev, [entry.id]: msg }));
-      } finally {
-        setLoadingId((prev) => (prev === entry.id ? null : prev));
-      }
-    },
-    [attachHeadlineToEntry, loadingId],
-  );
+  const { state } = useGame();
 
   const webBottomInset = Platform.OS === "web" ? 34 : 0;
 
@@ -90,13 +42,10 @@ export default function JournalScreen() {
       <JournalEntry
         entry={item}
         isLast={index === totalCount - 1}
-        loadingId={loadingId}
-        error={errorByEntryId[item.id]}
-        onRequestHeadline={requestHeadline}
         colors={colors}
       />
     ),
-    [colors, errorByEntryId, loadingId, requestHeadline, totalCount],
+    [colors, totalCount],
   );
 
   const keyExtractor = useCallback((item: DecisionLogEntry) => item.id, []);
@@ -147,47 +96,18 @@ export default function JournalScreen() {
 interface JournalEntryProps {
   entry: DecisionLogEntry;
   isLast: boolean;
-  loadingId: string | null;
-  error?: string;
-  onRequestHeadline: (entry: {
-    id: string;
-    eventTitle: string;
-    choiceLabel: string;
-    consequence: string;
-  }) => void;
   colors: ColorPalette;
 }
 
 const JournalEntry = memo(function JournalEntry({
   entry,
   isLast,
-  loadingId,
-  error,
-  onRequestHeadline,
   colors,
 }: JournalEntryProps) {
-  const onRequest = useCallback(
-    () =>
-      onRequestHeadline({
-        id: entry.id,
-        eventTitle: entry.eventTitle,
-        choiceLabel: entry.choiceLabel,
-        consequence: entry.consequence,
-      }),
-    [
-      entry.id,
-      entry.eventTitle,
-      entry.choiceLabel,
-      entry.consequence,
-      onRequestHeadline,
-    ],
-  );
-
   const effectKeys = useMemo(
     () => Object.keys(entry.effects) as (keyof Gauges)[],
     [entry.effects],
   );
-  const isLoading = loadingId === entry.id;
   const reaction = entry.oppositionReaction;
   const reactionTone =
     reaction?.stance === "exploit" || reaction?.stance === "denounce"
@@ -292,139 +212,6 @@ const JournalEntry = memo(function JournalEntry({
           </View>
         </View>
       ) : null}
-
-      {entry.aiHeadline ? (
-        (() => {
-          const h = entry.aiHeadline;
-          const mediaLogo =
-            (h.mediaId ? MEDIA_LOGOS[h.mediaId] : null) ??
-            getMediaLogoFromOutletName(h.outlet);
-          const toneVignette = getToneVignette(h.tone);
-          return (
-            <View
-              style={[
-                styles.headlineBox,
-                {
-                  borderLeftColor: colors.primary,
-                  backgroundColor: colors.muted,
-                },
-              ]}
-            >
-              {mediaLogo ? (
-                <Image
-                  source={mediaLogo}
-                  style={styles.headlineLogo}
-                  accessible={false}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.headlineLogoFallback,
-                    { backgroundColor: colors.background },
-                  ]}
-                >
-                  <Feather name="rss" size={18} color={colors.primary} />
-                </View>
-              )}
-              <View style={styles.headlineContent}>
-                <View style={styles.headlineMetaRow}>
-                  <Text
-                    style={[styles.headlineOutlet, { color: colors.primary }]}
-                    numberOfLines={1}
-                  >
-                    {h.outlet.toUpperCase()}
-                  </Text>
-                  <Image
-                    source={toneVignette}
-                    style={styles.headlineToneVignette}
-                    accessible={false}
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  />
-                  <Text
-                    style={[
-                      styles.headlineTone,
-                      { color: colors.mutedForeground },
-                    ]}
-                  >
-                    {h.tone}
-                  </Text>
-                </View>
-                <Text
-                  style={[styles.headlineTitle, { color: colors.foreground }]}
-                >
-                  « {h.headline} »
-                </Text>
-                {h.snippet ? (
-                  <Text
-                    style={[
-                      styles.headlineSnippet,
-                      { color: colors.mutedForeground },
-                    ]}
-                  >
-                    {h.snippet}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          );
-        })()
-      ) : (
-        <View style={styles.headlineActionRow}>
-          {isLoading ? (
-            <View style={styles.headlineLoadingRow}>
-              <ActivityIndicator
-                size="small"
-                color={colors.mutedForeground}
-              />
-              <Text
-                style={[
-                  styles.headlinePending,
-                  { color: colors.mutedForeground },
-                ]}
-              >
-                Les médias rédigent…
-              </Text>
-            </View>
-          ) : (
-            <>
-              {error ? (
-                <Text
-                  style={[
-                    styles.headlinePending,
-                    { color: colors.mutedForeground },
-                  ]}
-                >
-                  {error}
-                </Text>
-              ) : null}
-              <Pressable
-                onPress={onRequest}
-                disabled={loadingId !== null}
-                style={[
-                  styles.headlineRetry,
-                  {
-                    borderColor: colors.border,
-                    opacity: loadingId !== null ? 0.5 : 1,
-                  },
-                ]}
-              >
-                <Feather name="rss" size={11} color={colors.foreground} />
-                <Text
-                  style={[
-                    styles.headlineRetryText,
-                    { color: colors.foreground },
-                  ]}
-                >
-                  {error ? "RÉESSAYER" : "DEMANDER UNE RÉACTION MÉDIA"}
-                </Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-      )}
 
       {!isLast ? (
         <View

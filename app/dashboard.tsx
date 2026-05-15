@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Platform,
@@ -17,8 +16,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useGame, Gauges } from "@/context/GameContext";
-import { generateAIEvent } from "@/lib/aiEvents";
-import { analyzeGameState } from "@/lib/crisisDirector";
 import { MEDIA_OUTLETS } from "@/data/medias";
 import { OPPOSITION_STANCE_LABELS } from "@/lib/oppositionReaction";
 import { GaugeBar } from "@/components/GaugeBar";
@@ -77,19 +74,6 @@ export default function DashboardScreen() {
     resolveMinorEvent,
     dismissMinorEvent,
   } = useGame();
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-
-  // Module 4 — la une médiatique est désormais GÉNÉRÉE DE FAÇON
-  // DÉTERMINISTE par `composeHeadline` à l'intérieur de `resolveChoice`
-  // (voir GameContext). On ne fait plus d'appel IA ici. Le composant
-  // se contente d'afficher l'`aiHeadline` déjà attaché à la dernière
-  // log entry, avec la couleur/icône du média qui parle.
-
-  // Module IA 2: the crisis director observes the current state and
-  // tells us which categories / directives should bias the next crisis.
-  const directorProfile = useMemo(() => analyzeGameState(state), [state]);
-
   // Track previous gauges so the resource strip can show per-turn deltas
   // (P&W-style ▲/▼ next to each value). We snapshot at the START of the
   // turn before any new resolution mutates the gauges.
@@ -170,40 +154,6 @@ export default function DashboardScreen() {
     },
     [router],
   );
-
-  const handleAICrisis = useCallback(async () => {
-    if (aiLoading) return;
-    if (state.currentEvent) return;
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
-    setAiError(null);
-    setAiLoading(true);
-    try {
-      const recentTitles = state.log.slice(0, 8).map((e) => e.eventTitle);
-      const event = await generateAIEvent({
-        avoidTitles: recentTitles,
-        directives: directorProfile.directives,
-        preferredCategories: directorProfile.preferredCategories,
-      });
-      const accepted = injectCustomEvent(event);
-      if (!accepted) {
-        setAiError("Une crise est déjà en cours.");
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur inconnue";
-      setAiError(msg);
-    } finally {
-      setAiLoading(false);
-    }
-  }, [
-    aiLoading,
-    state.currentEvent,
-    state.log,
-    injectCustomEvent,
-    directorProfile.directives,
-    directorProfile.preferredCategories,
-  ]);
 
   const handleReset = () => {
     const action = async () => {
@@ -368,7 +318,6 @@ export default function DashboardScreen() {
             state.gameTime.currentMonth >= state.gameTime.nextEventMonth
           }
           onDrawNow={handleDrawAvailable}
-          isAILoading={aiLoading}
         />
 
         <SectionHeading
@@ -843,27 +792,6 @@ export default function DashboardScreen() {
         />
 
         <View style={styles.bottomBarInner}>
-        {directorProfile.hasSignals ? (
-          <View
-            style={[
-              styles.directorHint,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <Image
-              source={DASHBOARD_ICON_IMAGES.director}
-              style={styles.directorHintIcon}
-              resizeMode="contain"
-            />
-            <Text
-              style={[styles.directorHintText, { color: colors.cardForeground }]}
-              numberOfLines={2}
-            >
-              {directorProfile.summary}
-            </Text>
-          </View>
-        ) : null}
-
         {/* Bouton visible uniquement quand un briefing est disponible sans sauter du temps */}
         {!state.currentEvent &&
           !!state.gameTime &&
@@ -889,37 +817,6 @@ export default function DashboardScreen() {
               OUVRIR LE BRIEFING
             </Text>
           </Pressable>
-        ) : null}
-
-        <Pressable
-          onPress={handleAICrisis}
-          disabled={aiLoading || !!state.currentEvent}
-          style={({ pressed }) => [
-            styles.aiBtn,
-            {
-              borderColor: colors.border,
-              backgroundColor: colors.card,
-              opacity: aiLoading || state.currentEvent ? 0.55 : pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          {aiLoading ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
-          ) : (
-            <Image
-              source={DASHBOARD_ACTION_IMAGES.criseIA}
-              style={styles.aiBtnThumb}
-              resizeMode="contain"
-            />
-          )}
-          <Text style={[styles.aiBtnText, { color: colors.foreground }]}>
-            {aiLoading ? "GÉNÉRATION…" : "CRISE IA"}
-          </Text>
-        </Pressable>
-        {aiError ? (
-          <Text style={[styles.aiError, { color: colors.danger }]} numberOfLines={2}>
-            {aiError}
-          </Text>
         ) : null}
         </View>
       </View>
