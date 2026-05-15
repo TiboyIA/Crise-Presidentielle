@@ -30,6 +30,13 @@ import { UNITS } from "@/data/units";
 import { MILITARY_DOCTRINES } from "@/data/militaryDoctrines";
 import { calculateMilitaryPower, getOperationUnitBonus, calculateDailyUpkeep } from "@/logic/militaryEngine";
 import { computeRealTimeAdvance, initRealTime } from "@/logic/realTimeEngine";
+import {
+  clockNow,
+  currentGameHour,
+  gameHoursToRealMs,
+  realMsToGameHours,
+  migrateRealMsTimestamp,
+} from "@/logic/simulationClock";
 import type { MilitaryDoctrineId, PlayerUnit, TrainingQueueEntry, UnitId } from "@/types/units";
 import { STRATEGY_RESEARCH } from "@/data/strategyResearch";
 import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
@@ -115,8 +122,8 @@ function buildInitialState(playerName: string, doctrine: GovernanceDoctrine = "d
     upgradeEndTime: null,
   }));
 
-  const power = calculateGlobalPower(buildings, INITIAL_RESOURCES);
-  const now = Date.now();
+  const power           = calculateGlobalPower(buildings, INITIAL_RESOURCES);
+  const now             = clockNow();
   const seasonStartTime = now;
 
   return {
@@ -199,29 +206,52 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadStrategy().then((saved) => {
       if (saved) {
-        setState({
+        const merged: StrategyGameState = {
           ...saved,
-          news: saved.news ?? { ...DEFAULT_NEWS_STATE },
-          nationalIndicators: saved.nationalIndicators ?? { ...INITIAL_INDICATORS },
-          mandateDay: saved.mandateDay ?? 0,
-          lastPollShownAt: saved.lastPollShownAt ?? 0,
-          lastBilanShownAt: saved.lastBilanShownAt ?? 0,
-          hiddenPolitics: saved.hiddenPolitics ?? { ...INITIAL_HIDDEN_POLITICS },
+          news:                saved.news                ?? { ...DEFAULT_NEWS_STATE },
+          nationalIndicators:  saved.nationalIndicators  ?? { ...INITIAL_INDICATORS },
+          mandateDay:          saved.mandateDay          ?? 0,
+          lastPollShownAt:     saved.lastPollShownAt     ?? 0,
+          lastBilanShownAt:    saved.lastBilanShownAt    ?? 0,
+          hiddenPolitics:      saved.hiddenPolitics      ?? { ...INITIAL_HIDDEN_POLITICS },
           delayedConsequences: saved.delayedConsequences ?? [],
-          campaignPromises: saved.campaignPromises ?? buildInitialPromises(),
-          governanceDoctrine: saved.governanceDoctrine ?? "democratique",
-          reforms: saved.reforms ?? [],
-          strategyMinisters: saved.strategyMinisters ?? buildInitialMinisters(),
-          nationalDebt: saved.nationalDebt ?? 30,
-          achievements: saved.achievements ?? [],
-          playerUnits: saved.playerUnits ?? [],
-          trainingQueue: saved.trainingQueue ?? [],
-          militaryDoctrine: saved.militaryDoctrine ?? "defensive",
-          premiumGold: saved.premiumGold ?? 0,
-          publicMemory: saved.publicMemory ?? { traces: [] },
-          oppositionPower: saved.oppositionPower ?? 35,
-          realTime: saved.realTime ?? initRealTime(Date.now()),
-          strategyResearch: saved.strategyResearch ?? { ...DEFAULT_RESEARCH_STATE },
+          campaignPromises:    saved.campaignPromises    ?? buildInitialPromises(),
+          governanceDoctrine:  saved.governanceDoctrine  ?? "democratique",
+          reforms:             saved.reforms             ?? [],
+          strategyMinisters:   saved.strategyMinisters   ?? buildInitialMinisters(),
+          nationalDebt:        saved.nationalDebt        ?? 30,
+          achievements:        saved.achievements        ?? [],
+          playerUnits:         saved.playerUnits         ?? [],
+          trainingQueue:       saved.trainingQueue       ?? [],
+          militaryDoctrine:    saved.militaryDoctrine    ?? "defensive",
+          premiumGold:         saved.premiumGold         ?? 0,
+          publicMemory:        saved.publicMemory        ?? { traces: [] },
+          oppositionPower:     saved.oppositionPower     ?? 35,
+          realTime:            saved.realTime            ?? initRealTime(clockNow()),
+          strategyResearch:    saved.strategyResearch    ?? { ...DEFAULT_RESEARCH_STATE },
+        };
+        // ── Migration simulationClock ──────────────────────────────────────────
+        // Convertit les anciens timestamps réels (ms) en heures jeu absolues.
+        // Préserve le temps réel restant : un joueur qui attendait 1 h réelle
+        // continuera à attendre 1 h réelle — mais stocké en heures jeu désormais.
+        const startedAt = merged.startedAt;
+        setState({
+          ...merged,
+          trainingQueue: merged.trainingQueue.map((entry) => {
+            if (entry.endsAtGameHour !== undefined) return entry; // déjà migré
+            return {
+              ...entry,
+              endsAtGameHour:    migrateRealMsTimestamp(entry.endsAt, startedAt),
+              durationGameHours: realMsToGameHours(entry.endsAt - entry.startedAt),
+            };
+          }),
+          buildings: merged.buildings.map((b) => {
+            if (!b.upgradeEndTime || b.upgradeEndsAtGameHour !== undefined) return b;
+            return {
+              ...b,
+              upgradeEndsAtGameHour: migrateRealMsTimestamp(b.upgradeEndTime, startedAt),
+            };
+          }),
         });
       }
       setLoaded(true);
@@ -255,10 +285,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
 
   const tick = useCallback(() => {
     update((prev) => {
-      const now = Date.now();
+      const now         = clockNow();
+      // Heure jeu courante — coordonnée centrale de cette frame
+      const gameHourNow = currentGameHour(prev.startedAt);
 
-      // Collect completed upgrades
-      const buildings = collectUpgrades(prev.buildings);
+      // Collect completed upgrades (vérifie upgradeEndsAtGameHour en priorité)
+      const buildings = collectUpgrades(prev.buildings, gameHourNow);
 
       // Accumulate offline resources
       const resources = accumulateResources(buildings, prev.resources, prev.lastResourceTick);
@@ -300,13 +332,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       missions = checkMissionProgress(missions, resources, buildings, power);
 
       // Mark completed training queue entries
-      const trainingQueue = prev.trainingQueue.map((entry) =>
-        entry.status === "training" && now >= entry.endsAt
-          ? { ...entry, status: "completed" as const }
-          : entry,
-      );
+      // Vérifie endsAtGameHour (nouveau) en priorité, repli sur endsAt (ms réels)
+      const trainingQueue = prev.trainingQueue.map((entry) => {
+        if (entry.status === "completed") return entry;
+        const done = entry.endsAtGameHour !== undefined
+          ? gameHourNow >= entry.endsAtGameHour
+          : now >= entry.endsAt;
+        return done ? { ...entry, status: "completed" as const } : entry;
+      });
 
-      // Real-time mandate advancement (1 mandate day = 24 real hours).
+      // Real-time mandate advancement (1 mandate day = 6 real hours = 24 game hours).
       // Player actions don't move the mandate forward anymore; the wall clock does.
       const rtAdvance = computeRealTimeAdvance(prev.realTime, now);
       let withMandate: StrategyGameState = { ...ds, realTime: rtAdvance.realTime };
@@ -358,9 +393,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       if (!canAfford(levelData.cost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
 
       update((prev) => {
-        const resources = deductCost(levelData.cost, prev.resources);
-        const buildings = startUpgrade(prev.buildings, id);
-        const missions = checkMissionProgress(prev.missions, resources, buildings, prev.stats.globalPower, {
+        const resources    = deductCost(levelData.cost, prev.resources);
+        const gameHourNow  = currentGameHour(prev.startedAt);
+        const buildings    = startUpgrade(prev.buildings, id, gameHourNow);
+        const missions     = checkMissionProgress(prev.missions, resources, buildings, prev.stats.globalPower, {
           type: "upgrade_building",
           buildingId: id,
         });
@@ -397,7 +433,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const relations = prev.relations.map((r) => {
           if (r.countryId !== targetCountryId) return r;
           const { score, status } = updateRelationScore(r.score, result.relationDelta);
-          const cooldowns = { ...r.operationCooldowns, [type]: Date.now() + op.cooldown * 1000 };
+          const cooldowns = { ...r.operationCooldowns, [type]: clockNow() + op.cooldown * 1000 };
           const country = COUNTRIES[targetCountryId];
           const revealedIntel = (type === "espionage" && result.success)
             ? {
@@ -609,16 +645,20 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       }
       if (!canAfford(totalCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
       update((prev) => {
-        const resources = deductCost(totalCost, prev.resources);
-        const now = Date.now();
-        const totalTimeSec = def.trainingTimeSec * quantity;
+        const resources         = deductCost(totalCost, prev.resources);
+        const now               = clockNow();
+        const gameHourNow       = currentGameHour(prev.startedAt);
+        // trainingTimeSec est en secondes jeu → convertir en heures jeu
+        const durationGameHours = (def.trainingTimeSec * quantity) / 3600;
         const entry: TrainingQueueEntry = {
-          id: `${unitId}_${now}`,
+          id:               `${unitId}_${now}`,
           unitId,
           quantity,
-          startedAt: now,
-          endsAt: now + totalTimeSec * 1000,
-          status: "training",
+          startedAt:        now,
+          endsAt:           now + gameHoursToRealMs(durationGameHours),
+          endsAtGameHour:   gameHourNow + durationGameHours,
+          durationGameHours,
+          status:           "training",
         };
         return withNews({ ...prev, resources, trainingQueue: [...prev.trainingQueue, entry] });
       });

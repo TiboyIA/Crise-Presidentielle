@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { clockNow, realMsUntilGameHour } from "@/logic/simulationClock";
+import type { TrainingQueueEntry } from "@/types/units";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -29,8 +31,18 @@ const TABS: { id: TabId; label: string; icon: McIconName }[] = [
   { id: "doctrine", label: "Doctrine", icon: "sword-cross" },
 ];
 
-function formatRemaining(endsAt: number): string {
-  const ms = Math.max(0, endsAt - Date.now());
+/**
+ * Formate le temps réel restant pour une entrée de la file de formation.
+ * Utilise endsAtGameHour (nouveau système) en priorité ;
+ * repli sur endsAt (ms réels) pour les sauvegardes migrées.
+ *
+ * @param entry      entrée de la file de formation
+ * @param startedAt  state.startedAt — epoch de la partie
+ */
+function formatRemaining(entry: TrainingQueueEntry, startedAt: number): string {
+  const ms = entry.endsAtGameHour !== undefined
+    ? realMsUntilGameHour(entry.endsAtGameHour, startedAt)
+    : Math.max(0, entry.endsAt - clockNow());
   const sec = Math.floor(ms / 1000);
   if (sec < 60) return `${sec}s`;
   if (sec < 3600) return `${Math.floor(sec / 60)}min`;
@@ -195,7 +207,7 @@ export default function ForcesArmeesScreen() {
               const def = UNITS[entry.unitId];
               const isComplete = entry.status === "completed";
               const branchColor = BRANCH_COLORS[def?.branch ?? "land"] ?? PALETTE.gold;
-              const pct = isComplete ? 100 : Math.round(((Date.now() - entry.startedAt) / (entry.endsAt - entry.startedAt)) * 100);
+              const pct = isComplete ? 100 : Math.round(((clockNow() - entry.startedAt) / (entry.endsAt - entry.startedAt)) * 100);
               return (
                 <Panel key={entry.id} style={styles.queueCard}>
                   <View style={styles.queueRow}>
@@ -207,7 +219,7 @@ export default function ForcesArmeesScreen() {
                       </View>
                     </View>
                     <Text style={[styles.queueEta, { color: isComplete ? PALETTE.success : PALETTE.textMid }]}>
-                      {isComplete ? "✓ Prêt" : formatRemaining(entry.endsAt)}
+                      {isComplete ? "✓ Prêt" : formatRemaining(entry, state.startedAt)}
                     </Text>
                   </View>
                 </Panel>

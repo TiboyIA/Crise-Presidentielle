@@ -65,8 +65,21 @@ export interface TrainingQueueEntry {
   id: string;
   unitId: UnitId;
   quantity: number;
-  startedAt: number;  // ms timestamp
-  endsAt: number;     // ms timestamp
+  /** Timestamp réel de début (ms). Conservé pour compatibilité sauvegardes. */
+  startedAt: number;
+  /** Timestamp réel de fin (ms). Conservé pour compatibilité sauvegardes. */
+  endsAt: number;
+  /**
+   * Heure jeu absolue de fin (depuis state.startedAt).
+   * Source de vérité quand défini — le serveur validera cette valeur.
+   * Absent sur les anciennes sauvegardes (migration automatique au chargement).
+   */
+  endsAtGameHour?: number;
+  /**
+   * Durée totale de la mission en heures jeu.
+   * = def.trainingTimeSec / 3600 × quantity
+   */
+  durationGameHours?: number;
   status: "training" | "completed";
 }
 

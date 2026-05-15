@@ -1,7 +1,12 @@
 import { BUILDINGS } from "@/data/buildings";
 import type { BuildingId, PlayerBuilding, StrategyResources } from "@/types/strategy";
+import {
+  clockNow,
+  gameHoursToRealMs,
+  realMsUntilGameHour,
+} from "@/logic/simulationClock";
 
-export const MAX_OFFLINE_MINUTES = 24 * 60; // 24h max offline accumulation
+export const MAX_OFFLINE_MINUTES = 24 * 60; // 24h max offline pour la production de ressources
 
 export function canAfford(
   cost: Partial<StrategyResources>,
@@ -32,26 +37,63 @@ export function isUnlocked(building: PlayerBuilding, allBuildings: PlayerBuildin
   return (dep?.level ?? 0) >= req.level;
 }
 
+/**
+ * Démarre une amélioration de bâtiment.
+ *
+ * La durée (upgradeDuration) est en secondes JEU.
+ * Elle est convertie en ms réels via gameHoursToRealMs() pour le compte à rebours.
+ * La fin est aussi stockée en heure jeu absolue (upgradeEndsAtGameHour) pour
+ * le système serveur-authoritative futur.
+ *
+ * @param gameHourNow  heure jeu courante depuis state.startedAt
+ */
 export function startUpgrade(
   buildings: PlayerBuilding[],
   id: BuildingId,
+  gameHourNow: number,
 ): PlayerBuilding[] {
   return buildings.map((b) => {
     if (b.id !== id) return b;
     const def = BUILDINGS[id];
     const nextLevel = b.level + 1;
     if (nextLevel > def.maxLevel) return b;
-    const duration = def.levels[b.level]?.upgradeDuration ?? 60;
-    const now = Date.now();
-    return { ...b, upgradeStartTime: now, upgradeEndTime: now + duration * 1000 };
+    // upgradeDuration est en secondes jeu
+    const durationGameSec   = def.levels[b.level]?.upgradeDuration ?? 60;
+    const durationGameHours = durationGameSec / 3600;
+    const now               = clockNow();
+    return {
+      ...b,
+      upgradeStartTime:      now,
+      upgradeEndTime:        now + gameHoursToRealMs(durationGameHours),
+      upgradeEndsAtGameHour: gameHourNow + durationGameHours,
+    };
   });
 }
 
-export function collectUpgrades(buildings: PlayerBuilding[]): PlayerBuilding[] {
-  const now = Date.now();
+/**
+ * Collecte les améliorations terminées et incrémente le niveau.
+ *
+ * Vérifie d'abord upgradeEndsAtGameHour (système nouveau) ;
+ * repli sur upgradeEndTime (ms réels) pour les anciennes sauvegardes.
+ *
+ * @param gameHourNow  heure jeu courante depuis state.startedAt
+ */
+export function collectUpgrades(buildings: PlayerBuilding[], gameHourNow: number): PlayerBuilding[] {
+  const now = clockNow();
   return buildings.map((b) => {
-    if (b.upgradeEndTime !== null && now >= b.upgradeEndTime) {
-      return { ...b, level: b.level + 1, upgradeStartTime: null, upgradeEndTime: null };
+    if (!b.upgradeEndTime && !b.upgradeEndsAtGameHour) return b;
+    const done =
+      b.upgradeEndsAtGameHour != null
+        ? gameHourNow >= b.upgradeEndsAtGameHour
+        : now >= (b.upgradeEndTime ?? Infinity);
+    if (done) {
+      return {
+        ...b,
+        level:                 b.level + 1,
+        upgradeStartTime:      null,
+        upgradeEndTime:        null,
+        upgradeEndsAtGameHour: null,
+      };
     }
     return b;
   });
@@ -62,9 +104,10 @@ export function accumulateResources(
   resources: StrategyResources,
   lastTick: number,
 ): StrategyResources {
-  const now = Date.now();
-  const elapsedMs = now - lastTick;
-  const elapsedMinutes = Math.min(elapsedMs / 60000, MAX_OFFLINE_MINUTES);
+  // La production de ressources reste en temps réel (par minute réelle).
+  const now           = clockNow();
+  const elapsedMs     = now - lastTick;
+  const elapsedMinutes = Math.min(elapsedMs / 60_000, MAX_OFFLINE_MINUTES);
 
   if (elapsedMinutes < 0.5) return resources;
 
@@ -72,7 +115,7 @@ export function accumulateResources(
 
   for (const building of buildings) {
     if (building.level === 0) continue;
-    const def = BUILDINGS[building.id];
+    const def       = BUILDINGS[building.id];
     const levelData = def.levels[building.level - 1];
     if (!levelData) continue;
 
@@ -84,19 +127,41 @@ export function accumulateResources(
   return next;
 }
 
+/**
+ * Progression de l'amélioration (0..1).
+ * Basé sur les timestamps réels (valides dans les deux systèmes).
+ */
 export function getUpgradeProgress(building: PlayerBuilding): number {
   if (!building.upgradeStartTime || !building.upgradeEndTime) return 0;
-  const now = Date.now();
-  const total = building.upgradeEndTime - building.upgradeStartTime;
+  const now     = clockNow();
+  const total   = building.upgradeEndTime - building.upgradeStartTime;
   const elapsed = now - building.upgradeStartTime;
   return Math.min(1, elapsed / total);
 }
 
-export function timeRemaining(building: PlayerBuilding): number {
+/**
+ * Millisecondes réelles restantes avant la fin de l'amélioration.
+ *
+ * Utilise upgradeEndsAtGameHour si disponible (précis) ;
+ * repli sur upgradeEndTime (ms réels) pour les anciennes sauvegardes.
+ *
+ * @param startedAt  state.startedAt (requis pour le calcul en heures jeu)
+ */
+export function timeRemaining(building: PlayerBuilding, startedAt?: number): number {
+  if (
+    building.upgradeEndsAtGameHour != null &&
+    startedAt !== undefined
+  ) {
+    return realMsUntilGameHour(building.upgradeEndsAtGameHour, startedAt);
+  }
   if (!building.upgradeEndTime) return 0;
-  return Math.max(0, building.upgradeEndTime - Date.now());
+  return Math.max(0, building.upgradeEndTime - clockNow());
 }
 
+/**
+ * Formate une durée en ms pour l'affichage.
+ * Exemples : "30s" | "5min" | "4h" | "3j12h"
+ */
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.ceil(ms / 1000);
   if (totalSeconds < 60) return `${totalSeconds}s`;

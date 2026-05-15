@@ -1,28 +1,33 @@
 import { MISSION_POOL, pickDailyMissions } from "@/data/missions";
 import type { MissionDef, MissionType, OperationType, PlayerBuilding, PlayerMission, StrategyResources } from "@/types/strategy";
+import { clockNow, REAL_MS_PER_GAME_DAY } from "@/logic/simulationClock";
 
-const MISSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
+/**
+ * Durée d'un cycle de missions = 1 jour jeu.
+ * Temps réel : REAL_MS_PER_GAME_DAY = 6 h réelles (au lieu de 24 h précédemment).
+ * Le joueur voit "nouvelles missions dans Xh" exprimé en temps réel.
+ */
+const MISSION_DURATION_MS = REAL_MS_PER_GAME_DAY; // 6 h réelles = 1 jour jeu
 
 export function generateDailyMissions(dayIndex: number): PlayerMission[] {
   const defs = pickDailyMissions(dayIndex);
-  const now = Date.now();
+  const now  = clockNow();
   return defs.map((def) => ({
-    defId: def.id,
-    completed: false,
-    progress: 0,
-    target: def.target.amount ?? def.target.minPower ?? 1,
+    defId:      def.id,
+    completed:  false,
+    progress:   0,
+    target:     def.target.amount ?? def.target.minPower ?? 1,
     assignedAt: now,
   }));
 }
 
 export function getCurrentDayIndex(): number {
-  return Math.floor(Date.now() / MISSION_DURATION_MS);
+  return Math.floor(clockNow() / MISSION_DURATION_MS);
 }
 
 export function missionsExpired(missions: PlayerMission[]): boolean {
   if (missions.length === 0) return true;
-  const now = Date.now();
-  return missions[0].assignedAt < now - MISSION_DURATION_MS;
+  return missions[0].assignedAt < clockNow() - MISSION_DURATION_MS;
 }
 
 export function checkMissionProgress(
@@ -96,5 +101,5 @@ export function getMissionDef(defId: string): MissionDef | undefined {
 export function timeUntilReset(missions: PlayerMission[]): number {
   if (missions.length === 0) return 0;
   const expiry = missions[0].assignedAt + MISSION_DURATION_MS;
-  return Math.max(0, expiry - Date.now());
+  return Math.max(0, expiry - clockNow());
 }

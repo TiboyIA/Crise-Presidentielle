@@ -63,8 +63,16 @@ export interface BuildingDef {
 export interface PlayerBuilding {
   id: BuildingId;
   level: number; // 0 = not built, 1-10 = active level
+  /** Timestamp réel de début d'amélioration (ms). Conservé pour compatibilité. */
   upgradeStartTime: number | null;
+  /** Timestamp réel de fin d'amélioration (ms). Conservé pour compatibilité. */
   upgradeEndTime: number | null;
+  /**
+   * Heure jeu absolue de fin d'amélioration (depuis state.startedAt).
+   * Source de vérité quand défini.
+   * Absent sur les anciennes sauvegardes (migration automatique au chargement).
+   */
+  upgradeEndsAtGameHour?: number | null;
 }
 
 export type CountryId =
