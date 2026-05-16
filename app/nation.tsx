@@ -106,6 +106,22 @@ export default function NationScreen() {
                   <MaterialCommunityIcons name="file-document-outline" size={13} color={PALETTE.gold} />
                   <Text style={styles.briefingBtnText}>BRIEFING</Text>
                 </Pressable>
+                <Pressable
+                  onPress={() => router.push("/settings" as any)}
+                  hitSlop={8}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                >
+                  <MaterialCommunityIcons name="cog-outline" size={16} color={PALETTE.textMid} />
+                </Pressable>
+                {__DEV__ && (
+                  <Pressable
+                    onPress={() => router.push("/strategy-debug" as any)}
+                    hitSlop={8}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 0.4 })}
+                  >
+                    <MaterialCommunityIcons name="bug-outline" size={14} color="#a78bfa" />
+                  </Pressable>
+                )}
               </View>
             </View>
 

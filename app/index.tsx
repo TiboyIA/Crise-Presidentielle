@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,6 +28,32 @@ const DOCTRINE_OPTIONS: DoctrineOption[] = [
   { label: "Populaire",  subtitle: "Proximité, aides sociales, écoute du peuple",  doctrine: "populiste",      icon: "🗣️", color: "#e8a93a" },
 ];
 
+function HeaderContent({ compact }: { compact?: boolean }) {
+  return (
+    <>
+      <View style={[styles.crestFrame, compact && styles.crestFrameCompact]}>
+        <View style={styles.crestCorner1} />
+        <View style={styles.crestCorner2} />
+        <View style={styles.crestCorner3} />
+        <View style={styles.crestCorner4} />
+        <Text style={[styles.emblem, compact && styles.emblemCompact]}>⚜</Text>
+      </View>
+      <Text style={styles.republic}>RÉPUBLIQUE · COMMANDEMENT</Text>
+      <View style={[styles.titleBlock, compact && styles.titleBlockCompact]}>
+        <View style={styles.sideRule} />
+        <Text style={[styles.title, compact && styles.titleCompact]}>PRÉSIDENT</Text>
+        <View style={styles.sideRule} />
+      </View>
+      <View style={[styles.crisisLine, compact && styles.crisisLineCompact]}>
+        <Text style={styles.crisisDot}>·</Text>
+        <Text style={styles.crisis}>NATION EN CRISE</Text>
+        <Text style={styles.crisisDot}>·</Text>
+      </View>
+      <Text style={styles.tagline}>UNE GUERRE HYBRIDE EST EN COURS</Text>
+    </>
+  );
+}
+
 export default function StartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -38,6 +64,8 @@ export default function StartScreen() {
   const [playerName, setPlayerName] = useState("");
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [rankedMode, setRankedMode] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
   if (!loaded) return null;
 
@@ -53,6 +81,18 @@ export default function StartScreen() {
 
   const handleTutorial = () => {
     router.push("/tutorial");
+  };
+
+  const handleSettings = () => {
+    router.push("/settings" as any);
+  };
+
+  const handleShop = () => {
+    router.push("/shop" as any);
+  };
+
+  const handleSaves = () => {
+    router.push("/saves" as any);
   };
 
   const handleNameNext = () => {
@@ -83,6 +123,66 @@ export default function StartScreen() {
     router.replace("/nation");
   };
 
+  const bodyContent = (
+    <>
+      {step === "home" && (
+        <HomeBody
+          hasSave={hasSave}
+          onContinue={handleContinue}
+          onNewGame={handleNewGame}
+          onTutorial={handleTutorial}
+          onSettings={handleSettings}
+          onShop={handleShop}
+          onSaves={handleSaves}
+        />
+      )}
+      {step === "name" && (
+        <NameBody
+          playerName={playerName}
+          onChangeName={setPlayerName}
+          onNext={handleNameNext}
+          onBack={() => setStep("home")}
+        />
+      )}
+      {step === "doctrine" && (
+        <DoctrineBody
+          selectedLabel={selectedLabel}
+          rankedMode={rankedMode}
+          rankedAvailable={auth.isEnabled && auth.isReady}
+          onSelect={handleDoctrineSelect}
+          onToggleRanked={() => setRankedMode((v) => !v)}
+          onConfirm={handleConfirmDoctrine}
+          onBack={() => setStep("name")}
+        />
+      )}
+    </>
+  );
+
+  if (isLandscape) {
+    return (
+      <ImageBackground source={BG.investiture} style={styles.bg} resizeMode="cover">
+        <LinearGradient
+          colors={["rgba(6,8,16,0.35)", "rgba(6,8,16,0.55)", "rgba(6,8,16,0.92)", "#04060a"]}
+          locations={[0, 0.35, 0.78, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={["rgba(192,57,43,0.08)", "rgba(192,57,43,0)"]}
+          style={[StyleSheet.absoluteFill, { height: "60%" }]}
+        />
+        <View style={[styles.containerRow, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.leftPanel}>
+            <HeaderContent compact />
+            <Text style={[styles.version, styles.versionLandscape]}>v1.0.0 · PRÉSIDENT : NATION EN CRISE</Text>
+          </View>
+          <View style={styles.rightPanel}>
+            {bodyContent}
+          </View>
+        </View>
+      </ImageBackground>
+    );
+  }
+
   return (
     <ImageBackground source={BG.investiture} style={styles.bg} resizeMode="cover">
       <LinearGradient
@@ -94,62 +194,11 @@ export default function StartScreen() {
         colors={["rgba(192,57,43,0.08)", "rgba(192,57,43,0)"]}
         style={[StyleSheet.absoluteFill, { height: "60%" }]}
       />
-
       <View style={[styles.container, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 36 }]}>
-        {/* Header — always visible */}
         <View style={styles.header}>
-          <View style={styles.crestFrame}>
-            <View style={styles.crestCorner1} />
-            <View style={styles.crestCorner2} />
-            <View style={styles.crestCorner3} />
-            <View style={styles.crestCorner4} />
-            <Text style={styles.emblem}>⚜</Text>
-          </View>
-          <Text style={styles.republic}>RÉPUBLIQUE · COMMANDEMENT</Text>
-          <View style={styles.titleBlock}>
-            <View style={styles.sideRule} />
-            <Text style={styles.title}>PRÉSIDENT</Text>
-            <View style={styles.sideRule} />
-          </View>
-          <View style={styles.crisisLine}>
-            <Text style={styles.crisisDot}>·</Text>
-            <Text style={styles.crisis}>NATION EN CRISE</Text>
-            <Text style={styles.crisisDot}>·</Text>
-          </View>
-          <Text style={styles.tagline}>UNE GUERRE HYBRIDE EST EN COURS</Text>
+          <HeaderContent />
         </View>
-
-        {/* Body — varies by step */}
-        {step === "home" && (
-          <HomeBody
-            hasSave={hasSave}
-            onContinue={handleContinue}
-            onNewGame={handleNewGame}
-            onTutorial={handleTutorial}
-          />
-        )}
-
-        {step === "name" && (
-          <NameBody
-            playerName={playerName}
-            onChangeName={setPlayerName}
-            onNext={handleNameNext}
-            onBack={() => setStep("home")}
-          />
-        )}
-
-        {step === "doctrine" && (
-          <DoctrineBody
-            selectedLabel={selectedLabel}
-            rankedMode={rankedMode}
-            rankedAvailable={auth.isEnabled && auth.isReady}
-            onSelect={handleDoctrineSelect}
-            onToggleRanked={() => setRankedMode((v) => !v)}
-            onConfirm={handleConfirmDoctrine}
-            onBack={() => setStep("name")}
-          />
-        )}
-
+        {bodyContent}
         <Text style={styles.version}>v1.0.0 · PRÉSIDENT : NATION EN CRISE</Text>
       </View>
     </ImageBackground>
@@ -163,11 +212,17 @@ function HomeBody({
   onContinue,
   onNewGame,
   onTutorial,
+  onSettings,
+  onShop,
+  onSaves,
 }: {
   hasSave: boolean;
   onContinue: () => void;
   onNewGame: () => void;
   onTutorial: () => void;
+  onSettings: () => void;
+  onShop: () => void;
+  onSaves: () => void;
 }) {
   return (
     <View style={styles.homeBody}>
@@ -223,6 +278,24 @@ function HomeBody({
           style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
         >
           <Text style={styles.cancelText}>📖  Revoir le tutoriel</Text>
+        </Pressable>
+        <Pressable
+          onPress={onSettings}
+          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+        >
+          <Text style={styles.cancelText}>⚙️  Paramètres</Text>
+        </Pressable>
+        <Pressable
+          onPress={onSaves}
+          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+        >
+          <Text style={styles.cancelText}>💾  Sauvegardes</Text>
+        </Pressable>
+        <Pressable
+          onPress={onShop}
+          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+        >
+          <Text style={[styles.cancelText, styles.shopText]}>⚔️  Boutique — Packs d'extension</Text>
         </Pressable>
       </View>
     </View>
@@ -464,4 +537,24 @@ const styles = StyleSheet.create({
   btnRule: { width: 16, height: 1, backgroundColor: "rgba(255,255,255,0.5)" },
   cancelBtn: { paddingVertical: 6, alignItems: "center" },
   cancelText: { fontSize: 12, fontFamily: FONT.med, color: PALETTE.textMid, letterSpacing: 0.5 },
+  shopText: { color: PALETTE.gold, opacity: 0.85 },
+
+  // Landscape
+  containerRow: { flex: 1, flexDirection: "row", paddingHorizontal: 28 },
+  leftPanel: {
+    width: "36%",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingRight: 24,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "rgba(255,255,255,0.08)",
+  },
+  rightPanel: { flex: 1, paddingLeft: 24, justifyContent: "center" },
+  crestFrameCompact: { width: 54, height: 54, marginBottom: 2 },
+  emblemCompact: { fontSize: 26 },
+  titleBlockCompact: { marginTop: 4 },
+  titleCompact: { fontSize: 30, letterSpacing: 7 },
+  crisisLineCompact: { marginTop: 4 },
+  versionLandscape: { marginTop: 20 },
 });

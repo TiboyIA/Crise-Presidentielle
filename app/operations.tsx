@@ -9,6 +9,7 @@ import { useResponsive } from "@/utils/responsive";
 import { CountryCard } from "@/components/CountryCard";
 import { Badge, Panel, PrimaryButton, ScreenHeader, SectionHeader } from "@/components/ui";
 import { COUNTRY_LIST } from "@/data/countries";
+import { STRATEGY_RESEARCH_LIST } from "@/data/strategyResearch";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
 import { OPERATION_IMG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
@@ -41,6 +42,7 @@ export default function OperationsScreen() {
   };
 
   const ops = Object.values(OPERATIONS);
+  const completedResearch = state.strategyResearch?.completed ?? [];
 
   return (
     <View style={styles.container}>
@@ -92,6 +94,9 @@ export default function OperationsScreen() {
               const onCooldown = !!(cooldownExpiry && Date.now() < cooldownExpiry);
               const blocked = !check.allowed || onCooldown;
               const opImg = OPERATION_IMG[op.id];
+              const hasResearchBonus = STRATEGY_RESEARCH_LIST.some(
+                (r) => r.operationBonus === op.id && completedResearch.includes(r.id),
+              );
 
               return (
                 <View key={op.id} style={styles.opWrap}>
@@ -155,6 +160,13 @@ export default function OperationsScreen() {
                         <View style={styles.statusRow}>
                           <MaterialCommunityIcons name="timer-sand" size={12} color={PALETTE.warning} />
                           <Text style={[styles.statusText, { color: PALETTE.warning }]}>Rechargement en cours</Text>
+                        </View>
+                      )}
+
+                      {hasResearchBonus && (
+                        <View style={styles.statusRow}>
+                          <MaterialCommunityIcons name="flask-outline" size={12} color="#a78bfa" />
+                          <Text style={[styles.statusText, { color: "#a78bfa" }]}>Bonus R&D actif · +5% succès</Text>
                         </View>
                       )}
 

@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -58,8 +59,10 @@ export default function TutorialScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const [step, setStep] = useState(0);
 
+  const isLandscape = width > height;
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const webBottomInset = Platform.OS === "web" ? 34 : 0;
   const topPad = insets.top + webTopInset;
@@ -84,6 +87,119 @@ export default function TutorialScreen() {
   const current = STEPS[step]!;
   const isLast = step === STEPS.length - 1;
 
+  const topBar = (
+    <View style={[styles.topBar, { paddingTop: topPad + 12 }]}>
+      <View style={[styles.kickerWrap, { borderColor: colors.primary }]}>
+        <Text style={[styles.kicker, { color: colors.primary }]}>
+          {current.label}
+        </Text>
+      </View>
+      {!isLast ? (
+        <Pressable
+          onPress={skip}
+          hitSlop={12}
+          style={styles.skipBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Passer le tutoriel"
+        >
+          <Text style={styles.skip}>PASSER</Text>
+        </Pressable>
+      ) : (
+        <View />
+      )}
+    </View>
+  );
+
+  const bodyContent = (
+    <>
+      <View style={[styles.iconRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Feather name={current.icon} size={20} color={colors.primary} />
+        <Text style={[styles.iconRowText, { color: colors.mutedForeground }]}>
+          REPÈRE-CLÉ
+        </Text>
+      </View>
+      <Text style={[styles.title, { color: colors.foreground }]}>
+        {current.title}
+      </Text>
+      <Text style={[styles.text, { color: colors.mutedForeground }]}>
+        {current.body}
+      </Text>
+    </>
+  );
+
+  const footer = (
+    <View style={[styles.footer, { paddingBottom: insets.bottom + webBottomInset + 16 }]}>
+      <View style={styles.dots}>
+        {STEPS.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              {
+                backgroundColor: i === step ? colors.primary : colors.muted,
+                width: i === step ? 22 : 8,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <Pressable
+        onPress={next}
+        accessibilityRole="button"
+        accessibilityLabel={isLast ? "Commencer le jeu" : "Étape suivante"}
+        style={({ pressed }) => [
+          styles.cta,
+          { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+        ]}
+      >
+        <Text style={[styles.ctaText, { color: colors.primaryForeground }]}>
+          {isLast ? "COMMENCER" : "SUIVANT"}
+        </Text>
+        <Feather
+          name={isLast ? "play" : "arrow-right"}
+          size={16}
+          color={colors.primaryForeground}
+        />
+      </Pressable>
+    </View>
+  );
+
+  if (isLandscape) {
+    return (
+      <View style={[styles.container, styles.containerRow, { backgroundColor: colors.background }]}>
+        {/* Left: hero image column */}
+        <View style={styles.heroWrapLandscape}>
+          <Image
+            source={TUTORIAL_IMAGES[current.key]}
+            style={styles.heroImg}
+            resizeMode="cover"
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <LinearGradient
+            colors={["rgba(7,11,20,0.55)", "rgba(7,11,20,0.2)", "rgba(7,11,20,0.95)"]}
+            locations={[0, 0.5, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          {topBar}
+        </View>
+
+        {/* Right: content column */}
+        <View style={styles.rightColLandscape}>
+          <ScrollView
+            style={styles.bodyScrollView}
+            contentContainerStyle={[styles.bodyScroll, styles.bodyScrollLandscape]}
+            showsVerticalScrollIndicator={false}
+          >
+            {bodyContent}
+          </ScrollView>
+          {footer}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.heroWrap}>
@@ -96,45 +212,11 @@ export default function TutorialScreen() {
           importantForAccessibility="no"
         />
         <LinearGradient
-          colors={[
-            "rgba(7,11,20,0.55)",
-            "rgba(7,11,20,0.2)",
-            "rgba(7,11,20,0.95)",
-          ]}
+          colors={["rgba(7,11,20,0.55)", "rgba(7,11,20,0.2)", "rgba(7,11,20,0.95)"]}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
-
-        <View
-          style={[
-            styles.topBar,
-            { paddingTop: topPad + 12 },
-          ]}
-        >
-          <View
-            style={[
-              styles.kickerWrap,
-              { borderColor: colors.primary },
-            ]}
-          >
-            <Text style={[styles.kicker, { color: colors.primary }]}>
-              {current.label}
-            </Text>
-          </View>
-          {!isLast ? (
-            <Pressable
-              onPress={skip}
-              hitSlop={12}
-              style={styles.skipBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Passer le tutoriel"
-            >
-              <Text style={styles.skip}>PASSER</Text>
-            </Pressable>
-          ) : (
-            <View />
-          )}
-        </View>
+        {topBar}
       </View>
 
       <ScrollView
@@ -142,75 +224,10 @@ export default function TutorialScreen() {
         contentContainerStyle={styles.bodyScroll}
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[
-            styles.iconRow,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Feather name={current.icon} size={20} color={colors.primary} />
-          <Text
-            style={[styles.iconRowText, { color: colors.mutedForeground }]}
-          >
-            REPÈRE-CLÉ
-          </Text>
-        </View>
-        <Text style={[styles.title, { color: colors.foreground }]}>
-          {current.title}
-        </Text>
-        <Text style={[styles.text, { color: colors.mutedForeground }]}>
-          {current.body}
-        </Text>
+        {bodyContent}
       </ScrollView>
 
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: insets.bottom + webBottomInset + 16 },
-        ]}
-      >
-        <View style={styles.dots}>
-          {STEPS.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor:
-                    i === step ? colors.primary : colors.muted,
-                  width: i === step ? 22 : 8,
-                },
-              ]}
-            />
-          ))}
-        </View>
-        <Pressable
-          onPress={next}
-          accessibilityRole="button"
-          accessibilityLabel={isLast ? "Commencer le jeu" : "Étape suivante"}
-          style={({ pressed }) => [
-            styles.cta,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <Text
-            style={[styles.ctaText, { color: colors.primaryForeground }]}
-          >
-            {isLast ? "COMMENCER" : "SUIVANT"}
-          </Text>
-          <Feather
-            name={isLast ? "play" : "arrow-right"}
-            size={16}
-            color={colors.primaryForeground}
-          />
-        </Pressable>
-      </View>
+      {footer}
     </View>
   );
 }
@@ -219,10 +236,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  containerRow: {
+    flexDirection: "row",
+  },
   heroWrap: {
     width: "100%",
     height: 280,
     position: "relative",
+    overflow: "hidden",
+  },
+  heroWrapLandscape: {
+    width: "40%",
+    alignSelf: "stretch",
     overflow: "hidden",
   },
   heroImg: {
@@ -261,6 +286,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     color: "rgba(255,255,255,0.85)",
   },
+  rightColLandscape: {
+    flex: 1,
+  },
   bodyScrollView: {
     flex: 1,
   },
@@ -270,6 +298,10 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 8,
     gap: 14,
+  },
+  bodyScrollLandscape: {
+    paddingTop: 20,
+    justifyContent: "center",
   },
   iconRow: {
     alignSelf: "flex-start",

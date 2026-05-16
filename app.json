@@ -10,7 +10,7 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash_bg_v2.png",
+      "image": "./assets/images/splash_bg.png",
       "resizeMode": "cover",
       "backgroundColor": "#0a0c0e"
     },
@@ -23,7 +23,7 @@
       "package": "com.etatdecrise.president",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/adaptive_icon_foreground.png",
         "backgroundColor": "#0a0c0e"
       },
       "softwareKeyboardLayoutMode": "pan",

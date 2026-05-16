@@ -113,9 +113,10 @@ export function resolveOperation(
   type: OperationType,
   relation: CountryRelation,
   buildings: PlayerBuilding[],
+  researchCompleted: string[] = [],
 ): OperationResult {
   const op = OPERATIONS[type];
-  const successRate = computeSuccessRate(type, relation, buildings);
+  const successRate = computeSuccessRate(type, relation, buildings, researchCompleted);
   const success = Math.random() < successRate;
 
   if (type === "espionage") {
@@ -245,6 +246,7 @@ function computeSuccessRate(
   type: OperationType,
   relation: CountryRelation,
   buildings: PlayerBuilding[],
+  researchCompleted: string[] = [],
 ): number {
   const base: Record<OperationType, number> = {
     espionage: 0.85,
@@ -280,6 +282,17 @@ function computeSuccessRate(
   if (type === "military_operation") {
     rate += military * 0.02;
   }
+
+  // Research bonuses: each completed research that targets this operation adds +5%
+  const RESEARCH_OP_MAP: Partial<Record<OperationType, string[]>> = {
+    reinforce_cyber:    ["research_cybersec"],
+    espionage:          ["research_drones"],
+    steal_intel:        ["research_satellites"],
+    military_operation: ["research_missile_defense", "research_missiles", "research_military_bases"],
+    influence_campaign: ["research_infowar"],
+  };
+  const bonusResearches = RESEARCH_OP_MAP[type] ?? [];
+  rate += bonusResearches.filter((r) => researchCompleted.includes(r)).length * 0.05;
 
   return Math.min(0.95, Math.max(0.05, rate));
 }

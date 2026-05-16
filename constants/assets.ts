@@ -2,7 +2,7 @@
 // Reuses assets from the original game version
 
 export const BG = {
-  splash:      require("../assets/images/splash_bg_v2.png"),
+  splash:      require("../assets/images/splash_bg.png"),
   investiture: require("../assets/images/create/hero_investiture.png"),
   front:       require("../assets/images/screens/front_header.png"),
   journal:     require("../assets/images/journal/journal_header.png"),

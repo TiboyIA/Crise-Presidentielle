@@ -51,6 +51,14 @@ interface ComingSoonPack {
 
 const COMING_SOON: ComingSoonPack[] = [
   {
+    id: "guerre_hybride",
+    bannerKey: "cyber",
+    title: "Guerre Hybride",
+    tag: "VERSION 1.1 — BIENTÔT",
+    description:
+      "10 nouveaux événements premium : fuite de documents classifiés, sabotage industriel, cyberattaque bancaire, pression diplomatique coordonnée, infiltration institutionnelle, brouillage satellite, manipulation sociale et chantage énergétique.",
+  },
+  {
     id: "cyber",
     bannerKey: "cyber",
     title: "Cyber & désinformation",

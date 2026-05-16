@@ -21,6 +21,12 @@ import {
 } from "@/logic/newsEngine";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
+import {
+  saveToSlot as storageSaveToSlot,
+  loadFromSlot as storageLoadFromSlot,
+  deleteSlot as storageDeleteSlot,
+  type SlotNumber,
+} from "@/storage/saveSlots";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
 import { STRATEGY_MINISTERS, MINISTER_LIST, MINISTER_POOL, MINISTER_INDICATOR } from "@/data/strategyMinisters";
@@ -194,6 +200,9 @@ interface StrategyContextValue {
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
   launchStrategyResearch: (id: StrategyResearchId) => { success: boolean; reason?: string };
   tick: () => void;
+  saveToSlot: (slot: SlotNumber) => Promise<void>;
+  loadFromSlot: (slot: SlotNumber) => Promise<boolean>;
+  deleteSlot: (slot: SlotNumber) => Promise<void>;
 }
 
 const StrategyContext = createContext<StrategyContextValue | null>(null);
@@ -281,6 +290,63 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     saveStrategy(initial);
     // fire-and-forget balance tracking
     void trackGameStarted();
+  }, []);
+
+  const saveToSlotFn = useCallback(async (slot: SlotNumber) => {
+    if (!state) return;
+    await storageSaveToSlot(slot, state);
+  }, [state]);
+
+  const loadFromSlotFn = useCallback(async (slot: SlotNumber): Promise<boolean> => {
+    const saved = await storageLoadFromSlot(slot);
+    if (!saved) return false;
+    const merged: StrategyGameState = {
+      ...saved,
+      news:                saved.news                ?? { ...DEFAULT_NEWS_STATE },
+      nationalIndicators:  saved.nationalIndicators  ?? { ...INITIAL_INDICATORS },
+      mandateDay:          saved.mandateDay          ?? 0,
+      lastPollShownAt:     saved.lastPollShownAt     ?? 0,
+      lastBilanShownAt:    saved.lastBilanShownAt    ?? 0,
+      hiddenPolitics:      saved.hiddenPolitics      ?? { ...INITIAL_HIDDEN_POLITICS },
+      delayedConsequences: saved.delayedConsequences ?? [],
+      campaignPromises:    saved.campaignPromises    ?? buildInitialPromises(),
+      governanceDoctrine:  saved.governanceDoctrine  ?? "democratique",
+      reforms:             saved.reforms             ?? [],
+      strategyMinisters:   saved.strategyMinisters   ?? buildInitialMinisters(),
+      nationalDebt:        saved.nationalDebt        ?? 30,
+      achievements:        saved.achievements        ?? [],
+      playerUnits:         saved.playerUnits         ?? [],
+      trainingQueue:       saved.trainingQueue       ?? [],
+      militaryDoctrine:    saved.militaryDoctrine    ?? "defensive",
+      premiumGold:         saved.premiumGold         ?? 0,
+      publicMemory:        saved.publicMemory        ?? { traces: [] },
+      oppositionPower:     saved.oppositionPower     ?? 35,
+      realTime:            saved.realTime            ?? initRealTime(clockNow()),
+      strategyResearch:    saved.strategyResearch    ?? { ...DEFAULT_RESEARCH_STATE },
+    };
+    const startedAt = merged.startedAt;
+    const ready: StrategyGameState = {
+      ...merged,
+      trainingQueue: merged.trainingQueue.map((entry) => {
+        if (entry.endsAtGameHour !== undefined) return entry;
+        return {
+          ...entry,
+          endsAtGameHour:    migrateRealMsTimestamp(entry.endsAt, startedAt),
+          durationGameHours: realMsToGameHours(entry.endsAt - entry.startedAt),
+        };
+      }),
+      buildings: merged.buildings.map((b) => {
+        if (!b.upgradeEndTime || b.upgradeEndsAtGameHour !== undefined) return b;
+        return { ...b, upgradeEndsAtGameHour: migrateRealMsTimestamp(b.upgradeEndTime, startedAt) };
+      }),
+    };
+    setState(ready);
+    saveStrategy(ready);
+    return true;
+  }, []);
+
+  const deleteSlotFn = useCallback(async (slot: SlotNumber) => {
+    await storageDeleteSlot(slot);
   }, []);
 
   const tick = useCallback(() => {
@@ -421,7 +487,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       const op = OPERATIONS[type];
       const unitBonus = getOperationUnitBonus(type, state.playerUnits ?? [], state.militaryDoctrine ?? "defensive");
       // Unit bonus gives a second chance on failed ops
-      const baseResult = resolveOperation(type, relation, state.buildings);
+      const baseResult = resolveOperation(type, relation, state.buildings, state.strategyResearch?.completed ?? []);
       const result = (!baseResult.success && unitBonus > 0 && Math.random() < unitBonus)
         ? { ...baseResult, success: true, message: baseResult.message + " (unités mobilisées)" }
         : baseResult;
@@ -807,12 +873,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
+      saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
-      trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick],
+      trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
+      saveToSlotFn, loadFromSlotFn, deleteSlotFn],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;

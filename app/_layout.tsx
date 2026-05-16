@@ -48,6 +48,9 @@ function RootLayoutNav() {
       <Stack.Screen name="account-link" />
       <Stack.Screen name="briefing" options={{ presentation: "modal" }} />
       <Stack.Screen name="mandate-review" options={{ presentation: "modal" }} />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="saves" />
+      <Stack.Screen name="strategy-debug" />
       {/* Classic game screens */}
       <Stack.Screen name="tutorial" />
       <Stack.Screen name="create" />
