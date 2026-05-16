@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { PORTRAITS } from "@/data/portraits";
+import { THEMES } from "@/data/themes";
 import {
   Alert,
   Image,
@@ -491,6 +492,47 @@ export default function ShopScreen() {
           ))}
         </ScrollView>
 
+        <Text style={[styles.cosmeticSubheader, { color: colors.mutedForeground }]}>
+          THÈMES UI
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.portraitRow}
+        >
+          {THEMES.map((t) => (
+            <Pressable
+              key={t.id}
+              onPress={() => {
+                if (!t.free) {
+                  Alert.alert(
+                    t.name,
+                    `${t.flavorText}\n\nDisponible bientôt — ${t.price}`,
+                    [{ text: "OK" }],
+                  );
+                }
+              }}
+              style={({ pressed }) => [styles.portraitTile, { opacity: pressed && !t.free ? 0.7 : 1 }]}
+            >
+              <View style={[styles.themeSwatch, { borderColor: t.free ? t.accentSwatch : colors.border }]}>
+                <View style={[styles.themeSwatchLeft, { backgroundColor: t.accentSwatch }]} />
+                <View style={[styles.themeSwatchRight, { backgroundColor: t.bgSwatch }]} />
+                {!t.free && (
+                  <View style={styles.portraitLockBadge}>
+                    <Text style={{ fontSize: 9 }}>🔒</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.portraitTileName, { color: colors.foreground }]} numberOfLines={2}>
+                {t.name}
+              </Text>
+              <Text style={[styles.portraitTilePrice, { color: t.free ? "#3fbe7a" : colors.mutedForeground }]}>
+                {t.free ? "GRATUIT" : t.price}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
           Le pack de lancement est offert. Les futurs packs seront proposés à
           l'achat unitaire, sans abonnement.
@@ -734,4 +776,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
+  cosmeticSubheader: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 2,
+    marginTop: 16,
+    marginBottom: -4,
+  },
+  themeSwatch: {
+    width: 68,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 2,
+    overflow: "hidden",
+    flexDirection: "row",
+  },
+  themeSwatchLeft: { flex: 1 },
+  themeSwatchRight: { flex: 1 },
 });

@@ -20,6 +20,7 @@ import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { PortraitProvider } from "@/context/PortraitContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 SplashScreen.preventAutoHideAsync();
@@ -96,6 +97,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0a0c0e" }}>
             <KeyboardProvider>
               <AuthProvider>
+                <ThemeProvider>
                 <EntitlementsProvider>
                   <StrategyProvider>
                     <GameProvider>
@@ -106,6 +108,7 @@ export default function RootLayout() {
                     </GameProvider>
                   </StrategyProvider>
                 </EntitlementsProvider>
+                </ThemeProvider>
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

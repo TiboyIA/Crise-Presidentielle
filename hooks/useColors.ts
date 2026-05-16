@@ -1,11 +1,13 @@
+import { useContext } from "react";
 import { useColorScheme } from "react-native";
+import { ThemeContext } from "@/context/ThemeContext";
+import baseColors from "@/constants/colors";
 
-import colors from "@/constants/colors";
-
-type Palette = typeof colors.light;
-
-export function useColors(): Palette & { radius: number } {
+export function useColors() {
+  const theme = useContext(ThemeContext);
+  if (theme) return theme.colors;
+  // Fallback when used outside ThemeProvider (e.g. Storybook, tests)
   const scheme = useColorScheme();
-  const palette: Palette = scheme === "dark" ? colors.dark : colors.light;
-  return { ...palette, radius: colors.radius };
+  const palette = scheme === "dark" ? baseColors.dark : baseColors.light;
+  return { ...palette, radius: baseColors.radius };
 }
