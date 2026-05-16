@@ -70,6 +70,14 @@ const COMING_SOON: ComingSoonPack[] = [
       "10 nouveaux événements premium : cyberattaque d'hôpital, campagne de fake news coordonnée, infiltration de bots étrangers, panne télécom nationale, fuite de données gouvernementales, sabotage réseau électrique, manipulation d'élection par IA, espionnage industriel, blackout numérique et guerre de l'information.",
   },
   {
+    id: "politiques_avancees",
+    title: "Bundle Politiques Avancées",
+    tag: "BIENTÔT",
+    price: "2,99 €",
+    description:
+      "3 nouvelles doctrines de gouvernance : Souverainiste (primauté nationale, stabilité institutionnelle), Écologiste (transition verte, bonne presse, économie ralentie) et Libéral (croissance forte, inégalités accrues). Chacune avec ses dérives passives et ses arbitrages uniques.",
+  },
+  {
     id: "pack_grandes_puissances",
     title: "Pays — Grandes Puissances",
     tag: "BIENTÔT",

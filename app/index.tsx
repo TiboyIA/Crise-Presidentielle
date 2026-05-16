@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { startRankedRun, setRankedIntended } from "@/services/RankedService";
 import { COUNTRIES } from "@/data/countries";
 import { COUNTRY_PACKS, isCountryFree, getCountryPack } from "@/data/countryPacks";
+import { DOCTRINE_PACK, isDoctrineInPack } from "@/data/doctrinesPacks";
 import { BG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { CountryId, GovernanceDoctrine } from "@/types/strategy";
@@ -20,14 +21,18 @@ interface DoctrineOption {
   doctrine: GovernanceDoctrine;
   icon: string;
   color: string;
+  locked?: boolean;
 }
 
 const DOCTRINE_OPTIONS: DoctrineOption[] = [
-  { label: "Réformateur", subtitle: "Dialogue, transparence, libertés civiles", doctrine: "democratique",    icon: "⚖️", color: "#4a9fff" },
-  { label: "Protecteur",  subtitle: "Sécurité nationale, ordre public, frontières", doctrine: "securitaire",   icon: "🛡️", color: "#e54848" },
-  { label: "Bâtisseur",  subtitle: "Infrastructures, industrie, long terme",       doctrine: "technocratique", icon: "🏗️", color: "#3fbe7a" },
-  { label: "Technocrate", subtitle: "Expertise, données, modernisation de l'État",  doctrine: "technocratique", icon: "🤖", color: "#a78bfa" },
-  { label: "Populaire",  subtitle: "Proximité, aides sociales, écoute du peuple",  doctrine: "populiste",      icon: "🗣️", color: "#e8a93a" },
+  { label: "Réformateur",  subtitle: "Dialogue, transparence, libertés civiles",               doctrine: "democratique",    icon: "⚖️", color: "#4a9fff" },
+  { label: "Protecteur",   subtitle: "Sécurité nationale, ordre public, frontières",           doctrine: "securitaire",     icon: "🛡️", color: "#e54848" },
+  { label: "Bâtisseur",   subtitle: "Infrastructures, industrie, long terme",                 doctrine: "technocratique",  icon: "🏗️", color: "#3fbe7a" },
+  { label: "Technocrate",  subtitle: "Expertise, données, modernisation de l'État",            doctrine: "technocratique",  icon: "🤖", color: "#a78bfa" },
+  { label: "Populaire",   subtitle: "Proximité, aides sociales, écoute du peuple",            doctrine: "populiste",       icon: "🗣️", color: "#e8a93a" },
+  { label: "Souverainiste", subtitle: "Primauté nationale, méfiance envers le multilatéralisme", doctrine: "souverainiste", icon: "🗺️", color: "#6b8cce", locked: true },
+  { label: "Écologiste",   subtitle: "Transition verte, sobriété, énergies renouvelables",    doctrine: "ecologiste",      icon: "🌿", color: "#4caf50", locked: true },
+  { label: "Libéral",      subtitle: "Marché libre, compétitivité, attractivité étrangère",   doctrine: "liberal",         icon: "📈", color: "#26c6da", locked: true },
 ];
 
 function HeaderContent({ compact }: { compact?: boolean }) {
@@ -110,7 +115,7 @@ export default function StartScreen() {
   const handleConfirmDoctrine = async () => {
     if (!selectedLabel) return;
     const opt = DOCTRINE_OPTIONS.find((o) => o.label === selectedLabel);
-    if (!opt) return;
+    if (!opt || opt.locked) return;
     startNewGame(playerName.trim(), opt.doctrine, selectedCountry);
     if (rankedMode && auth.isEnabled && auth.accessToken) {
       setRankedIntended(true);
@@ -480,6 +485,10 @@ function DoctrineBody({
   onConfirm: () => void;
   onBack: () => void;
 }) {
+  const selectedOpt = selectedLabel !== null
+    ? DOCTRINE_OPTIONS.find((o) => o.label === selectedLabel)
+    : null;
+  const canConfirm = selectedOpt !== null && selectedOpt !== undefined && !selectedOpt.locked;
   return (
     <View style={styles.doctrineBody}>
       <Text style={styles.stepLabel}>ÉTAPE 3 / 3 — DOCTRINE</Text>
@@ -492,22 +501,37 @@ function DoctrineBody({
       >
         {DOCTRINE_OPTIONS.map((opt) => {
           const active = selectedLabel === opt.label;
+          const locked = opt.locked ?? false;
           return (
             <Pressable
               key={opt.label}
-              onPress={() => onSelect(opt.label)}
+              onPress={() => {
+                if (locked) {
+                  Alert.alert(
+                    `${opt.icon} ${opt.label}`,
+                    `Disponible dans le « ${DOCTRINE_PACK.title} » — BIENTÔT\n${DOCTRINE_PACK.price}`,
+                    [{ text: "OK" }],
+                  );
+                } else {
+                  onSelect(opt.label);
+                }
+              }}
               style={({ pressed }) => [
                 styles.doctrineCard,
-                active && { borderColor: opt.color, backgroundColor: opt.color + "18" },
-                pressed && { opacity: 0.8 },
+                active && !locked && { borderColor: opt.color, backgroundColor: opt.color + "18" },
+                locked && { opacity: 0.5 },
+                pressed && { opacity: locked ? 0.35 : 0.8 },
               ]}
             >
               <Text style={styles.doctrineIcon}>{opt.icon}</Text>
               <View style={styles.doctrineText}>
-                <Text style={[styles.doctrineName, active && { color: opt.color }]}>{opt.label}</Text>
+                <Text style={[styles.doctrineName, active && !locked && { color: opt.color }]}>{opt.label}</Text>
                 <Text style={styles.doctrineDesc}>{opt.subtitle}</Text>
               </View>
-              {active && <View style={[styles.doctrineCheck, { backgroundColor: opt.color }]} />}
+              {locked
+                ? <Text style={styles.countryLock}>🔒</Text>
+                : active && <View style={[styles.doctrineCheck, { backgroundColor: opt.color }]} />
+              }
             </Pressable>
           );
         })}
@@ -529,16 +553,16 @@ function DoctrineBody({
       <View style={styles.actions}>
         <Pressable
           onPress={onConfirm}
-          disabled={selectedLabel === null}
-          style={({ pressed }) => [styles.btnWrap, { opacity: pressed && selectedLabel !== null ? 0.85 : 1 }]}
+          disabled={canConfirm === false}
+          style={({ pressed }) => [styles.btnWrap, { opacity: pressed && canConfirm ? 0.85 : 1 }]}
         >
           <LinearGradient
-            colors={selectedLabel !== null ? ["#d04030", PALETTE.crimsonDim] : ["#222a36", "#10141c"]}
+            colors={canConfirm ? ["#d04030", PALETTE.crimsonDim] : ["#222a36", "#10141c"]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.mainBtn}
           >
             <View style={styles.btnRule} />
-            <Text style={[styles.mainBtnText, selectedLabel === null && { color: PALETTE.textLow }]}>PRÊTER SERMENT</Text>
+            <Text style={[styles.mainBtnText, !canConfirm && { color: PALETTE.textLow }]}>PRÊTER SERMENT</Text>
             <View style={styles.btnRule} />
           </LinearGradient>
         </Pressable>

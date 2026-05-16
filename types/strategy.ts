@@ -240,7 +240,8 @@ export type NewsType =
 export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
 
 export type GovernanceDoctrine =
-  | "democratique" | "technocratique" | "securitaire" | "populiste" | "autoritaire";
+  | "democratique" | "technocratique" | "securitaire" | "populiste" | "autoritaire"
+  | "souverainiste" | "ecologiste" | "liberal";
 
 export type ReformId =
   | "fiscal" | "securite" | "energie" | "industrie"
