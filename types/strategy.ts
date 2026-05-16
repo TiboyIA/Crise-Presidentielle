@@ -403,6 +403,12 @@ export interface NewsState {
 }
 
 // ── Main state ────────────────────────────────────────────────
+export interface DailyLoginRewardState {
+  lastLoginRewardAt: number;
+  currentStreak: number;
+  totalDaysClaimed: number;
+}
+
 export interface StrategyGameState {
   version: number;
   playerName: string;
@@ -441,4 +447,6 @@ export interface StrategyGameState {
   realTime: import("@/logic/realTimeEngine").RealTimeState;
   // Research tree (optional for backward compat)
   strategyResearch?: import("@/types/strategyResearch").StrategyResearchState;
+  // Daily login reward — optional for backward compat
+  dailyLoginReward?: DailyLoginRewardState;
 }

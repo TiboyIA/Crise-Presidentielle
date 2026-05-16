@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -23,6 +23,7 @@ import { RESOURCE_LABELS } from "@/types/strategy";
 import { BG, RESOURCE_IMG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { ResourceKey } from "@/types/strategy";
+import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -60,8 +61,9 @@ const INDICATOR_COLORS: Record<string, string> = {
 export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister } = useStrategy();
+  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, claimDailyReward } = useStrategy();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
+  const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [reformsExpanded, setReformsExpanded] = useState(false);
   const [secondaryExpanded, setSecondaryExpanded] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
@@ -69,6 +71,8 @@ export default function NationScreen() {
   if (!state) return null;
 
   const country = COUNTRIES[state.countryId];
+  const rewardReady = isDailyRewardReady(state.dailyLoginReward);
+  const nextReward = getNextReward(state.dailyLoginReward);
   const rank = getPlayerRank(state.ranking);
   const title = getRankTitle(rank, state.ranking.length);
   const titleIcon = getTitleIcon(title);
@@ -80,6 +84,40 @@ export default function NationScreen() {
 
   return (
     <View style={styles.root}>
+      {/* MODAL RÉCOMPENSE QUOTIDIENNE */}
+      <Modal
+        visible={rewardModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRewardModalVisible(false)}
+      >
+        <Pressable style={styles.rewardOverlay} onPress={() => setRewardModalVisible(false)}>
+          <Pressable style={styles.rewardModal} onPress={() => {}}>
+            <Text style={styles.rewardModalIcon}>{nextReward.icon}</Text>
+            <Text style={styles.rewardModalKicker}>{nextReward.dayLabel} / 7</Text>
+            <Text style={styles.rewardModalTitle}>{nextReward.title}</Text>
+            <Text style={styles.rewardModalDesc}>{nextReward.description}</Text>
+            {state.dailyLoginReward && state.dailyLoginReward.currentStreak > 1 && (
+              <Text style={styles.rewardStreak}>
+                🔥 {state.dailyLoginReward.currentStreak} jours consécutifs
+              </Text>
+            )}
+            <Pressable
+              style={({ pressed }) => [styles.rewardClaimBtn, { opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => {
+                claimDailyReward();
+                setRewardModalVisible(false);
+              }}
+            >
+              <Text style={styles.rewardClaimBtnText}>RÉCLAMER</Text>
+            </Pressable>
+            <Pressable onPress={() => setRewardModalVisible(false)} style={styles.rewardDismiss}>
+              <Text style={styles.rewardDismissText}>Plus tard</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* HERO */}
       <ImageBackground source={BG.dashboard} style={[styles.hero, { paddingTop: insets.top + 8 }]} resizeMode="cover" imageStyle={styles.heroImg}>
         <LinearGradient colors={["rgba(6,8,18,0.05)", "rgba(6,8,18,0.55)", "rgba(10,12,20,0.95)"]} locations={[0, 0.5, 1]} style={styles.heroGrad}>
@@ -165,6 +203,22 @@ export default function NationScreen() {
       >
         {/* HORLOGE STRATÉGIQUE — drives mandate progression in real time */}
         <StrategicClock />
+
+        {/* RÉCOMPENSE QUOTIDIENNE */}
+        {rewardReady && (
+          <Pressable
+            onPress={() => setRewardModalVisible(true)}
+            style={({ pressed }) => [styles.rewardCard, { opacity: pressed ? 0.85 : 1 }]}
+          >
+            <Text style={styles.rewardIcon}>{nextReward.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rewardCardLabel}>RÉCOMPENSE DU JOUR · {nextReward.dayLabel}</Text>
+              <Text style={styles.rewardCardTitle}>{nextReward.title}</Text>
+              <Text style={styles.rewardCardDesc}>{nextReward.description}</Text>
+            </View>
+            <MaterialCommunityIcons name="gift-outline" size={20} color={PALETTE.gold} />
+          </Pressable>
+        )}
 
         {/* RESOURCES STRIP */}
         <SectionHeader label="Ressources nationales" />
@@ -634,4 +688,55 @@ const styles = StyleSheet.create({
 
   secondaryCabinetToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, justifyContent: "center" },
   secondaryCabinetLabel: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1.5, flex: 1, textAlign: "center" },
+
+  // Daily reward card
+  rewardCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: PALETTE.gold + "55",
+    backgroundColor: PALETTE.gold + "0d",
+  },
+  rewardIcon: { fontSize: 26 },
+  rewardCardLabel: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2, marginBottom: 2 },
+  rewardCardTitle: { fontSize: 13, fontFamily: FONT.bold, color: PALETTE.textHigh, letterSpacing: 0.3 },
+  rewardCardDesc: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.gold, marginTop: 2 },
+
+  // Daily reward modal
+  rewardOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(4,6,10,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  rewardModal: {
+    width: "100%",
+    backgroundColor: "#0f131e",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: PALETTE.gold + "44",
+    padding: 28,
+    alignItems: "center",
+    gap: 10,
+  },
+  rewardModalIcon: { fontSize: 48 },
+  rewardModalKicker: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 3, color: PALETTE.gold, marginTop: 4 },
+  rewardModalTitle: { fontSize: 20, fontFamily: FONT.bold, color: "#ffffff", letterSpacing: 0.3, textAlign: "center" },
+  rewardModalDesc: { fontSize: 14, fontFamily: FONT.med, color: PALETTE.gold, textAlign: "center", lineHeight: 20 },
+  rewardStreak: { fontSize: 12, fontFamily: FONT.semi, color: "#ff9d3b", marginTop: 2 },
+  rewardClaimBtn: {
+    marginTop: 8,
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: RADIUS.sm,
+    backgroundColor: PALETTE.gold,
+    alignItems: "center",
+  },
+  rewardClaimBtnText: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 3, color: "#05070d" },
+  rewardDismiss: { paddingVertical: 8 },
+  rewardDismissText: { fontSize: 11, fontFamily: FONT.med, color: PALETTE.textLow },
 });

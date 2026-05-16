@@ -27,6 +27,11 @@ import {
   deleteSlot as storageDeleteSlot,
   type SlotNumber,
 } from "@/storage/saveSlots";
+import {
+  isDailyRewardReady,
+  getNextReward,
+  getNextStreak,
+} from "@/data/dailyRewards";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
 import { STRATEGY_MINISTERS, MINISTER_LIST, MINISTER_POOL, MINISTER_INDICATOR } from "@/data/strategyMinisters";
@@ -203,6 +208,7 @@ interface StrategyContextValue {
   saveToSlot: (slot: SlotNumber) => Promise<void>;
   loadFromSlot: (slot: SlotNumber) => Promise<boolean>;
   deleteSlot: (slot: SlotNumber) => Promise<void>;
+  claimDailyReward: () => void;
 }
 
 const StrategyContext = createContext<StrategyContextValue | null>(null);
@@ -348,6 +354,27 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const deleteSlotFn = useCallback(async (slot: SlotNumber) => {
     await storageDeleteSlot(slot);
   }, []);
+
+  const claimDailyReward = useCallback(() => {
+    update((prev) => {
+      if (!isDailyRewardReady(prev.dailyLoginReward)) return prev;
+      const reward = getNextReward(prev.dailyLoginReward);
+      const newStreak = getNextStreak(prev.dailyLoginReward);
+      const resources = { ...prev.resources };
+      for (const [key, val] of Object.entries(reward.effects) as [keyof StrategyResources, number][]) {
+        resources[key] = Math.min(resources[key] + val, 9999);
+      }
+      return {
+        ...prev,
+        resources,
+        dailyLoginReward: {
+          lastLoginRewardAt: Date.now(),
+          currentStreak: newStreak,
+          totalDaysClaimed: (prev.dailyLoginReward?.totalDaysClaimed ?? 0) + 1,
+        },
+      };
+    });
+  }, [update]);
 
   const tick = useCallback(() => {
     update((prev) => {
@@ -874,13 +901,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
+      claimDailyReward,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
-      saveToSlotFn, loadFromSlotFn, deleteSlotFn],
+      saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;
