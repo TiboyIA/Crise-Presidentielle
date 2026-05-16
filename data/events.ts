@@ -18,7 +18,7 @@ export type { ReformKind };
  * who own the matching entitlement (RevenueCat). Events with no `pack`
  * are part of the free core game.
  */
-export type EventPack = "climate";
+export type EventPack = "climate" | "guerre_hybride" | "cyber";
 
 export type EventCategory =
   | "social"

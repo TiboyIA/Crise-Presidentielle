@@ -28,7 +28,7 @@ serve(async (req) => {
 
   let query = supabase
     .from("leaderboard_entries")
-    .select("id, display_name, country_id, doctrine, score, mandate_days, created_at, season")
+    .select("id, player_id, display_name, country_id, doctrine, score, mandate_days, created_at, season, rank_title, global_power")
     .eq("season", season)
     .order("score", { ascending: false })
     .range(offset, offset + limit - 1);

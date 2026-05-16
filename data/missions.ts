@@ -7,8 +7,8 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Améliorez l'un de vos bâtiments.",
     type: "upgrade_building",
     target: { amount: 1 },
-    reward: { money: 500, influence: 20 },
-    rewardPoints: 50,
+    reward: { money: 800, influence: 30 },
+    rewardPoints: 70,
   },
   {
     id: "upgrade_economy",
@@ -16,8 +16,8 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Améliorez le Ministère de l'Économie.",
     type: "upgrade_building",
     target: { amount: 1, buildingId: "economy_ministry" },
-    reward: { money: 800, influence: 30 },
-    rewardPoints: 80,
+    reward: { money: 1000, influence: 50 },
+    rewardPoints: 100,
   },
   {
     id: "upgrade_defense",
@@ -52,8 +52,8 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Accumulez 2 000 d'argent.",
     type: "collect_resources",
     target: { amount: 2000, resourceKey: "money" },
-    reward: { influence: 40, technology: 15 },
-    rewardPoints: 40,
+    reward: { money: 200, influence: 60, technology: 25 },
+    rewardPoints: 60,
   },
   {
     id: "collect_intel",

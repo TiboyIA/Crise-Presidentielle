@@ -7,6 +7,8 @@ import type { EventPack } from "@/data/events";
 // Must match exactly what you configure in the RevenueCat dashboard.
 const PACK_TO_ENTITLEMENT: Record<EventPack, string> = {
   climate: "climate_pack",
+  guerre_hybride: "guerre_hybride_pack",
+  cyber: "cyber_pack",
 };
 
 // Reverse mapping used by the entitlements layer to convert backend responses.

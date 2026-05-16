@@ -402,9 +402,17 @@ serve(async (req) => {
 
     const { data: player } = await service
       .from("players")
-      .select("display_name")
+      .select("display_name, pending_debuff")
       .eq("id", user.id)
       .single();
+
+    // Apply any active cyber debuff
+    const debuff = player?.pending_debuff as { score_penalty_pct?: number } | null;
+    const penaltyPct = Math.max(0, Math.min(20, debuff?.score_penalty_pct ?? 0));
+    const finalScore = penaltyPct > 0 ? Math.round(score * (1 - penaltyPct / 100)) : score;
+    if (penaltyPct > 0) {
+      await service.from("players").update({ pending_debuff: null }).eq("id", user.id);
+    }
 
     // Bulk insert events
     if (events.length > 0) {
@@ -440,10 +448,10 @@ serve(async (req) => {
       .eq("season", season)
       .maybeSingle();
 
-    if (!existing || score > existing.score) {
+    if (!existing || finalScore > existing.score) {
       if (existing) {
         await service.from("leaderboard_entries")
-          .update({ run_id: runId, display_name: player?.display_name ?? "Président", country_id: run.country_id, doctrine: run.doctrine, score, mandate_days: mandateDays })
+          .update({ run_id: runId, display_name: player?.display_name ?? "Président", country_id: run.country_id, doctrine: run.doctrine, score: finalScore, mandate_days: mandateDays })
           .eq("id", existing.id);
       } else {
         await service.from("leaderboard_entries").insert({
@@ -452,7 +460,7 @@ serve(async (req) => {
           display_name: player?.display_name ?? "Président",
           country_id: run.country_id,
           doctrine: run.doctrine,
-          score,
+          score: finalScore,
           mandate_days: mandateDays,
           season,
         });
@@ -460,7 +468,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, score }),
+      JSON.stringify({ ok: true, score: finalScore, ...(penaltyPct > 0 ? { penaltyPct } : {}) }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
   } catch (e) {

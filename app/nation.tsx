@@ -25,6 +25,7 @@ import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { ResourceKey } from "@/types/strategy";
 import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
+import { isRankedIntended } from "@/services/RankedService";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -208,6 +209,14 @@ export default function NationScreen() {
       >
         {/* HORLOGE STRATÉGIQUE — drives mandate progression in real time */}
         <StrategicClock />
+
+        {/* MODE CLASSÉ ACTIF */}
+        {isRankedIntended() && (
+          <View style={styles.rankedBadge}>
+            <MaterialCommunityIcons name="sword-cross" size={11} color={PALETTE.gold} />
+            <Text style={styles.rankedBadgeText}>MODE CLASSÉ ACTIF</Text>
+          </View>
+        )}
 
         {/* RÉCOMPENSE QUOTIDIENNE */}
         {rewardReady && (
@@ -576,6 +585,8 @@ function ResourceChip({ imgKey, label, value }: { imgKey: ResourceKey; label: st
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: PALETTE.ink },
+  rankedBadge: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.gold + "66", backgroundColor: PALETTE.gold + "12" },
+  rankedBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2 },
   hero: { width: "100%" },
   heroImg: {},
   heroGrad: { paddingBottom: 14 },

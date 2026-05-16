@@ -151,7 +151,7 @@ export function resolveOperation(
       message: success
         ? "Cyberattaque réussie. Infrastructures adverses perturbées."
         : "Attaque neutralisée par la cyberdéfense adverse.",
-      rewards: success ? { technology: 60, intelligence: 40 } : { technology: 10 },
+      rewards: success ? { technology: 60, intelligence: 40 } : { technology: 25 },
       relationDelta: success ? -20 : -10,
       rankingPoints: success ? 50 : 5,
       xp: success ? 60 : 15,

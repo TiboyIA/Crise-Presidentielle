@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -13,6 +13,7 @@ import { Badge, Panel, ScreenHeader, SectionHeader } from "@/components/ui";
 import { getPlayerRank, getRankTitle, getTitleIcon } from "@/logic/botEngine";
 import { formatDuration } from "@/logic/buildingEngine";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
+import { hasPendingSubmission } from "@/services/RankedService";
 
 const SEASON_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -29,6 +30,21 @@ export default function RankingScreen() {
   const { state } = useStrategy();
   const auth = useAuth();
   const { hPad } = useResponsive();
+
+  const [rankedPending, setRankedPending] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    hasPendingSubmission().then((pending) => {
+      if (!mountedRef.current) return;
+      setRankedPending(pending);
+    });
+  }, []);
 
   if (!state) return null;
 
@@ -116,6 +132,100 @@ export default function RankingScreen() {
             </LinearGradient>
           </Pressable>
         )}
+
+        {/* Cyberattaques */}
+        {auth.isEnabled && (
+          <Pressable
+            onPress={() => router.push("/cyber-ops")}
+            style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <LinearGradient colors={["#0d1119", "#0d1119"]} style={[styles.leaderboardBtnInner, { borderColor: PALETTE.danger + "55" }]}>
+              <MaterialCommunityIcons name="lightning-bolt" size={20} color={PALETTE.danger} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.leaderboardBtnTitle, { color: PALETTE.danger }]}>MES CYBERATTAQUES</Text>
+                <Text style={styles.leaderboardBtnSub}>Opérations de guerre numérique en cours</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* Espionnage */}
+        {auth.isEnabled && (
+          <Pressable
+            onPress={() => router.push("/spy-ops")}
+            style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <LinearGradient colors={["#0d1119", "#0d1119"]} style={styles.leaderboardBtnInner}>
+              <MaterialCommunityIcons name="magnify" size={20} color={PALETTE.gold} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.leaderboardBtnTitle}>MES OPÉRATIONS D'ESPIONNAGE</Text>
+                <Text style={styles.leaderboardBtnSub}>Consulter les résultats de renseignement</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* Alliances */}
+        {auth.isEnabled && (
+          <Pressable
+            onPress={() => router.push("/alliances")}
+            style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <LinearGradient colors={["#0d1119", "#0d1119"]} style={styles.leaderboardBtnInner}>
+              <MaterialCommunityIcons name="handshake" size={20} color={PALETTE.gold} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.leaderboardBtnTitle}>MES ALLIANCES</Text>
+                <Text style={styles.leaderboardBtnSub}>Gérer vos alliances diplomatiques</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* Soumission ranked en attente */}
+        {rankedPending && (
+          <View style={[styles.leaderboardBtn, { overflow: "hidden" }]}>
+            <LinearGradient colors={["#0d1119", "#0d1119"]} style={[styles.leaderboardBtnInner, { borderColor: PALETTE.warning + "55" }]}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color={PALETTE.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.leaderboardBtnTitle, { color: PALETTE.warning }]}>SOUMISSION EN ATTENTE</Text>
+                <Text style={styles.leaderboardBtnSub}>Score classé enregistré — sera soumis à la prochaine connexion</Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+
+        {/* Forum mondial */}
+        <Pressable
+          onPress={() => router.push("/chat")}
+          style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+        >
+          <LinearGradient colors={["#0d1119", "#0d1119"]} style={[styles.leaderboardBtnInner, { borderColor: PALETTE.gold + "55" }]}>
+            <MaterialCommunityIcons name="forum-outline" size={20} color={PALETTE.gold} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.leaderboardBtnTitle}>FORUM DIPLOMATIQUE</Text>
+              <Text style={styles.leaderboardBtnSub}>Canal mondial de la saison en cours</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+          </LinearGradient>
+        </Pressable>
+
+        {/* Classement PvP */}
+        <Pressable
+          onPress={() => router.push("/ranking-pvp")}
+          style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
+        >
+          <LinearGradient colors={["#0d1119", "#0d1119"]} style={[styles.leaderboardBtnInner, { borderColor: PALETTE.crimson + "55" }]}>
+            <MaterialCommunityIcons name="sword-cross" size={20} color={PALETTE.crimson} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.leaderboardBtnTitle, { color: PALETTE.crimson }]}>CLASSEMENT PvP</Text>
+              <Text style={styles.leaderboardBtnSub}>Guerre des nations — points d'engagement saisonniers</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
+          </LinearGradient>
+        </Pressable>
 
         {/* Leaderboard mondial */}
         <Pressable

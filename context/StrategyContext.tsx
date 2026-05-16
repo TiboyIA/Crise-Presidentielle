@@ -526,6 +526,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       const check = canLaunchOperation(type, relation, state.buildings, state.resources);
       if (!check.allowed) return { success: false, message: check.reason ?? "Impossible" };
 
+      const mandateDaySnap = state.mandateDay;
+
       const op = OPERATIONS[type];
       const unitBonus = getOperationUnitBonus(type, state.playerUnits ?? [], state.militaryDoctrine ?? "defensive");
       // Unit bonus gives a second chance on failed ops
@@ -586,6 +588,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         return withNews(advanceMandateDay(baseOp, 0));
       });
 
+      rankRecord("military_op", type, mandateDaySnap);
       return { success: result.success, message: result.message };
     },
     [state, update],

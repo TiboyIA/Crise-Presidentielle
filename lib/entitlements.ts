@@ -68,7 +68,7 @@ async function readVerifiedCache(): Promise<EventPack[]> {
   }
 }
 
-export const ALL_PACKS: readonly EventPack[] = ["climate"] as const;
+export const ALL_PACKS: readonly EventPack[] = ["climate", "guerre_hybride", "cyber"] as const;
 
 export const FREE_PACKS: ReadonlySet<EventPack> = new Set<EventPack>([
   "climate",

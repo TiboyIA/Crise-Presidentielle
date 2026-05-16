@@ -96,7 +96,7 @@ async function onAuthenticated(token: string, userId: string): Promise<void> {
 
   const appVersion = (Constants.expoConfig?.version ?? "0.0.0") as string;
   registerDevice(token, appVersion); // fire-and-forget
-  retryPendingSubmission(); // retry ranked submit if network was unavailable last time
+  retryPendingSubmission();    // retry ranked submit if network was unavailable last time
 
   // Cloud save sync — restore cloud save if it's newer than local
   const local = await loadStrategy();

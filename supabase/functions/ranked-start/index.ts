@@ -14,6 +14,7 @@ const VALID_COUNTRY_IDS = new Set([
 
 const VALID_DOCTRINES = new Set([
   "democratique", "technocratique", "securitaire", "populiste", "autoritaire",
+  "souverainiste", "ecologiste", "liberal",
 ]);
 
 const MAX_RUNS_PER_HOUR = 10;

@@ -207,6 +207,11 @@ export async function submitRankedRun(
       _rankedIntended = false;
       return { ok: true, score: data.score };
     }
+    // Rejet définitif (run invalide ou déjà traitée) — nettoyer pour éviter les boucles
+    if (res.status === 422 || res.status === 409) {
+      await clearRun();
+      _rankedIntended = false;
+    }
     return { ok: false, reason: data.reason ?? data.error ?? "server-error" };
   } catch {
     // Save for retry on next launch
@@ -257,6 +262,16 @@ export async function retryPendingSubmission(): Promise<SubmitResult | null> {
 /** Returns true if there is an active ranked run locally. */
 export async function hasActiveRun(): Promise<boolean> {
   return (await loadMeta()) !== null;
+}
+
+/** Returns true if a submission is queued for retry (network was unavailable). */
+export async function hasPendingSubmission(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SUBMIT_KEY);
+    return raw !== null;
+  } catch {
+    return false;
+  }
 }
 
 /** Abandons the current run locally without notifying the server. */

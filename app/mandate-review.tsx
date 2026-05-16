@@ -62,6 +62,7 @@ export default function MandateReviewScreen() {
   const auth = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [rankedScore, setRankedScore] = useState<number | null>(null);
+  const [rankedRejected, setRankedRejected] = useState(false);
   const [offlineRanked, setOfflineRanked] = useState(false);
 
   useEffect(() => {
@@ -102,6 +103,10 @@ export default function MandateReviewScreen() {
       if (result.ok && result.score != null) {
         setRankedScore(result.score);
         return; // Show score first — player taps again to proceed
+      }
+      if (!result.ok && result.reason !== "network-unavailable") {
+        // Rejet serveur (run invalide, ban, version…) — afficher sans bloquer
+        setRankedRejected(true);
       }
     }
     startNewMandate();
@@ -156,6 +161,19 @@ export default function MandateReviewScreen() {
               <Text style={styles.offlineBannerTitle}>Partie hors ligne</Text>
               <Text style={styles.offlineBannerSub}>
                 Cette partie a été jouée sans connexion. Elle est enregistrée dans votre progression, mais non éligible au classement mondial.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* RANKED REJECTED BANNER */}
+        {rankedRejected && (
+          <View style={[styles.offlineBanner, { borderColor: PALETTE.danger + "55", backgroundColor: PALETTE.danger + "0d" }]}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={14} color={PALETTE.danger} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.offlineBannerTitle, { color: PALETTE.danger }]}>Score non homologué</Text>
+              <Text style={styles.offlineBannerSub}>
+                Le serveur n'a pas validé cette run. La partie est enregistrée dans votre progression locale.
               </Text>
             </View>
           </View>

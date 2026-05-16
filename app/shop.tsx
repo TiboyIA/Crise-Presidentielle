@@ -17,7 +17,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { isPackFree, useEntitlements } from "@/lib/entitlements";
-import { purchasePack } from "@/lib/purchases";
+import { purchasePack, restorePurchases } from "@/lib/purchases";
 import { GameSecurityService } from "@/services/GameSecurityService";
 import type { EventPack } from "@/data/events";
 import {
@@ -103,29 +103,31 @@ const PACKS: PackInfo[] = [
       { id: "migration", label: "Migration intra-européenne" },
     ],
   },
-];
-
-const COMING_SOON: ComingSoonPack[] = [
   {
     id: "guerre_hybride",
     bannerKey: "cyber",
     title: "Guerre Hybride",
-    tag: "BIENTÔT",
+    tag: "PACK PREMIUM",
     price: "2,99 €",
     category: "scenarios",
     description:
       "10 nouveaux événements premium : fuite de documents classifiés, sabotage industriel, cyberattaque bancaire, pression diplomatique coordonnée, infiltration institutionnelle, brouillage satellite, manipulation sociale et chantage énergétique.",
+    bullets: [],
   },
   {
     id: "cyber",
     bannerKey: "cyber",
     title: "Cyber & Désinformation",
-    tag: "BIENTÔT",
+    tag: "PACK PREMIUM",
     price: "2,99 €",
     category: "scenarios",
     description:
       "10 nouveaux événements premium : cyberattaque d'hôpital, campagne de fake news coordonnée, infiltration de bots étrangers, panne télécom nationale, fuite de données gouvernementales, sabotage réseau électrique, manipulation d'élection par IA, espionnage industriel, blackout numérique et guerre de l'information.",
+    bullets: [],
   },
+];
+
+const COMING_SOON: ComingSoonPack[] = [
   {
     id: "pack_grandes_puissances",
     title: "Pays — Grandes Puissances",
@@ -199,6 +201,7 @@ export default function ShopScreen() {
   const insets = useSafeAreaInsets();
   const { hasPack, grantLocal, revokeLocal, refresh, loaded } = useEntitlements();
   const [purchasing, setPurchasing] = useState<EventPack | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const webBottomInset = Platform.OS === "web" ? 34 : 0;
@@ -245,6 +248,26 @@ export default function ShopScreen() {
     },
     [grantLocal, refresh],
   );
+
+  const onRestore = useCallback(async () => {
+    setRestoring(true);
+    try {
+      const restored = await restorePurchases();
+      await refresh();
+      if (Platform.OS === "web") return;
+      Alert.alert(
+        "Achats restaurés",
+        restored.length > 0
+          ? `${restored.length} pack(s) récupéré(s).`
+          : "Aucun achat à restaurer pour ce compte.",
+        [{ text: "OK" }],
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de restaurer les achats. Réessayez.", [{ text: "OK" }]);
+    } finally {
+      setRestoring(false);
+    }
+  }, [refresh]);
 
   const onRevoke = useCallback(
     async (pack: EventPack) => {
@@ -568,6 +591,16 @@ export default function ShopScreen() {
           Le pack de lancement est offert. Les futurs packs seront proposés à
           l'achat unitaire, sans abonnement.
         </Text>
+
+        <Pressable
+          onPress={() => void onRestore()}
+          disabled={restoring}
+          style={({ pressed }) => [styles.restoreBtn, { opacity: pressed || restoring ? 0.5 : 1 }]}
+        >
+          <Text style={[styles.restoreBtnText, { color: colors.mutedForeground }]}>
+            {restoring ? "Restauration…" : "Restaurer les achats"}
+          </Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -813,6 +846,16 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginTop: 16,
     marginBottom: -4,
+  },
+  restoreBtn: {
+    alignItems: "center",
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  restoreBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    textDecorationLine: "underline",
   },
   themeSwatch: {
     width: 68,

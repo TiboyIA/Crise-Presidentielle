@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -11,11 +11,14 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 const DOCTRINE_LABELS: Record<string, string> = {
-  democratique:  "Réformateur",
-  securitaire:   "Protecteur",
-  technocratique:"Technocrate",
-  populiste:     "Populaire",
-  autoritaire:   "Autoritaire",
+  democratique:   "Réformateur",
+  securitaire:    "Protecteur",
+  technocratique: "Technocrate",
+  populiste:      "Populaire",
+  autoritaire:    "Autoritaire",
+  souverainiste:  "Souverainiste",
+  ecologiste:     "Écologiste",
+  liberal:        "Libéral",
 };
 
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -28,12 +31,16 @@ const COUNTRY_FLAGS: Record<string, string> = {
 
 interface LeaderboardEntry {
   id: string;
+  player_id: string;
   display_name: string;
   country_id: string;
   doctrine: string;
   score: number;
   mandate_days: number;
   created_at: string;
+  season: number;
+  rank_title: string;
+  global_power: number;
 }
 
 async function fetchLeaderboard(offset = 0): Promise<LeaderboardEntry[]> {
@@ -56,6 +63,12 @@ export default function RankingGlobalScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const load = useCallback(async () => {
     setError(false);
@@ -86,7 +99,10 @@ export default function RankingGlobalScreen() {
     const date = new Date(item.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 
     return (
-      <View style={[styles.row, isTop3 && styles.rowTop3]}>
+      <Pressable
+        onPress={() => router.push({ pathname: "/player-profile", params: { entry: JSON.stringify(item), rank: String(rank) } })}
+        style={({ pressed }) => [styles.row, isTop3 && styles.rowTop3, { opacity: pressed ? 0.7 : 1 }]}
+      >
         <Text style={[styles.rank, { color: rankColor, width: rank >= 10 ? 28 : 22 }]}>
           {rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : `#${rank}`}
         </Text>
@@ -98,7 +114,8 @@ export default function RankingGlobalScreen() {
         <Text style={[styles.score, isTop3 && { color: rankColor }]}>
           {item.score.toLocaleString()}
         </Text>
-      </View>
+        <MaterialCommunityIcons name="chevron-right" size={14} color={PALETTE.textLow} />
+      </Pressable>
     );
   };
 
@@ -118,12 +135,18 @@ export default function RankingGlobalScreen() {
 
       <View style={styles.headerRule} />
 
-      {/* Player's own rank badge if logged in */}
+      {/* Bandeau score du joueur */}
       {auth.isEnabled && (
         <View style={styles.ownBadge}>
-          <MaterialCommunityIcons name="account-circle-outline" size={14} color={PALETTE.gold} />
+          <MaterialCommunityIcons
+            name="sword-cross"
+            size={14}
+            color={PALETTE.gold}
+          />
           <Text style={styles.ownBadgeText}>
-            Active le Mode Classé pour apparaître ici
+            {auth.isLinked
+              ? "Les scores proviennent du mode classé — lance une partie en mode classé pour participer"
+              : "Lie ton compte Google ou Apple pour participer au classement mondial"}
           </Text>
         </View>
       )}

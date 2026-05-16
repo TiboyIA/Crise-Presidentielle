@@ -119,7 +119,7 @@ export default function StartScreen() {
     startNewGame(playerName.trim(), opt.doctrine, selectedCountry);
     if (rankedMode && auth.isEnabled && auth.accessToken) {
       setRankedIntended(true);
-      const run = await startRankedRun(auth.accessToken, "france", opt.doctrine, playerName.trim());
+      const run = await startRankedRun(auth.accessToken, selectedCountry, opt.doctrine, playerName.trim());
       if (!run) {
         Alert.alert(
           "Mode classé indisponible",
@@ -541,7 +541,7 @@ function DoctrineBody({
             <View style={[styles.rankedDot, rankedMode && styles.rankedDotActive]} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rankedLabel, rankedMode && { color: PALETTE.gold }]}>MODE CLASSÉ</Text>
-              <Text style={styles.rankedDesc}>Score soumis au classement mondial en fin de partie</Text>
+              <Text style={styles.rankedDesc}>Vos décisions sont enregistrées localement puis soumises au serveur en fin de mandat pour entrer dans le classement mondial.</Text>
             </View>
             <Text style={{ fontSize: 14, color: rankedMode ? PALETTE.gold : PALETTE.textLow }}>
               {rankedMode ? "✓" : "○"}
