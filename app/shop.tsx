@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { PORTRAITS } from "@/data/portraits";
 import {
   Alert,
   Image,
@@ -437,6 +438,59 @@ export default function ShopScreen() {
           </>
         )}
 
+        {/* ── Cosmétiques ─────────────────────────────────────────── */}
+        <View style={[styles.categoryHeader, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 8, paddingTop: 24 }]}>
+          <Text style={styles.categoryIcon}>🎨</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.categoryTitle, { color: colors.foreground }]}>COSMÉTIQUES</Text>
+            <Text style={[styles.categorySubtitle, { color: colors.mutedForeground }]}>
+              Personnalisez le portrait de votre président
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.portraitRow}
+        >
+          {PORTRAITS.map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => {
+                if (!p.free) {
+                  Alert.alert(
+                    `${p.icon} ${p.name}`,
+                    `${p.flavorText}\n\nDisponible bientôt — ${p.price}`,
+                    [{ text: "OK" }],
+                  );
+                }
+              }}
+              style={({ pressed }) => [styles.portraitTile, { opacity: pressed && !p.free ? 0.7 : 1 }]}
+            >
+              <View
+                style={[
+                  styles.portraitCircle,
+                  { backgroundColor: p.bgColor, borderColor: p.free ? p.borderColor : colors.border },
+                ]}
+              >
+                <Text style={styles.portraitIcon}>{p.icon}</Text>
+                {!p.free && (
+                  <View style={styles.portraitLockBadge}>
+                    <Text style={{ fontSize: 9 }}>🔒</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.portraitTileName, { color: colors.foreground }]} numberOfLines={2}>
+                {p.name}
+              </Text>
+              <Text style={[styles.portraitTilePrice, { color: p.free ? "#3fbe7a" : colors.mutedForeground }]}>
+                {p.free ? "GRATUIT" : p.price}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
           Le pack de lancement est offert. Les futurs packs seront proposés à
           l'achat unitaire, sans abonnement.
@@ -638,5 +692,46 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontStyle: "italic",
     marginTop: 4,
+  },
+  portraitRow: {
+    gap: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+  },
+  portraitTile: {
+    width: 84,
+    alignItems: "center",
+    gap: 6,
+  },
+  portraitCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  portraitIcon: { fontSize: 30 },
+  portraitLockBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  portraitTileName: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+    lineHeight: 13,
+  },
+  portraitTilePrice: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
   },
 });

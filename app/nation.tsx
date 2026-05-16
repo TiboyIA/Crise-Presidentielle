@@ -24,6 +24,7 @@ import { BG, RESOURCE_IMG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { ResourceKey } from "@/types/strategy";
 import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
+import { usePortrait } from "@/context/PortraitContext";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -62,6 +63,7 @@ export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, claimDailyReward } = useStrategy();
+  const { selectedPortrait } = usePortrait();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [reformsExpanded, setReformsExpanded] = useState(false);
@@ -164,8 +166,11 @@ export default function NationScreen() {
             </View>
 
             <View style={styles.heroRow}>
-              <View style={styles.flagFrame}>
-                <Text style={styles.flag}>{country.flag}</Text>
+              <View style={[styles.flagFrame, { backgroundColor: selectedPortrait.bgColor, borderColor: selectedPortrait.borderColor }]}>
+                <Text style={styles.flag}>{selectedPortrait.icon}</Text>
+                <View style={styles.flagBadge}>
+                  <Text style={styles.flagBadgeText}>{country.flag}</Text>
+                </View>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.country}>{country.name}</Text>
@@ -587,7 +592,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: PALETTE.goldDim + "55",
     alignItems: "center", justifyContent: "center",
   },
-  flag: { fontSize: 36 },
+  flag: { fontSize: 32 },
+  flagBadge: {
+    position: "absolute", bottom: -4, right: -4,
+    backgroundColor: PALETTE.void, borderRadius: 12,
+    paddingHorizontal: 2, paddingVertical: 1,
+  },
+  flagBadgeText: { fontSize: 18 },
   country: { fontSize: 22, fontFamily: FONT.bold, color: PALETTE.textHigh, letterSpacing: 0.5 },
   player: { fontSize: 12, fontFamily: FONT.med, color: "rgba(255,255,255,0.65)", marginTop: 2 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },

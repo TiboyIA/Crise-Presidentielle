@@ -19,6 +19,7 @@ import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { PortraitProvider } from "@/context/PortraitContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 SplashScreen.preventAutoHideAsync();
@@ -98,8 +99,10 @@ export default function RootLayout() {
                 <EntitlementsProvider>
                   <StrategyProvider>
                     <GameProvider>
-                      <StatusBar style="light" />
-                      <RootLayoutNav />
+                      <PortraitProvider>
+                        <StatusBar style="light" />
+                        <RootLayoutNav />
+                      </PortraitProvider>
                     </GameProvider>
                   </StrategyProvider>
                 </EntitlementsProvider>
