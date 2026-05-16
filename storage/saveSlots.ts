@@ -1,8 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { StrategyGameState } from "@/types/strategy";
 
-export type SlotNumber = 1 | 2 | 3;
+export type SlotNumber = 1 | 2 | 3 | 4 | 5 | 6;
+/** Base slots — always available. */
 export const SLOT_NUMBERS: SlotNumber[] = [1, 2, 3];
+/** Bonus slots — unlocked by purchase. */
+export const BONUS_SLOT_NUMBERS: SlotNumber[] = [4, 5, 6];
 
 export interface SaveSlotMeta {
   slot: SlotNumber;

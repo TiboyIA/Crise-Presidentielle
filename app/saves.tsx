@@ -14,10 +14,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import {
   readAllSlotMetas,
+  readSlotMeta,
   SLOT_NUMBERS,
+  BONUS_SLOT_NUMBERS,
   type SaveSlotMeta,
   type SlotNumber,
 } from "@/storage/saveSlots";
+import { hasBonusSlots } from "@/storage/saveSlotBonus";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
 function formatDate(ms: number): string {
@@ -35,6 +38,8 @@ export default function SavesScreen() {
   const insets = useSafeAreaInsets();
   const { state, saveToSlot, loadFromSlot, deleteSlot } = useStrategy();
   const [metas, setMetas] = useState<(SaveSlotMeta | null)[]>([null, null, null]);
+  const [bonusMetas, setBonusMetas] = useState<(SaveSlotMeta | null)[]>([null, null, null]);
+  const [bonusOwned, setBonusOwned] = useState(false);
   const [busy, setBusy] = useState<SlotNumber | null>(null);
 
   const hasSave = state !== null;
@@ -42,8 +47,14 @@ export default function SavesScreen() {
   const webBottom = Platform.OS === "web" ? 34 : 0;
 
   const refreshMetas = useCallback(async () => {
-    const loaded = await readAllSlotMetas();
-    setMetas(loaded);
+    const [base, bonus, owned] = await Promise.all([
+      readAllSlotMetas(),
+      Promise.all(BONUS_SLOT_NUMBERS.map(readSlotMeta)),
+      hasBonusSlots(),
+    ]);
+    setMetas(base);
+    setBonusMetas(bonus);
+    setBonusOwned(owned);
   }, []);
 
   useEffect(() => {
@@ -240,6 +251,114 @@ export default function SavesScreen() {
           );
         })}
 
+        <View style={styles.bonusSection}>
+          <View style={styles.bonusSectionHeader}>
+            <View style={styles.bonusSectionLine} />
+            <Text style={styles.bonusSectionLabel}>EMPLACEMENTS BONUS</Text>
+            <View style={styles.bonusSectionLine} />
+          </View>
+
+          {bonusOwned ? (
+            BONUS_SLOT_NUMBERS.map((slot, i) => {
+              const meta = bonusMetas[i] ?? null;
+              const isBusy = busy === slot;
+              return (
+                <View key={slot} style={[styles.card, styles.cardBonus]}>
+                  <View style={styles.cardHeader}>
+                    <View style={[styles.slotBadge, styles.slotBadgeBonus]}>
+                      <Text style={[styles.slotBadgeText, { color: PALETTE.gold }]}>{slot}</Text>
+                    </View>
+                    <Text style={styles.slotLabel}>EMPLACEMENT {slot}</Text>
+                    {meta && (
+                      <Pressable
+                        onPress={() => handleDelete(slot, meta)}
+                        disabled={isBusy}
+                        hitSlop={10}
+                        style={({ pressed }) => [styles.deleteBtn, { opacity: pressed || isBusy ? 0.4 : 0.65 }]}
+                      >
+                        <Feather name="trash-2" size={14} color={PALETTE.crimson} />
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {meta ? (
+                    <View style={styles.cardBody}>
+                      <Text style={styles.saveName}>{meta.playerName}</Text>
+                      <View style={styles.saveMeta}>
+                        <View style={styles.saveMetaItem}>
+                          <Feather name="calendar" size={11} color={PALETTE.textLow} />
+                          <Text style={styles.saveMetaText}>Jour {meta.mandateDay}</Text>
+                        </View>
+                        <View style={styles.saveMetaItem}>
+                          <Feather name="clock" size={11} color={PALETTE.textLow} />
+                          <Text style={styles.saveMetaText}>{formatDate(meta.savedAt)}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.cardActions}>
+                        {hasSave && (
+                          <Pressable
+                            onPress={() => handleSave(slot, meta)}
+                            disabled={isBusy}
+                            style={({ pressed }) => [styles.actionBtn, styles.actionBtnSecondary, { opacity: pressed || isBusy ? 0.6 : 1 }]}
+                          >
+                            <Feather name="save" size={13} color={PALETTE.textMid} />
+                            <Text style={styles.actionBtnSecondaryText}>{isBusy ? "…" : "Écraser"}</Text>
+                          </Pressable>
+                        )}
+                        <Pressable
+                          onPress={() => handleLoad(slot, meta)}
+                          disabled={isBusy}
+                          style={({ pressed }) => [styles.actionBtn, styles.actionBtnPrimary, { opacity: pressed || isBusy ? 0.7 : 1, flex: 1 }]}
+                        >
+                          <Feather name="play" size={13} color="#fff" />
+                          <Text style={styles.actionBtnPrimaryText}>{isBusy ? "CHARGEMENT…" : "CHARGER"}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.cardBody}>
+                      <Text style={styles.emptyText}>Emplacement vide</Text>
+                      {hasSave && (
+                        <Pressable
+                          onPress={() => handleSave(slot, null)}
+                          disabled={isBusy}
+                          style={({ pressed }) => [styles.actionBtn, styles.actionBtnPrimary, { opacity: pressed || isBusy ? 0.7 : 1, marginTop: 4 }]}
+                        >
+                          <Feather name="save" size={13} color="#fff" />
+                          <Text style={styles.actionBtnPrimaryText}>{isBusy ? "SAUVEGARDE…" : "SAUVEGARDER ICI"}</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          ) : (
+            <Pressable
+              onPress={() =>
+                Alert.alert(
+                  "+3 Emplacements bonus",
+                  "Portez votre capacité à 6 sauvegardes simultanées.\n\nDisponible bientôt — 0,99 €",
+                  [{ text: "OK" }],
+                )
+              }
+              style={({ pressed }) => [styles.lockedCard, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View style={styles.lockedCardInner}>
+                <Text style={styles.lockedIcon}>🔒</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.lockedTitle}>+3 EMPLACEMENTS BONUS</Text>
+                  <Text style={styles.lockedDesc}>
+                    Portez votre capacité à 6 sauvegardes simultanées.
+                  </Text>
+                </View>
+                <Text style={styles.lockedPrice}>0,99 €</Text>
+              </View>
+              <Text style={styles.lockedSoon}>BIENTÔT</Text>
+            </Pressable>
+          )}
+        </View>
+
         <Text style={styles.hint}>
           Les sauvegardes sont stockées localement sur cet appareil.
         </Text>
@@ -406,5 +525,59 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
     lineHeight: 15,
+  },
+  bonusSection: { gap: 14, marginTop: 6 },
+  bonusSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: -2,
+  },
+  bonusSectionLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: "rgba(255,255,255,0.08)" },
+  bonusSectionLabel: {
+    fontSize: 8,
+    fontFamily: FONT.bold,
+    letterSpacing: 2.5,
+    color: PALETTE.textLow,
+  },
+  cardBonus: { borderColor: PALETTE.gold + "22" },
+  slotBadgeBonus: { borderColor: PALETTE.gold + "55", backgroundColor: PALETTE.gold + "10" },
+  lockedCard: {
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderStyle: "dashed",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    padding: 16,
+    gap: 8,
+  },
+  lockedCardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
+  lockedIcon: { fontSize: 20, opacity: 0.5 },
+  lockedTitle: {
+    fontSize: 11,
+    fontFamily: FONT.bold,
+    letterSpacing: 2,
+    color: PALETTE.textMid,
+  },
+  lockedDesc: {
+    fontSize: 11,
+    fontFamily: FONT.reg,
+    color: PALETTE.textLow,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  lockedPrice: {
+    fontSize: 14,
+    fontFamily: FONT.bold,
+    color: PALETTE.textLow,
+    opacity: 0.6,
+  },
+  lockedSoon: {
+    fontSize: 8,
+    fontFamily: FONT.bold,
+    letterSpacing: 2,
+    color: PALETTE.textLow,
+    opacity: 0.5,
+    textAlign: "center",
   },
 });

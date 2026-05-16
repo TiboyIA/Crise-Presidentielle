@@ -533,6 +533,37 @@ export default function ShopScreen() {
           ))}
         </ScrollView>
 
+        <Text style={[styles.cosmeticSubheader, { color: colors.mutedForeground }]}>
+          SAUVEGARDES
+        </Text>
+        <Pressable
+          onPress={() =>
+            Alert.alert(
+              "+3 Emplacements de sauvegarde",
+              "Portez votre capacité à 6 sauvegardes simultanées.\nAucun impact sur le gameplay — pur confort.\n\nDisponible bientôt — 0,99 €",
+              [{ text: "OK" }],
+            )
+          }
+          style={({ pressed }) => [
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 0.82 },
+          ]}
+        >
+          <View style={[styles.cardBody, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+            <Text style={{ fontSize: 28 }}>💾</Text>
+            <View style={{ flex: 1, gap: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={[styles.cardTag, { color: colors.mutedForeground }]}>BIENTÔT</Text>
+                <Text style={[styles.cardPrice, { color: colors.foreground, opacity: 0.55, fontSize: 14 }]}>0,99 €</Text>
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.foreground, fontSize: 16 }]}>+3 Emplacements bonus</Text>
+              <Text style={[styles.cardDescription, { color: colors.mutedForeground, fontSize: 12 }]}>
+                Passez de 3 à 6 sauvegardes simultanées. Aucun avantage gameplay.
+              </Text>
+            </View>
+          </View>
+        </Pressable>
+
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
           Le pack de lancement est offert. Les futurs packs seront proposés à
           l'achat unitaire, sans abonnement.
