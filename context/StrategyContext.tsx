@@ -32,6 +32,7 @@ import {
   getNextReward,
   getNextStreak,
 } from "@/data/dailyRewards";
+import { COUNTRY_RESOURCE_BONUS } from "@/data/countryPacks";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
 import { STRATEGY_MINISTERS, MINISTER_LIST, MINISTER_POOL, MINISTER_INDICATOR } from "@/data/strategyMinisters";
@@ -125,7 +126,11 @@ const INITIAL_RESOURCES: StrategyResources = {
   cyberDefense: 40,
 };
 
-function buildInitialState(playerName: string, doctrine: GovernanceDoctrine = "democratique"): StrategyGameState {
+function buildInitialState(
+  playerName: string,
+  doctrine: GovernanceDoctrine = "democratique",
+  countryId: CountryId = "france",
+): StrategyGameState {
   const buildings: PlayerBuilding[] = INITIAL_BUILDINGS.map((b) => ({
     id: b.id,
     level: b.level,
@@ -133,15 +138,25 @@ function buildInitialState(playerName: string, doctrine: GovernanceDoctrine = "d
     upgradeEndTime: null,
   }));
 
-  const power           = calculateGlobalPower(buildings, INITIAL_RESOURCES);
+  const bonus = COUNTRY_RESOURCE_BONUS[countryId] ?? {};
+  const resources: StrategyResources = {
+    ...INITIAL_RESOURCES,
+    ...Object.fromEntries(
+      (Object.entries(bonus) as [keyof StrategyResources, number][]).map(
+        ([k, v]) => [k, INITIAL_RESOURCES[k] + v],
+      ),
+    ),
+  };
+
+  const power           = calculateGlobalPower(buildings, resources);
   const now             = clockNow();
   const seasonStartTime = now;
 
   return {
     version: 1,
     playerName,
-    countryId: "france",
-    resources: { ...INITIAL_RESOURCES },
+    countryId,
+    resources,
     buildings,
     stats: {
       globalPower: power,
@@ -153,7 +168,7 @@ function buildInitialState(playerName: string, doctrine: GovernanceDoctrine = "d
       season: 1,
       seasonStartTime,
     },
-    relations: getInitialRelations("france"),
+    relations: getInitialRelations(countryId),
     missions: generateDailyMissions(getCurrentDayIndex()),
     news: { ...DEFAULT_NEWS_STATE },
     lastResourceTick: now,
@@ -188,7 +203,7 @@ interface StrategyContextValue {
   loaded: boolean;
   shouldShowPoll: boolean;
   shouldShowBilan: boolean;
-  startNewGame: (playerName: string, doctrine?: GovernanceDoctrine) => void;
+  startNewGame: (playerName: string, doctrine?: GovernanceDoctrine, countryId?: CountryId) => void;
   upgradeBuilding: (id: BuildingId) => { success: boolean; reason?: string };
   launchOperation: (type: OperationType, targetCountryId: CountryId) => { success: boolean; message: string };
   collectMissionReward: (defId: string) => void;
@@ -290,8 +305,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [scheduleSave],
   );
 
-  const startNewGame = useCallback((playerName: string, doctrine?: GovernanceDoctrine) => {
-    const initial = buildInitialState(playerName, doctrine);
+  const startNewGame = useCallback((playerName: string, doctrine?: GovernanceDoctrine, countryId?: CountryId) => {
+    const initial = buildInitialState(playerName, doctrine, countryId);
     setState(initial);
     saveStrategy(initial);
     // fire-and-forget balance tracking

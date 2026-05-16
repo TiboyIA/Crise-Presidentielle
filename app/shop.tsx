@@ -47,6 +47,7 @@ interface ComingSoonPack {
   title: string;
   tag: string;
   description: string;
+  price?: string;
 }
 
 const COMING_SOON: ComingSoonPack[] = [
@@ -54,17 +55,43 @@ const COMING_SOON: ComingSoonPack[] = [
     id: "guerre_hybride",
     bannerKey: "cyber",
     title: "Guerre Hybride",
-    tag: "VERSION 1.1 — BIENTÔT",
+    tag: "BIENTÔT",
+    price: "2,99 €",
     description:
       "10 nouveaux événements premium : fuite de documents classifiés, sabotage industriel, cyberattaque bancaire, pression diplomatique coordonnée, infiltration institutionnelle, brouillage satellite, manipulation sociale et chantage énergétique.",
   },
   {
     id: "cyber",
     bannerKey: "cyber",
-    title: "Cyber & désinformation",
-    tag: "VERSION 1.2 — BIENTÔT",
+    title: "Cyber & Désinformation",
+    tag: "BIENTÔT",
+    price: "2,99 €",
     description:
-      "Cyberattaque hôpital, fake news, bots étrangers, panne télécom, fuite de données.",
+      "10 nouveaux événements premium : cyberattaque d'hôpital, campagne de fake news coordonnée, infiltration de bots étrangers, panne télécom nationale, fuite de données gouvernementales, sabotage réseau électrique, manipulation d'élection par IA, espionnage industriel, blackout numérique et guerre de l'information.",
+  },
+  {
+    id: "pack_grandes_puissances",
+    title: "Pays — Grandes Puissances",
+    tag: "BIENTÔT",
+    price: "4,99 €",
+    description:
+      "Jouez avec 5 nations supplémentaires : États-Unis 🇺🇸, Chine 🇨🇳, Russie 🇷🇺, Royaume-Uni 🇬🇧, Allemagne 🇩🇪. Chaque pays apporte ses propres ressources initiales et ses défis géopolitiques uniques.",
+  },
+  {
+    id: "pack_asie_pacifique",
+    title: "Pays — Asie-Pacifique",
+    tag: "BIENTÔT",
+    price: "3,99 €",
+    description:
+      "Jouez avec 5 nations supplémentaires : Japon 🇯🇵, Corée du Sud 🇰🇷, Inde 🇮🇳, Australie 🇦🇺, Pakistan 🇵🇰. Affrontez les tensions régionales et les dynamiques économiques de l'Indo-Pacifique.",
+  },
+  {
+    id: "pack_reste_monde",
+    title: "Pays — Reste du Monde",
+    tag: "BIENTÔT",
+    price: "3,99 €",
+    description:
+      "Jouez avec 9 nations supplémentaires : Brésil 🇧🇷, Turquie 🇹🇷, Iran 🇮🇷, Israël 🇮🇱, Arabie Saoudite 🇸🇦, Nigéria 🇳🇬, Canada 🇨🇦, Italie 🇮🇹, Corée du Nord 🇰🇵.",
   },
 ];
 
@@ -452,6 +479,11 @@ export default function ShopScreen() {
                         >
                           {p.tag}
                         </Text>
+                        {p.price && (
+                          <Text style={[styles.cardPrice, { color: colors.foreground, opacity: 0.55 }]}>
+                            {p.price}
+                          </Text>
+                        )}
                       </View>
                       <Text
                         style={[styles.cardTitle, { color: colors.foreground }]}

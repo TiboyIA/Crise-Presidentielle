@@ -6,11 +6,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useAuth } from "@/context/AuthContext";
 import { startRankedRun, setRankedIntended } from "@/services/RankedService";
+import { COUNTRIES } from "@/data/countries";
+import { COUNTRY_PACKS, isCountryFree, getCountryPack } from "@/data/countryPacks";
 import { BG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import type { GovernanceDoctrine } from "@/types/strategy";
+import type { CountryId, GovernanceDoctrine } from "@/types/strategy";
 
-type Step = "home" | "name" | "doctrine";
+type Step = "home" | "country" | "name" | "doctrine";
 
 interface DoctrineOption {
   label: string;
@@ -63,6 +65,7 @@ export default function StartScreen() {
   const [step, setStep] = useState<Step>("home");
   const [playerName, setPlayerName] = useState("");
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<CountryId>("france");
   const [rankedMode, setRankedMode] = useState(false);
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -76,7 +79,7 @@ export default function StartScreen() {
   };
 
   const handleNewGame = () => {
-    setStep("name");
+    setStep("country");
   };
 
   const handleTutorial = () => {
@@ -108,7 +111,7 @@ export default function StartScreen() {
     if (!selectedLabel) return;
     const opt = DOCTRINE_OPTIONS.find((o) => o.label === selectedLabel);
     if (!opt) return;
-    startNewGame(playerName.trim(), opt.doctrine);
+    startNewGame(playerName.trim(), opt.doctrine, selectedCountry);
     if (rankedMode && auth.isEnabled && auth.accessToken) {
       setRankedIntended(true);
       const run = await startRankedRun(auth.accessToken, "france", opt.doctrine, playerName.trim());
@@ -136,12 +139,20 @@ export default function StartScreen() {
           onSaves={handleSaves}
         />
       )}
+      {step === "country" && (
+        <CountryBody
+          selectedCountry={selectedCountry}
+          onSelect={setSelectedCountry}
+          onNext={() => setStep("name")}
+          onBack={() => setStep("home")}
+        />
+      )}
       {step === "name" && (
         <NameBody
           playerName={playerName}
           onChangeName={setPlayerName}
           onNext={handleNameNext}
-          onBack={() => setStep("home")}
+          onBack={() => setStep("country")}
         />
       )}
       {step === "doctrine" && (
@@ -317,7 +328,7 @@ function NameBody({
   return (
     <View style={styles.nameBody}>
       <View style={styles.inputSection}>
-        <Text style={styles.stepLabel}>ÉTAPE 1 / 2 — IDENTITÉ</Text>
+        <Text style={styles.stepLabel}>ÉTAPE 2 / 3 — IDENTITÉ</Text>
         <Text style={styles.inputLabel}>VOTRE NOM DE PRÉSIDENT</Text>
         <TextInput
           style={styles.input}
@@ -357,6 +368,101 @@ function NameBody({
   );
 }
 
+function CountryBody({
+  selectedCountry,
+  onSelect,
+  onNext,
+  onBack,
+}: {
+  selectedCountry: CountryId;
+  onSelect: (id: CountryId) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const sorted = [
+    COUNTRIES["france"],
+    ...Object.values(COUNTRIES).filter((c) => c.id !== "france"),
+  ];
+
+  return (
+    <View style={styles.doctrineBody}>
+      <Text style={styles.stepLabel}>ÉTAPE 1 / 3 — PAYS</Text>
+      <Text style={styles.doctrineSubtitle}>Seule la France est disponible gratuitement</Text>
+
+      <ScrollView
+        style={styles.doctrineScroll}
+        contentContainerStyle={styles.doctrineList}
+        showsVerticalScrollIndicator={false}
+      >
+        {sorted.map((country) => {
+          const free = isCountryFree(country.id);
+          const pack = getCountryPack(country.id);
+          const active = selectedCountry === country.id;
+
+          return (
+            <Pressable
+              key={country.id}
+              onPress={() => {
+                if (!free) {
+                  Alert.alert(
+                    `${country.flag} ${country.name}`,
+                    `Disponible dans le « ${pack!.title} » — BIENTÔT\n${pack!.price}`,
+                    [{ text: "OK" }],
+                  );
+                } else {
+                  onSelect(country.id);
+                }
+              }}
+              style={({ pressed }) => [
+                styles.doctrineCard,
+                active && free && { borderColor: PALETTE.gold, backgroundColor: PALETTE.gold + "18" },
+                !free && { opacity: 0.5 },
+                pressed && { opacity: !free ? 0.35 : 0.8 },
+              ]}
+            >
+              <Text style={styles.countryFlag}>{country.flag}</Text>
+              <View style={styles.doctrineText}>
+                <Text style={[styles.doctrineName, active && free && { color: PALETTE.gold }]}>
+                  {country.name}
+                </Text>
+                <Text style={styles.doctrineDesc}>{country.region}</Text>
+              </View>
+              {free ? (
+                <View style={styles.countryTagFree}>
+                  <Text style={styles.countryTagFreeText}>GRATUIT</Text>
+                </View>
+              ) : (
+                <Text style={styles.countryLock}>🔒</Text>
+              )}
+              {active && free && <View style={[styles.doctrineCheck, { backgroundColor: PALETTE.gold }]} />}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.actions}>
+        <Pressable
+          onPress={onNext}
+          style={({ pressed }) => [styles.btnWrap, { opacity: pressed ? 0.85 : 1 }]}
+        >
+          <LinearGradient
+            colors={["#d04030", PALETTE.crimsonDim]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.mainBtn}
+          >
+            <View style={styles.btnRule} />
+            <Text style={styles.mainBtnText}>SUIVANT →</Text>
+            <View style={styles.btnRule} />
+          </LinearGradient>
+        </Pressable>
+        <Pressable onPress={onBack} style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}>
+          <Text style={styles.cancelText}>← Retour</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function DoctrineBody({
   selectedLabel,
   rankedMode,
@@ -376,7 +482,7 @@ function DoctrineBody({
 }) {
   return (
     <View style={styles.doctrineBody}>
-      <Text style={styles.stepLabel}>ÉTAPE 2 / 2 — DOCTRINE</Text>
+      <Text style={styles.stepLabel}>ÉTAPE 3 / 3 — DOCTRINE</Text>
       <Text style={styles.doctrineSubtitle}>Choisissez votre style de gouvernance</Text>
 
       <ScrollView
@@ -528,6 +634,18 @@ const styles = StyleSheet.create({
   rankedDotActive: { backgroundColor: PALETTE.gold },
   rankedLabel: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 2 },
   rankedDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2, lineHeight: 13 },
+
+  // Country
+  countryFlag: { fontSize: 22 },
+  countryTagFree: {
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: "#3fbe7a66",
+    backgroundColor: "#3fbe7a18",
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  countryTagFreeText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2, color: "#3fbe7a" },
+  countryLock: { fontSize: 13, opacity: 0.6 },
 
   // Shared actions
   actions: { gap: 10 },
