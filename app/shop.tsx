@@ -26,6 +26,15 @@ import {
   type ClimateBulletKey,
 } from "@/data/shopImages";
 
+type ShopCategoryId = "scenarios" | "pays" | "politiques";
+
+interface ShopCategoryDef {
+  id: ShopCategoryId;
+  icon: string;
+  title: string;
+  subtitle: string;
+}
+
 interface BulletEntry {
   id: ClimateBulletKey;
   label: string;
@@ -39,6 +48,7 @@ interface PackInfo {
   price: string;
   description: string;
   bullets: BulletEntry[];
+  category: ShopCategoryId;
 }
 
 interface ComingSoonPack {
@@ -48,58 +58,27 @@ interface ComingSoonPack {
   tag: string;
   description: string;
   price?: string;
+  category: ShopCategoryId;
 }
 
-const COMING_SOON: ComingSoonPack[] = [
+const SHOP_CATEGORIES: ShopCategoryDef[] = [
   {
-    id: "guerre_hybride",
-    bannerKey: "cyber",
-    title: "Guerre Hybride",
-    tag: "BIENTÔT",
-    price: "2,99 €",
-    description:
-      "10 nouveaux événements premium : fuite de documents classifiés, sabotage industriel, cyberattaque bancaire, pression diplomatique coordonnée, infiltration institutionnelle, brouillage satellite, manipulation sociale et chantage énergétique.",
+    id: "scenarios",
+    icon: "⚡",
+    title: "SCÉNARIOS DE CRISE",
+    subtitle: "Nouveaux événements thématiques injectés dans vos crises",
   },
   {
-    id: "cyber",
-    bannerKey: "cyber",
-    title: "Cyber & Désinformation",
-    tag: "BIENTÔT",
-    price: "2,99 €",
-    description:
-      "10 nouveaux événements premium : cyberattaque d'hôpital, campagne de fake news coordonnée, infiltration de bots étrangers, panne télécom nationale, fuite de données gouvernementales, sabotage réseau électrique, manipulation d'élection par IA, espionnage industriel, blackout numérique et guerre de l'information.",
+    id: "pays",
+    icon: "🌍",
+    title: "PAYS JOUABLES",
+    subtitle: "Prenez les commandes d'une autre puissance mondiale",
   },
   {
-    id: "politiques_avancees",
-    title: "Bundle Politiques Avancées",
-    tag: "BIENTÔT",
-    price: "2,99 €",
-    description:
-      "3 nouvelles doctrines de gouvernance : Souverainiste (primauté nationale, stabilité institutionnelle), Écologiste (transition verte, bonne presse, économie ralentie) et Libéral (croissance forte, inégalités accrues). Chacune avec ses dérives passives et ses arbitrages uniques.",
-  },
-  {
-    id: "pack_grandes_puissances",
-    title: "Pays — Grandes Puissances",
-    tag: "BIENTÔT",
-    price: "4,99 €",
-    description:
-      "Jouez avec 5 nations supplémentaires : États-Unis 🇺🇸, Chine 🇨🇳, Russie 🇷🇺, Royaume-Uni 🇬🇧, Allemagne 🇩🇪. Chaque pays apporte ses propres ressources initiales et ses défis géopolitiques uniques.",
-  },
-  {
-    id: "pack_asie_pacifique",
-    title: "Pays — Asie-Pacifique",
-    tag: "BIENTÔT",
-    price: "3,99 €",
-    description:
-      "Jouez avec 5 nations supplémentaires : Japon 🇯🇵, Corée du Sud 🇰🇷, Inde 🇮🇳, Australie 🇦🇺, Pakistan 🇵🇰. Affrontez les tensions régionales et les dynamiques économiques de l'Indo-Pacifique.",
-  },
-  {
-    id: "pack_reste_monde",
-    title: "Pays — Reste du Monde",
-    tag: "BIENTÔT",
-    price: "3,99 €",
-    description:
-      "Jouez avec 9 nations supplémentaires : Brésil 🇧🇷, Turquie 🇹🇷, Iran 🇮🇷, Israël 🇮🇱, Arabie Saoudite 🇸🇦, Nigéria 🇳🇬, Canada 🇨🇦, Italie 🇮🇹, Corée du Nord 🇰🇵.",
+    id: "politiques",
+    icon: "🏛",
+    title: "POLITIQUES & GOUVERNANCE",
+    subtitle: "Nouvelles doctrines et styles de gouvernement",
   },
 ];
 
@@ -110,6 +89,7 @@ const PACKS: PackInfo[] = [
     title: "Crise climatique",
     tag: "OFFERT — PACK DE LANCEMENT",
     price: "0 €",
+    category: "scenarios",
     description:
       "Douze nouveaux événements thématiques : canicules meurtrières, sécheresses, méga-feux, inondations, tensions agricoles, blackouts énergétiques. Chaque crise force des arbitrages déchirants entre écologie, souveraineté et popularité. Inclus gratuitement avec le jeu.",
     bullets: [
@@ -120,6 +100,65 @@ const PACKS: PackInfo[] = [
       { id: "penurie", label: "Pénuries d'eau en montagne" },
       { id: "migration", label: "Migration intra-européenne" },
     ],
+  },
+];
+
+const COMING_SOON: ComingSoonPack[] = [
+  {
+    id: "guerre_hybride",
+    bannerKey: "cyber",
+    title: "Guerre Hybride",
+    tag: "BIENTÔT",
+    price: "2,99 €",
+    category: "scenarios",
+    description:
+      "10 nouveaux événements premium : fuite de documents classifiés, sabotage industriel, cyberattaque bancaire, pression diplomatique coordonnée, infiltration institutionnelle, brouillage satellite, manipulation sociale et chantage énergétique.",
+  },
+  {
+    id: "cyber",
+    bannerKey: "cyber",
+    title: "Cyber & Désinformation",
+    tag: "BIENTÔT",
+    price: "2,99 €",
+    category: "scenarios",
+    description:
+      "10 nouveaux événements premium : cyberattaque d'hôpital, campagne de fake news coordonnée, infiltration de bots étrangers, panne télécom nationale, fuite de données gouvernementales, sabotage réseau électrique, manipulation d'élection par IA, espionnage industriel, blackout numérique et guerre de l'information.",
+  },
+  {
+    id: "pack_grandes_puissances",
+    title: "Pays — Grandes Puissances",
+    tag: "BIENTÔT",
+    price: "4,99 €",
+    category: "pays",
+    description:
+      "Jouez avec 5 nations supplémentaires : États-Unis 🇺🇸, Chine 🇨🇳, Russie 🇷🇺, Royaume-Uni 🇬🇧, Allemagne 🇩🇪. Chaque pays apporte ses propres ressources initiales et ses défis géopolitiques uniques.",
+  },
+  {
+    id: "pack_asie_pacifique",
+    title: "Pays — Asie-Pacifique",
+    tag: "BIENTÔT",
+    price: "3,99 €",
+    category: "pays",
+    description:
+      "Jouez avec 5 nations supplémentaires : Japon 🇯🇵, Corée du Sud 🇰🇷, Inde 🇮🇳, Australie 🇦🇺, Pakistan 🇵🇰. Affrontez les tensions régionales et les dynamiques économiques de l'Indo-Pacifique.",
+  },
+  {
+    id: "pack_reste_monde",
+    title: "Pays — Reste du Monde",
+    tag: "BIENTÔT",
+    price: "3,99 €",
+    category: "pays",
+    description:
+      "Jouez avec 9 nations supplémentaires : Brésil 🇧🇷, Turquie 🇹🇷, Iran 🇮🇷, Israël 🇮🇱, Arabie Saoudite 🇸🇦, Nigéria 🇳🇬, Canada 🇨🇦, Italie 🇮🇹, Corée du Nord 🇰🇵.",
+  },
+  {
+    id: "politiques_avancees",
+    title: "Politiques Avancées",
+    tag: "BIENTÔT",
+    price: "2,99 €",
+    category: "politiques",
+    description:
+      "3 nouvelles doctrines de gouvernance : Souverainiste (primauté nationale, stabilité institutionnelle), Écologiste (transition verte, bonne presse, économie ralentie) et Libéral (croissance forte, inégalités accrues). Chacune avec ses dérives passives et ses arbitrages uniques.",
   },
 ];
 
@@ -280,237 +319,121 @@ export default function ShopScreen() {
           </Text>
         ) : (
           <>
-            {PACKS.map((p) => {
-              const owned = hasPack(p.id);
-              const free = isPackFree(p.id);
-              const isPurchasing = purchasing === p.id;
+            {SHOP_CATEGORIES.map((cat, catIdx) => {
+              const activePacks = PACKS.filter((p) => p.category === cat.id);
+              const comingSoonPacks = COMING_SOON.filter((p) => p.category === cat.id);
               return (
-                <View
-                  key={p.id}
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: owned ? colors.primary : colors.border,
-                    },
-                  ]}
-                >
-                  <PackBanner source={SHOP_PACK_BANNERS[p.bannerKey]} />
-
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardTop}>
-                      <Text style={[styles.cardTag, { color: colors.primary }]}>
-                        {p.tag}
-                      </Text>
-                      {free ? (
-                        <View
-                          style={[
-                            styles.ownedBadge,
-                            { backgroundColor: colors.primary },
-                          ]}
-                        >
-                          <Image
-                            source={SHOP_ICONS.gift}
-                            style={styles.badgeIcon}
-                            resizeMode="contain"
-                          />
-                          <Text
-                            style={[
-                              styles.ownedText,
-                              { color: colors.primaryForeground },
-                            ]}
-                          >
-                            OFFERT
-                          </Text>
-                        </View>
-                      ) : owned ? (
-                        <View
-                          style={[
-                            styles.ownedBadge,
-                            { backgroundColor: colors.primary },
-                          ]}
-                        >
-                          <Image
-                            source={SHOP_ICONS.check}
-                            style={styles.badgeIcon}
-                            resizeMode="contain"
-                          />
-                          <Text
-                            style={[
-                              styles.ownedText,
-                              { color: colors.primaryForeground },
-                            ]}
-                          >
-                            DÉBLOQUÉ
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text
-                          style={[styles.cardPrice, { color: colors.foreground }]}
-                        >
-                          {p.price}
-                        </Text>
-                      )}
-                    </View>
-
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-                      {p.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.cardDescription,
-                        { color: colors.mutedForeground },
-                      ]}
-                    >
-                      {p.description}
-                    </Text>
-
-                    <View style={styles.bulletList}>
-                      {p.bullets.map((b) => (
-                        <View key={b.id} style={styles.bulletRow}>
-                          <Image
-                            source={SHOP_BULLET_THUMBS[b.id]}
-                            style={[
-                              styles.bulletThumb,
-                              { borderColor: colors.border },
-                            ]}
-                            resizeMode="cover"
-                          />
-                          <Text
-                            style={[
-                              styles.bulletText,
-                              { color: colors.foreground },
-                            ]}
-                          >
-                            {b.label}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-
-                    {free ? (
-                      <Text
-                        style={[
-                          styles.giftNote,
-                          { color: colors.mutedForeground },
-                        ]}
-                      >
-                        Inclus avec le jeu, accessible immédiatement.
-                      </Text>
-                    ) : owned ? (
-                      <Pressable
-                        onPress={() => onRevoke(p.id)}
-                        style={({ pressed }) => [
-                          styles.secondaryBtn,
-                          {
-                            borderColor: colors.border,
-                            opacity: pressed ? 0.7 : 1,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.secondaryBtnText,
-                            { color: colors.mutedForeground },
-                          ]}
-                        >
-                          Retirer le pack
-                        </Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        onPress={() => void onPurchase(p.id)}
-                        disabled={isPurchasing}
-                        style={({ pressed }) => [
-                          styles.primaryBtn,
-                          {
-                            backgroundColor: colors.primary,
-                            opacity: pressed || isPurchasing ? 0.7 : 1,
-                          },
-                        ]}
-                      >
-                        <Image
-                          source={SHOP_ICONS.unlock}
-                          style={styles.primaryBtnIcon}
-                          resizeMode="contain"
-                        />
-                        <Text
-                          style={[
-                            styles.primaryBtnText,
-                            { color: colors.primaryForeground },
-                          ]}
-                        >
-                          {isPurchasing ? "EN COURS…" : "DÉBLOQUER"}
-                        </Text>
-                      </Pressable>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-
-            {COMING_SOON.length > 0 && (
-              <>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: colors.mutedForeground },
-                  ]}
-                >
-                  À VENIR
-                </Text>
-                {COMING_SOON.map((p) => (
+                <React.Fragment key={cat.id}>
                   <View
-                    key={p.id}
                     style={[
-                      styles.card,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: colors.border,
-                        opacity: 0.78,
-                      },
+                      styles.categoryHeader,
+                      catIdx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 8, paddingTop: 24 },
                     ]}
                   >
-                    {p.bannerKey ? (
-                      <PackBanner
-                        source={SHOP_PACK_BANNERS[p.bannerKey]}
-                        dimmed
-                      />
-                    ) : null}
-                    <View style={styles.cardBody}>
-                      <View style={styles.cardTop}>
-                        <Text
-                          style={[
-                            styles.cardTag,
-                            { color: colors.mutedForeground },
-                          ]}
-                        >
-                          {p.tag}
-                        </Text>
-                        {p.price && (
-                          <Text style={[styles.cardPrice, { color: colors.foreground, opacity: 0.55 }]}>
-                            {p.price}
-                          </Text>
-                        )}
-                      </View>
-                      <Text
-                        style={[styles.cardTitle, { color: colors.foreground }]}
-                      >
-                        {p.title}
+                    <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.categoryTitle, { color: colors.foreground }]}>
+                        {cat.title}
                       </Text>
-                      <Text
-                        style={[
-                          styles.cardDescription,
-                          { color: colors.mutedForeground },
-                        ]}
-                      >
-                        {p.description}
+                      <Text style={[styles.categorySubtitle, { color: colors.mutedForeground }]}>
+                        {cat.subtitle}
                       </Text>
                     </View>
                   </View>
-                ))}
-              </>
-            )}
+
+                  {activePacks.map((p) => {
+                    const owned = hasPack(p.id);
+                    const free = isPackFree(p.id);
+                    const isPurchasing = purchasing === p.id;
+                    return (
+                      <View
+                        key={p.id}
+                        style={[
+                          styles.card,
+                          { backgroundColor: colors.card, borderColor: owned ? colors.primary : colors.border },
+                        ]}
+                      >
+                        <PackBanner source={SHOP_PACK_BANNERS[p.bannerKey]} />
+                        <View style={styles.cardBody}>
+                          <View style={styles.cardTop}>
+                            <Text style={[styles.cardTag, { color: colors.primary }]}>{p.tag}</Text>
+                            {free ? (
+                              <View style={[styles.ownedBadge, { backgroundColor: colors.primary }]}>
+                                <Image source={SHOP_ICONS.gift} style={styles.badgeIcon} resizeMode="contain" />
+                                <Text style={[styles.ownedText, { color: colors.primaryForeground }]}>OFFERT</Text>
+                              </View>
+                            ) : owned ? (
+                              <View style={[styles.ownedBadge, { backgroundColor: colors.primary }]}>
+                                <Image source={SHOP_ICONS.check} style={styles.badgeIcon} resizeMode="contain" />
+                                <Text style={[styles.ownedText, { color: colors.primaryForeground }]}>DÉBLOQUÉ</Text>
+                              </View>
+                            ) : (
+                              <Text style={[styles.cardPrice, { color: colors.foreground }]}>{p.price}</Text>
+                            )}
+                          </View>
+                          <Text style={[styles.cardTitle, { color: colors.foreground }]}>{p.title}</Text>
+                          <Text style={[styles.cardDescription, { color: colors.mutedForeground }]}>{p.description}</Text>
+                          <View style={styles.bulletList}>
+                            {p.bullets.map((b) => (
+                              <View key={b.id} style={styles.bulletRow}>
+                                <Image
+                                  source={SHOP_BULLET_THUMBS[b.id]}
+                                  style={[styles.bulletThumb, { borderColor: colors.border }]}
+                                  resizeMode="cover"
+                                />
+                                <Text style={[styles.bulletText, { color: colors.foreground }]}>{b.label}</Text>
+                              </View>
+                            ))}
+                          </View>
+                          {free ? (
+                            <Text style={[styles.giftNote, { color: colors.mutedForeground }]}>
+                              Inclus avec le jeu, accessible immédiatement.
+                            </Text>
+                          ) : owned ? (
+                            <Pressable
+                              onPress={() => onRevoke(p.id)}
+                              style={({ pressed }) => [styles.secondaryBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                            >
+                              <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Retirer le pack</Text>
+                            </Pressable>
+                          ) : (
+                            <Pressable
+                              onPress={() => void onPurchase(p.id)}
+                              disabled={isPurchasing}
+                              style={({ pressed }) => [styles.primaryBtn, { backgroundColor: colors.primary, opacity: pressed || isPurchasing ? 0.7 : 1 }]}
+                            >
+                              <Image source={SHOP_ICONS.unlock} style={styles.primaryBtnIcon} resizeMode="contain" />
+                              <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
+                                {isPurchasing ? "EN COURS…" : "DÉBLOQUER"}
+                              </Text>
+                            </Pressable>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+
+                  {comingSoonPacks.map((p) => (
+                    <View
+                      key={p.id}
+                      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.78 }]}
+                    >
+                      {p.bannerKey ? <PackBanner source={SHOP_PACK_BANNERS[p.bannerKey]} dimmed /> : null}
+                      <View style={styles.cardBody}>
+                        <View style={styles.cardTop}>
+                          <Text style={[styles.cardTag, { color: colors.mutedForeground }]}>{p.tag}</Text>
+                          {p.price && (
+                            <Text style={[styles.cardPrice, { color: colors.foreground, opacity: 0.55 }]}>{p.price}</Text>
+                          )}
+                        </View>
+                        <Text style={[styles.cardTitle, { color: colors.foreground }]}>{p.title}</Text>
+                        <Text style={[styles.cardDescription, { color: colors.mutedForeground }]}>{p.description}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </React.Fragment>
+              );
+            })}
           </>
         )}
 
@@ -690,12 +613,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginTop: 8,
   },
-  sectionTitle: {
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  categoryIcon: {
+    fontSize: 22,
+  },
+  categoryTitle: {
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 2.5,
-    marginTop: 12,
-    marginBottom: -4,
+  },
+  categorySubtitle: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+    lineHeight: 15,
   },
   giftNote: {
     fontSize: 12,
