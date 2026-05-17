@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -27,6 +27,7 @@ import type { ResourceKey } from "@/types/strategy";
 import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
 import { isRankedIntended } from "@/services/RankedService";
+import { computeFrustration } from "@/logic/playerExperienceEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -71,7 +72,10 @@ export default function NationScreen() {
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [reformsExpanded, setReformsExpanded] = useState(false);
   const [secondaryExpanded, setSecondaryExpanded] = useState(false);
+  const [advisorDismissed, setAdvisorDismissed] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
+
+  const frustration = useMemo(() => (state ? computeFrustration(state) : null), [state]);
 
   if (!state) return null;
 
@@ -233,6 +237,39 @@ export default function NationScreen() {
               <Text style={styles.rewardCardDesc}>{nextReward.description}</Text>
             </View>
             <MaterialCommunityIcons name="gift-outline" size={20} color={PALETTE.gold} />
+          </Pressable>
+        )}
+
+        {/* CONSEIL STRATÉGIQUE — s'affiche si frustrationScore > 70 */}
+        {!advisorDismissed && frustration?.recommendation && (
+          <Pressable
+            onPress={() => router.push(frustration.recommendation!.actionRoute as any)}
+            style={({ pressed }) => [styles.advisorCard, { opacity: pressed ? 0.9 : 1 }]}
+          >
+            <View style={styles.advisorHeader}>
+              <MaterialCommunityIcons name="lightbulb-outline" size={13} color="#e8a93a" />
+              <Text style={styles.advisorKicker}>CONSEIL STRATÉGIQUE</Text>
+              <Pressable
+                onPress={(e) => { e.stopPropagation(); setAdvisorDismissed(true); }}
+                hitSlop={10}
+                style={styles.advisorDismissBtn}
+              >
+                <MaterialCommunityIcons name="close" size={14} color="#6b7280" />
+              </Pressable>
+            </View>
+            <Text style={styles.advisorConseil}>{frustration.recommendation.conseil}</Text>
+            {frustration.recommendation.missionTitle && (
+              <View style={styles.advisorMission}>
+                <MaterialCommunityIcons name="flag-outline" size={11} color="#4a9fff" />
+                <Text style={styles.advisorMissionLabel} numberOfLines={1}>
+                  Mission : {frustration.recommendation.missionTitle}
+                </Text>
+              </View>
+            )}
+            <View style={styles.advisorAction}>
+              <Text style={styles.advisorActionLabel}>{frustration.recommendation.actionLabel}</Text>
+              <MaterialCommunityIcons name="arrow-right" size={12} color="#e8a93a" />
+            </View>
           </Pressable>
         )}
 
@@ -780,4 +817,30 @@ const styles = StyleSheet.create({
   rewardClaimBtnText: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 3, color: "#05070d" },
   rewardDismiss: { paddingVertical: 8 },
   rewardDismissText: { fontSize: 11, fontFamily: FONT.med, color: PALETTE.textLow },
+
+  // Frustration advisor card
+  advisorCard: {
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: "#e8a93a44",
+    backgroundColor: "#e8a93a0d",
+    padding: 12,
+    gap: 8,
+  },
+  advisorHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  advisorKicker: { fontSize: 8, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 2, flex: 1 },
+  advisorDismissBtn: { padding: 2 },
+  advisorConseil: { fontSize: 12, fontFamily: FONT.reg, color: "#d1d5db", lineHeight: 17 },
+  advisorMission: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#4a9fff18",
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  advisorMissionLabel: { fontSize: 10, fontFamily: FONT.semi, color: "#4a9fff", flex: 1 },
+  advisorAction: { flexDirection: "row", alignItems: "center", gap: 4, justifyContent: "flex-end" },
+  advisorActionLabel: { fontSize: 10, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 0.5 },
 });
