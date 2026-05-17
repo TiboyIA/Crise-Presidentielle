@@ -29,6 +29,7 @@ import { usePortrait } from "@/context/PortraitContext";
 import { isRankedIntended } from "@/services/RankedService";
 import { computeFrustration } from "@/logic/playerExperienceEngine";
 import { computePlayerStyle } from "@/logic/playerSegmentation";
+import { generateRecommendations } from "@/logic/recommendationEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -76,8 +77,9 @@ export default function NationScreen() {
   const [advisorDismissed, setAdvisorDismissed] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
 
-  const frustration   = useMemo(() => (state ? computeFrustration(state) : null),   [state]);
-  const playerStyle   = useMemo(() => (state ? computePlayerStyle(state) : null),   [state]);
+  const frustration       = useMemo(() => (state ? computeFrustration(state) : null),        [state]);
+  const playerStyle       = useMemo(() => (state ? computePlayerStyle(state) : null),        [state]);
+  const recommendations   = useMemo(() => (state ? generateRecommendations(state) : []),     [state]);
 
   if (!state) return null;
 
@@ -519,6 +521,34 @@ export default function NationScreen() {
           </Panel>
         )}
 
+        {/* RECOMMANDATIONS — prochaine action pertinente */}
+        {recommendations.length > 0 && (
+          <View style={styles.recCard}>
+            <View style={styles.recHeader}>
+              <MaterialCommunityIcons name="compass-outline" size={13} color={PALETTE.info} />
+              <Text style={styles.recKicker}>PROCHAINE ACTION</Text>
+            </View>
+            {recommendations.map((rec, i) => (
+              <Pressable
+                key={rec.id}
+                onPress={() => router.push(rec.targetRoute as any)}
+                style={({ pressed }) => [
+                  styles.recRow,
+                  i < recommendations.length - 1 && styles.recRowBorder,
+                  { opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <View style={[styles.recDot, { backgroundColor: rec.priority === 1 ? "#FF8040" : rec.priority === 2 ? PALETTE.info : "#6b7280" }]} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.recTitle} numberOfLines={1}>{rec.title}</Text>
+                  <Text style={styles.recReason} numberOfLines={2}>{rec.reason}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={16} color={PALETTE.textLow} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {/* ACTIONS */}
         <SectionHeader label="Cabinet présidentiel" />
         <View style={styles.navGrid}>
@@ -875,4 +905,37 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.05)",
   },
   styleChipText: { fontSize: 9, fontFamily: FONT.med, letterSpacing: 0.8 },
+
+  // Recommendation card
+  recCard: {
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: PALETTE.info + "33",
+    backgroundColor: PALETTE.info + "0a",
+    overflow: "hidden",
+  },
+  recHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.info + "22",
+  },
+  recKicker: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.info, letterSpacing: 2, flex: 1 },
+  recRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  recRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  recDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  recTitle: { fontSize: 12, fontFamily: FONT.semi, color: PALETTE.textHigh },
+  recReason: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14 },
 });
