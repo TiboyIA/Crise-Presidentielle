@@ -39,6 +39,7 @@ const NAV_ITEMS: { mcIcon: McIconName; label: string; route: string; tint?: stri
   { mcIcon: "trophy-outline",              label: "Classement",       route: "/ranking",              tint: PALETTE.gold },
   { mcIcon: "clipboard-list-outline",      label: "Missions",         route: "/missions",             tint: PALETTE.info },
   { mcIcon: "newspaper-variant-outline",   label: "Journal de Crise", route: "/journal-crise",        tint: PALETTE.crimson },
+  { mcIcon: "orbit",                       label: "Forces Cosmiques", route: "/entities",             tint: "#9b59b6" },
 ];
 
 const RESOURCE_ORDER: ResourceKey[] = ["money", "influence", "energy", "intelligence", "technology", "military", "cyberDefense"];
@@ -477,6 +478,8 @@ export default function NationScreen() {
                 const e = NEWS_EVENT_MAP[id];
                 return e?.isInteractive && e?.urgency === "critique";
               });
+            const hasCosmicPending = item.route === "/entities" &&
+              (state.news?.pendingIds ?? []).some((id) => id.startsWith("cosmic_"));
             const cellW = `${Math.floor(100 / navCols) - 1}%` as const;
             return (
               <Pressable
@@ -498,6 +501,10 @@ export default function NationScreen() {
                     {hasCriticalPending ? (
                       <View style={[styles.navBadge, styles.navBadgeCritique]}>
                         <Text style={styles.navBadgeText}>CRITIQUE</Text>
+                      </View>
+                    ) : hasCosmicPending ? (
+                      <View style={[styles.navBadge, styles.navBadgeCosmic]}>
+                        <Text style={styles.navBadgeText}>SIGNAL</Text>
                       </View>
                     ) : (unread > 0 || upgrades > 0 || claimable > 0) ? (
                       <View style={styles.navBadge}>
@@ -656,6 +663,7 @@ const styles = StyleSheet.create({
   navIconRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" },
   navBadge: { backgroundColor: PALETTE.danger, borderRadius: 8, minWidth: 18, height: 18, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
   navBadgeCritique: { backgroundColor: "#FF3040", borderRadius: 4, minWidth: 50, height: 16, paddingHorizontal: 5 },
+  navBadgeCosmic: { backgroundColor: "#9b59b6", borderRadius: 4, minWidth: 44, height: 16, paddingHorizontal: 5 },
   navBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: "#fff" },
   navLabel: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh, letterSpacing: 0.3 },
 

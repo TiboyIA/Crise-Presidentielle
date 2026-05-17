@@ -74,6 +74,7 @@ function RootLayoutNav() {
       <Stack.Screen name="alliances" />
       <Stack.Screen name="spy-ops" />
       <Stack.Screen name="cyber-ops" />
+      <Stack.Screen name="entities" />
       <Stack.Screen name="ranking-pvp" />
       <Stack.Screen name="account-link" />
       <Stack.Screen name="briefing" options={{ presentation: "modal" }} />

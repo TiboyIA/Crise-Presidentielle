@@ -410,6 +410,13 @@ export interface DailyLoginRewardState {
   totalDaysClaimed: number;
 }
 
+export interface CosmicInfluence {
+  auroria: number;       // 0–100 base score
+  obscurium: number;     // 0–100 base score
+  lastCosmicEventAt: number; // mandateDay of last cosmic event
+  discovered: boolean;
+}
+
 export interface StrategyGameState {
   version: number;
   playerName: string;
@@ -450,4 +457,6 @@ export interface StrategyGameState {
   strategyResearch?: import("@/types/strategyResearch").StrategyResearchState;
   // Daily login reward — optional for backward compat
   dailyLoginReward?: DailyLoginRewardState;
+  // Cosmic entities layer — optional for backward compat
+  cosmicInfluence?: CosmicInfluence;
 }

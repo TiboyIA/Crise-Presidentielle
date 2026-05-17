@@ -197,6 +197,7 @@ function buildInitialState(
     oppositionPower: 35,
     realTime: initRealTime(now),
     strategyResearch: { ...DEFAULT_RESEARCH_STATE },
+    cosmicInfluence: { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
   };
 }
 
@@ -274,6 +275,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           oppositionPower:     saved.oppositionPower     ?? 35,
           realTime:            saved.realTime            ?? initRealTime(clockNow()),
           strategyResearch:    saved.strategyResearch    ?? { ...DEFAULT_RESEARCH_STATE },
+          cosmicInfluence:     saved.cosmicInfluence     ?? { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
         };
         // ── Migration simulationClock ──────────────────────────────────────────
         // Convertit les anciens timestamps réels (ms) en heures jeu absolues.

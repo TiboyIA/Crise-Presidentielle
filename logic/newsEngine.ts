@@ -92,6 +92,8 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     no_energy_sovereign:         !(state.strategyResearch?.completed ?? []).includes("research_energy_sovereign"),
     has_satellites:              (state.strategyResearch?.completed ?? []).includes("research_satellites"),
     has_infowar:                 (state.strategyResearch?.completed ?? []).includes("research_infowar"),
+    cosmic_auroria_eligible:     indicators.cohesion >= 50 && hp.institutionalStability >= 55 && hp.scandalRisk < 50,
+    cosmic_obscurium_active:     hp.scandalRisk > 40 || resources.cyberDefense < 40 || hp.popularFatigue > 55,
   };
 }
 
