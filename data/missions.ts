@@ -7,7 +7,7 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Améliorez l'un de vos bâtiments.",
     type: "upgrade_building",
     target: { amount: 1 },
-    reward: { money: 800, influence: 30 },
+    reward: { money: 450, influence: 30 },
     rewardPoints: 70,
   },
   {
@@ -16,7 +16,7 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Améliorez le Ministère de l'Économie.",
     type: "upgrade_building",
     target: { amount: 1, buildingId: "economy_ministry" },
-    reward: { money: 1000, influence: 50 },
+    reward: { money: 650, influence: 50 },
     rewardPoints: 100,
   },
   {
@@ -79,7 +79,7 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Lancez une campagne d'influence.",
     type: "launch_operation",
     target: { amount: 1, operationType: "influence_campaign" },
-    reward: { influence: 100, money: 200 },
+    reward: { influence: 60, money: 200 },
     rewardPoints: 70,
   },
   {
@@ -97,7 +97,7 @@ export const MISSION_POOL: MissionDef[] = [
     description: "Signez un traité avec un pays.",
     type: "launch_operation",
     target: { amount: 1, operationType: "sign_treaty" },
-    reward: { influence: 120, money: 300 },
+    reward: { influence: 75, money: 300 },
     rewardPoints: 90,
   },
   {

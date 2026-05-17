@@ -1,7 +1,7 @@
 import type { BuildingDef, BuildingId, BuildingLevel, StrategyResources } from "@/types/strategy";
 
-const UPGRADE_DURATIONS = [60, 300, 1200, 3600, 14400, 43200, 57600, 115200, 172800, 259200];
-// 1min, 5min, 20min, 1h, 4h, 12h, 16h→4h réel, 32h→8h réel, 48h→12h réel, 72h→18h réel
+const UPGRADE_DURATIONS = [60, 300, 1200, 3600, 14400, 28800, 57600, 115200, 172800, 259200];
+// 1min, 5min, 20min, 1h, 4h, 8h→2h réel, 16h→4h réel, 32h→8h réel, 48h→12h réel, 72h→18h réel
 
 function genLevels(
   baseCost: Partial<StrategyResources>,
@@ -140,7 +140,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
       { money: 80, influence: 3 },
       22,
     ),
-    unlockRequirement: { buildingId: "economy_ministry", level: 2 },
+    unlockRequirement: { buildingId: "economy_ministry", level: 3 },
   },
   media_agency: {
     id: "media_agency",
@@ -166,7 +166,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
       { military: 12, energy: 4 },
       25,
     ),
-    unlockRequirement: { buildingId: "defense_ministry", level: 2 },
+    unlockRequirement: { buildingId: "defense_ministry", level: 3 },
   },
 };
 
