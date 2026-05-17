@@ -56,6 +56,7 @@ import { STRATEGY_RESEARCH } from "@/data/strategyResearch";
 import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import type { StrategyResearchId, StrategyResearchState } from "@/types/strategyResearch";
 import { trackGameStarted, trackCrisisResolved, trackActionUsed } from "@/storage/balanceStorage";
+import { track as telemetry } from "@/services/TelemetryService";
 import { COUNTRIES } from "@/data/countries";
 import { recordEvent as rankRecord } from "@/services/RankedService";
 import type {
@@ -326,8 +327,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     const initial = buildInitialState(playerName, doctrine, countryId);
     setState(initial);
     saveStrategy(initial);
-    // fire-and-forget balance tracking
     void trackGameStarted();
+    void telemetry("new_game_started", { metadata: { doctrine: doctrine ?? "democratique", countryId: countryId ?? "france" } });
   }, []);
 
   const saveToSlotFn = useCallback(async (slot: SlotNumber) => {
@@ -528,6 +529,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         return withNews(advanceMandateDay({ ...prev, resources, buildings, missions }, 0));
       });
 
+      void telemetry("building_upgrade_started", {
+        gameDay:  state.mandateDay,
+        metadata: { buildingId: id, toLevel: building.level + 1 },
+      });
       return { success: true };
     },
     [state, update],
@@ -606,6 +611,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       });
 
       rankRecord("military_op", type, mandateDaySnap);
+      void telemetry("operation_launched", {
+        gameDay:  mandateDaySnap,
+        metadata: { operationType: type, success: result.success },
+      });
       return { success: result.success, message: result.message };
     },
     [state, update],
@@ -653,6 +662,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
+      void telemetry("crisis_choice_made", {
+        gameDay:  state?.mandateDay,
+        metadata: { eventId, choiceId },
+      });
     },
     [state, update],
   );
@@ -690,8 +703,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           },
         }, 0);
       });
+      void telemetry("mission_completed", { gameDay: state?.mandateDay, metadata: { defId } });
     },
-    [update],
+    [update, state],
   );
 
   const acknowledgePoll = useCallback(() => {
@@ -889,6 +903,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         return withNews(advanceMandateDay({ ...prev, resources, strategyResearch }, 0));
       });
       void trackActionUsed(`research_${id}`);
+      void telemetry("research_started", { gameDay: state.mandateDay, metadata: { researchId: id } });
       return { success: true };
     },
     [state, update],

@@ -17,6 +17,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { track as telemetry } from "@/services/TelemetryService";
 import { CrisisAlertOverlay } from "@/components/CrisisAlertOverlay";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
@@ -109,6 +110,10 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    void telemetry("app_open");
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 
