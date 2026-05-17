@@ -19,6 +19,15 @@ export default function AccountLinkScreen() {
   const [loading, setLoading] = useState<"google" | "apple" | null>(null);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
+  function linkErrorMessage(error?: string): string {
+    switch (error) {
+      case "no-session":              return "Session expirée. Relancez l'application.";
+      case "identity-already-linked": return "Ce compte est déjà lié à un autre joueur.";
+      case "not-enabled":             return "Authentification non disponible.";
+      default:                        return "Liaison impossible. Réessayez dans un instant.";
+    }
+  }
+
   async function handleLinkGoogle() {
     setLoading("google");
     setFeedback(null);
@@ -27,7 +36,7 @@ export default function AccountLinkScreen() {
     if (result.ok) {
       setFeedback({ ok: true, message: "Compte sécurisé avec succès." });
     } else if (result.error !== "cancelled") {
-      setFeedback({ ok: false, message: `Erreur : ${result.error ?? "inconnue"}` });
+      setFeedback({ ok: false, message: linkErrorMessage(result.error) });
     }
   }
 

@@ -48,7 +48,7 @@ serve(async (req) => {
     .eq("is_active", true);
 
   if (error) {
-    return new Response(JSON.stringify({ error: "db-error", detail: error.message }), {
+    return new Response(JSON.stringify({ error: "server-error" }), {
       status: 500,
       headers: { ...CORS, "Content-Type": "application/json" },
     });

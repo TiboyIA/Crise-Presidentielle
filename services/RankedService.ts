@@ -33,11 +33,15 @@ export type RankedEventType =
   | "military_op"
   | "game_over"
   | "mandate_end"
-  | "building_upgrade_completed"   // bâtiment terminé — vérification durée minimale côté serveur
+  | "building_upgrade_started"     // horodatage de démarrage — pairing avec completed côté serveur
+  | "building_upgrade_completed"   // bâtiment terminé — durée = elapsed_ms delta avec started
+  | "research_started"             // horodatage de démarrage de recherche
   | "research_completed"           // recherche terminée — contrôle durationDays minimal
-  | "unit_training_completed"      // unités collectées — contrôle durée de formation
+  | "unit_training_started"        // horodatage de démarrage de formation
+  | "unit_training_completed"      // unités collectées — durée = elapsed_ms delta avec started
   | "resource_snapshot_periodic"   // snapshot 5 min — détecte accumulation impossible
-  | "ranked_score_hint";           // résumé vérifiable juste avant soumission — croisé avec journal côté serveur
+  | "operation_result"             // résultat enrichi avec coûts/gains — cohérence ressources
+  | "ranked_score_hint";           // résumé vérifiable juste avant soumission
 
 export interface RunEvent {
   seq: number;
@@ -57,10 +61,12 @@ interface RunMeta {
 
 interface PendingSubmit {
   runId: string;
-  accessToken: string;
+  // accessToken intentionally omitted — never persist JWTs in AsyncStorage.
+  // retryPendingSubmission() receives a fresh token from AuthContext on launch.
   events: RunEvent[];
   finalIndicators: FinalIndicators;
   mandateDays: number;
+  journalHash: string;
   deviceId?: string;
   appVersion?: string;
 }
@@ -82,12 +88,34 @@ export interface SubmitResult {
   reason?: string;
 }
 
+// ── Journal integrity hash (djb2, non-cryptographique) ────────────────────────
+// Détecte la corruption accidentelle du journal local (écriture AsyncStorage
+// incomplète, parse JSON tronqué). Le serveur recompute le même hash.
+// Non secret : ne prouve pas l'authenticité des données, ne remplace pas
+// les contrôles serveur. Ne pas l'exposer dans l'UI ni l'interpréter côté client.
+
+function hashJournal(events: RunEvent[]): string {
+  const str = JSON.stringify(events);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+    h = h >>> 0; // keep unsigned 32-bit
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
 async function loadJournal(): Promise<RunEvent[]> {
   try {
     const raw = await AsyncStorage.getItem(JOURNAL_KEY);
-    return raw ? (JSON.parse(raw) as RunEvent[]) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      await AsyncStorage.removeItem(JOURNAL_KEY);
+      return [];
+    }
+    return parsed as RunEvent[];
   } catch {
     return [];
   }
@@ -197,10 +225,12 @@ export async function submitRankedRun(
   if (!meta) return { ok: false, reason: "no-active-run" };
 
   const events = await loadJournal();
+  const journalHash = hashJournal(events);
   const deviceId = await AsyncStorage.getItem("sync_device_id_v1").catch(() => null);
   const appVersion = (Constants.expoConfig?.version ?? "") as string;
   const payload = {
     runId: meta.runId, events, finalIndicators, mandateDays,
+    journalHash,
     ...(deviceId ? { deviceId } : {}),
     ...(appVersion ? { appVersion } : {}),
   };
@@ -226,8 +256,8 @@ export async function submitRankedRun(
     }
     return { ok: false, reason: data.reason ?? data.error ?? "server-error" };
   } catch {
-    // Save for retry on next launch
-    const pending: PendingSubmit = { ...payload, accessToken };
+    // Save for retry on next launch — accessToken intentionally excluded.
+    const pending: PendingSubmit = { ...payload };
     await AsyncStorage.setItem(PENDING_SUBMIT_KEY, JSON.stringify(pending));
     return { ok: false, reason: "network-unavailable" };
   }
@@ -235,22 +265,28 @@ export async function submitRankedRun(
 
 /**
  * Retries a previously failed submission if one is stored.
- * Call this on app launch after auth is ready.
+ * Call this on app launch after auth is ready, passing a fresh access token.
  */
-export async function retryPendingSubmission(): Promise<SubmitResult | null> {
+export async function retryPendingSubmission(accessToken: string): Promise<SubmitResult | null> {
   try {
     const raw = await AsyncStorage.getItem(PENDING_SUBMIT_KEY);
     if (!raw) return null;
 
     const pending = JSON.parse(raw) as PendingSubmit;
+    if (!pending.runId || !Array.isArray(pending.events)) {
+      await AsyncStorage.removeItem(PENDING_SUBMIT_KEY);
+      return null;
+    }
+
     const res = await fetch(supabaseUrl("/ranked-submit"), {
       method: "POST",
-      headers: headers(pending.accessToken),
+      headers: headers(accessToken),
       body: JSON.stringify({
         runId: pending.runId,
         events: pending.events,
         finalIndicators: pending.finalIndicators,
         mandateDays: pending.mandateDays,
+        journalHash: pending.journalHash,
         ...(pending.deviceId ? { deviceId: pending.deviceId } : {}),
         ...(pending.appVersion ? { appVersion: pending.appVersion } : {}),
       }),
@@ -291,107 +327,163 @@ export async function abandonRun(): Promise<void> {
   await clearRun();
 }
 
-// ── Notes serveur : validation anti-triche (ranked-submit) ───────────────────
+// ── Notes serveur V2 : validation anti-triche (ranked-submit) ────────────────
 //
-// Le serveur reçoit { runId, events: RunEvent[], finalIndicators, mandateDays,
-// deviceId?, appVersion? }. Aucune validation définitive côté client.
-// Toute run rejetée retourne HTTP 422 ; suspecte retourne 200 ok:true + flag
-// "suspect:true" pour revue manuelle. Ne pas bannir automatiquement.
+// Payload reçu : { runId, events, finalIndicators, mandateDays,
+//                  journalHash, deviceId?, appVersion? }
 //
-// ── PAYLOADS PAR TYPE D'ÉVÉNEMENT ────────────────────────────────────────────
+// Aucune validation définitive côté client.
+// Rejet dur → HTTP 422 ; suspect → 200 ok:true + suspect:true (revue manuelle).
+// Ne pas bannir automatiquement. Le compte reste jouable en mode non classé.
 //
-//  building_upgrade_completed  { level: number, durationRealMs: number }
-//    → durationRealMs = Date.now() - upgradeStartTime (real ms, côté client)
-//    → valider que durationRealMs ≥ UPGRADE_DURATIONS_REAL_MS[level-1] × 0.85
-//    → UPGRADE_DURATIONS_REAL_MS[L] = UPGRADE_DURATIONS_SEC[L] × (3600000/240)
-//    → UPGRADE_DURATIONS_SEC = [60,300,1200,3600,14400,28800,57600,115200,172800,259200]
+// ── ÉVÉNEMENTS ET PAYLOADS ───────────────────────────────────────────────────
 //
-//  research_completed          { durationDays: number }
-//    → durationDays = completesAtDay − startedAtDay (jours de mandat)
-//    → durée minimale théorique par recherche : 1 jour (serveur connaît les defs)
+//  building_upgrade_started    event_id = buildingId
+//    payload { targetLevel: number }
+//    → enregistré à l'instant du clic. Utilisé pour calculer la durée réelle
+//      par différence elapsed_ms avec building_upgrade_completed.
+//
+//  building_upgrade_completed  event_id = buildingId
+//    payload { level: number, durationRealMs: number }
+//    → DURÉE SERVEUR = completed.elapsed_ms − started.elapsed_ms (plus fiable)
+//    → durationRealMs est un champ secondaire, utilisé si started manquant
+//    → UPGRADE_DURATIONS_REAL_MS[L] = UPGRADE_DURATIONS_GAME_MIN[L] × 15000
+//    → UPGRADE_DURATIONS_GAME_MIN = [60,300,1200,3600,14400,28800,57600,115200,172800,259200]
+//    → durée minimale = UPGRADE_DURATIONS_REAL_MS[targetLevel-1] × 0.85
+//    → régression de niveau (completed.level < précédent même bâtiment) → rejet
+//
+//  research_started            event_id = researchId
+//    payload { durationDays: number }
+//    → enregistré au moment du lancement, avant que la file commence.
+//
+//  research_completed          event_id = researchId
+//    payload { durationDays: number }
+//    → durationDays = completesAtDay − startedAtDay
 //    → rejet si durationDays < 1 ou > 60
+//    → max 15 research_completed (borne théorique)
+//    → DURÉE SERVEUR = mandate_day_completed − mandate_day_started (via events)
 //
-//  unit_training_completed     { quantity: number, durationGameHours: number }
-//    → durationGameHours = durée prévue pour quantity unités (stockée côté client)
-//    → durée minimale : 1h jeu par unité de base (serveur connaît UNITS defs)
+//  unit_training_started       event_id = unitId
+//    payload { quantity: number, durationGameHours: number }
+//    → enregistré à l'instant du lancement.
+//
+//  unit_training_completed     event_id = unitId
+//    payload { quantity: number, durationGameHours: number }
+//    → DURÉE SERVEUR = completed.elapsed_ms − started.elapsed_ms
+//    → 1 game hour = 15 real min = 900 000 ms réels
+//    → rejet si elapsed_ms delta < durationGameHours × 900 000 × 0.85
 //    → rejet si durationGameHours < 0.1
 //
-//  resource_snapshot_periodic  { money, influence, military, cyberDefense, power, rankingPoints }
-//    → snapshots toutes les 5 min réelles
-//    → comparer snapshots successifs pour détecter accumulation impossible
-//    → maxima théoriques par 5 min (lvl 10 tous bâtiments) :
-//        money       ≤ 1 250     influence  ≤ 400
-//        military    ≤ 600       cyberDefense ≤ 400
-//    → seuil suspect : gain > 2× max théorique sans event justificatif dans l'intervalle
+//  operation_result            event_id = operationType
+//    payload { success: boolean, moneySpent: number, influenceSpent: number, rankingGained: number }
+//    → enregistré à chaque opération (complète military_op)
+//    → cohérence ressources : somme des moneySpent doit être ≤ resources initiales +
+//      revenus estimés (snapshots) + récompenses missions visibles
+//    → rankingGained doit correspondre aux tables du jeu (serveur connaît OPERATIONS)
+//
+//  military_op                 event_id = operationType
+//    payload { success: boolean }
+//    → maintenu pour rétrocompatibilité avec runs soumises avant V2
+//    → taux de succès global : if ops ≥ 5 and successRate > 0.95 → suspect
+//
+//  resource_snapshot_periodic  event_id = "snapshot"
+//    payload { money, influence, military, cyberDefense, power, rankingPoints }
+//    → snapshot toutes les 5 min réelles — détecte accumulation impossible
+//    → maxima théoriques par 5 min (bâtiments tous niveau max) :
+//        money ≤ 1 250 · influence ≤ 400 · military ≤ 600 · cyberDefense ≤ 400
+//    → seuil suspect : gain entre 2 snapshots > 2× max théorique sans event justificatif
 //    → seuil rejet   : gain > 10× max théorique
+//    → rankingPoints ne doit jamais décroître entre snapshots (sauf event mandate_end)
 //
-//  military_op                 payload { success: boolean }  — event_id = operationType
-//    → taux de succès côté serveur : if ops ≥ 5 and successRate > 0.95 → suspect
-//    → (la formule normale plafonne à ~0.90 avec tous les bâtiments max)
-//
-//  crisis_choice               choice_id = choiceId  — suffisant pour compter et croiser
+//  crisis_choice               choice_id = choiceId  — comptage + cohérence narrative
 //  reform_launched             event_id = reformId   — comptage seul
 //  doctrine_set                event_id = doctrineId — comptage seul
-//  mandate_end                 aucun payload         — comptage seul
-//  ranked_score_hint           payload complet       — croiser avec score calculé
+//  mandate_end                 event_id = "mandate_end" — comptage seul
+//  game_over                   event_id = "game_over"  — terminal
+//  ranked_score_hint           event_id = "score_hint"
+//    payload = { rankingPoints, globalPower, mandateDay, ... }
+//    → croiser avec finalIndicators ; écart > 20 pts → suspect
 //
-// ── CONTRÔLES ANTI-TRICHE ────────────────────────────────────────────────────
+// ── CONTRÔLES ANTI-TRICHE V2 ─────────────────────────────────────────────────
 //
-// 1. DURÉE MINIMALE PLAUSIBLE
-//    elapsed_ms du dernier événement doit être ≥ mandateDays × 21_600_000 × 0.8
-//    (REAL_MS_PER_GAME_DAY = 6h = 21 600 000 ms côté serveur).
-//    Rejet dur (422) si la durée réelle est impossible.
+// 1. HASH D'INTÉGRITÉ DU JOURNAL
+//    Le serveur recompute hashJournal(events) (djb2 identique) et compare avec
+//    journalHash reçu. Mismatch → flag "journal-hash-mismatch" (pas rejet :
+//    le hash n'est pas une preuve de sécurité, juste de corruption).
 //
-// 2. ACTIONS PAR MINUTE (APM)
-//    nb_events_actifs / (elapsed_ms / 60_000)   — exclure resource_snapshot_periodic.
-//    Alerte : > 3 events/min sur plus de 10 min.
-//    Rejet   : > 8 events/min (impossible humainement).
+// 2. DURÉE MINIMALE PLAUSIBLE (impossible_timing)
+//    elapsed_ms du dernier événement ≥ mandateDays × 21_600_000 × 0.8
+//    (1 mandate day = 6h réelles = 21 600 000 ms).
+//    Rejet dur si durée réelle est physiquement impossible.
 //
-// 3. PROGRESSION BÂTIMENTS
-//    Pour chaque building_upgrade_completed :
-//      vérifier payload.durationRealMs ≥ UPGRADE_DURATIONS_REAL_MS[level-1] × 0.85
-//    Régression de niveau (level[n] < level[n-1] même bâtiment) → rejet.
-//    Plusieurs upgrades level max en < 10 min réelles → suspect.
+// 3. PAIRING STARTED / COMPLETED (impossible_timing · invalid_event_sequence)
+//    Pour chaque *_completed : rechercher le *_started correspondant (même event_id).
+//    Vérifier : completed.elapsed_ms − started.elapsed_ms ≥ durée_min × 0.85.
+//    Incohérence de niveau entre started.targetLevel et completed.level → rejet.
+//    Absence de started pour un completed → flag suspect (vieux client, pas rejet).
+//    Plus de 3 completed sans started → suspect.
 //
-// 4. RECHERCHES
-//    durationDays < 1 → rejet.
-//    Plus de 15 research_completed (max théorique = 15 recherches) → rejet.
+// 4. ACTIONS PAR MINUTE / APM (impossible_timing)
+//    nb_events_actifs / (elapsed_ms / 60 000) — exclure resource_snapshot_periodic.
+//    Alerte : > 3 events/min sur > 10 min → flag.
+//    Rejet   : > 8 events/min (impossible humainement) → 422.
 //
-// 5. ACCUMULATION DE RESSOURCES
-//    Comparer snapshots successifs — seuils ci-dessus (section PAYLOADS).
-//    Cohérence rankingPoints entre snapshots et ranked_score_hint.
+// 5. COHÉRENCE RESSOURCES / COÛTS (impossible_resources)
+//    Reconstituer les dépenses via operation_result.moneySpent + coûts connus
+//    des reforms/doctrines/unités. Comparer avec revenus estimés par snapshots.
+//    Si ressources initiales + revenus − dépenses < −5 % de la valeur simulée → suspect.
+//    Si écart > −30 % (ressources impossiblement négatives) → rejet.
 //
-// 6. SÉQUENCE IMPOSSIBLE
-//    mandate_day qui régresse entre deux événements consécutifs → rejet.
-//    ranked_score_hint absent ou incohérent avec finalIndicators → suspect.
+// 6. PROGRESSION BÂTIMENTS (impossible_timing · invalid_event_sequence)
+//    Régression : level[n] < level[n-1] même bâtiment → rejet.
+//    Plusieurs upgrades au niveau max en < 10 min réelles → suspect.
+//    Nombre d'upgrades par bâtiment > maxLevel (défini dans data/buildings) → rejet.
 //
-// 7. OPÉRATIONS MILITAIRES
-//    Taux de succès calculé à partir des events military_op.success.
-//    > 95 % sur ≥ 5 ops → suspect (formule légitime plafonne à ≈ 90 %).
+// 7. RECHERCHES (impossible_timing)
+//    research_completed.durationDays < 1 → rejet.
+//    Plus de 15 research_completed → rejet.
+//    DURÉE MANDATE : mandate_day_completed − mandate_day_started (via events) < 1 → rejet.
+//
+// 8. OPÉRATIONS MILITAIRES (impossible_resources)
+//    Taux de succès > 95 % sur ≥ 5 ops → suspect (formule plafonne à ≈ 90 %).
+//    moneySpent < 0 ou > 10× coût théorique → rejet.
+//
+// 9. SÉQUENCE IMPOSSIBLE (invalid_event_sequence)
+//    mandate_day régresse entre deux événements consécutifs → rejet.
+//    ranked_score_hint absent ou écart > 20 pts avec finalIndicators → flag.
+//    events.seq non continu → rejet.
+//
+// 10. VERSION INCONNUE (unknown_app_version)
+//    appVersion absente ou < MIN_APP_VERSION env var → flag.
+//    Si MIN_APP_VERSION configuré et appVersion trop ancienne → rejet (403).
+//
+// 11. SOUMISSION DUPLIQUÉE (duplicate_submit)
+//    Run déjà au statut "validated" ou "rejected" → 409.
+//    Joueur ayant soumis une run validée dans les 23h → 429.
 //
 // ── SCORE DE CONFIANCE ───────────────────────────────────────────────────────
 //
-// Calculer un score 0–100 reflétant la fiabilité de la run avant de scorer.
-// Partir de 100 et soustraire des pénalités :
-//
-//   confiance -= 30  si durée impossible (→ rejet direct si < 0)
-//   confiance -= 20  si APM > seuil alerte (3/min sur > 10 min)
-//   confiance -= 20  si accumulation ressource 2× max théorique
-//   confiance -= 15  si upgrade trop rapide (durationRealMs < min × 0.85)
+//   confiance -= 30  si durée totale impossible                  (→ rejet direct)
+//   confiance -= 20  si APM > 3/min sur > 10 min
+//   confiance -= 20  si accumulation ressource > 2× max théorique / 5 min
+//   confiance -= 15  si timing upgrade/training impossible (elapsed delta)
 //   confiance -= 10  si taux succès ops > 95 % (≥ 5 ops)
 //   confiance -= 10  si ranked_score_hint absent ou incohérent (écart > 20 pts)
-//   confiance -= 5   si device déjà marqué suspect dans les 30 derniers jours
+//   confiance -= 10  si cohérence ressources < −30 %
+//   confiance -= 5   si device marqué suspect dans les 30 derniers jours
+//   confiance -= 5   si journalHash mismatch
+//   confiance -= 5   si > 3 completed sans started correspondant
 //
 // Politique :
-//   confiance ≥ 80 → run acceptée normalement
-//   confiance 50–79 → acceptée + flag suspect:true pour revue manuelle
-//   confiance < 50 → rejetée (422) même sans rejet dur individuel
+//   confiance ≥ 80 → run acceptée
+//   confiance 50–79 → acceptée + suspect:true pour revue manuelle (30 jours)
+//   confiance < 50 → rejetée (422)
 //
 // ── POLITIQUE DE TRAITEMENT ──────────────────────────────────────────────────
-//   - Rejet dur (422) : durée impossible, APM > 8/min, ressources × 10 max, confiance < 50.
-//   - Marquage suspect (200 + suspect:true) : confiance 50–79.
-//   - Ne pas bannir côté client. Le compte reste jouable en mode non classé.
-//   - Conserver les runs suspectes 30 jours pour revue manuelle.
-//   - Rate-limit : max 1 soumission par account toutes les 23h.
-//   - Rate-limit device : max 3 soumissions différents accounts / device / 24h.
+//   Rejet dur (422) : impossible_timing, APM > 8/min, impossible_resources,
+//                     invalid_event_sequence, confiance < 50.
+//   Marquage suspect (200 + suspect:true) : confiance 50–79.
+//   Ne pas bannir côté client.
+//   Rate-limit : max 1 run validée par account / 23h.
+//   Rate-limit device : max 3 comptes différents / device / 24h.
 

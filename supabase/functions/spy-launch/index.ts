@@ -12,6 +12,7 @@ const TARGET_COOLDOWN_MS = 24 * 60 * 60 * 1000;  // 24h same target
 const NEW_ACCOUNT_DAYS  = 7;
 
 const VALID_OP_TYPES = new Set(["intel_probe", "doctrine_scan", "score_range"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function currentSeason(): number {
   const now = new Date();
@@ -39,6 +40,9 @@ serve(async (req) => {
 
     if (!targetPlayerId || !opType) {
       return new Response(JSON.stringify({ error: "missing-fields" }), { status: 400, headers: CORS });
+    }
+    if (!UUID_RE.test(targetPlayerId)) {
+      return new Response(JSON.stringify({ error: "invalid-target" }), { status: 400, headers: CORS });
     }
     if (!VALID_OP_TYPES.has(opType)) {
       return new Response(JSON.stringify({ error: "invalid-op-type" }), { status: 400, headers: CORS });
@@ -127,7 +131,7 @@ serve(async (req) => {
 
     if (insertError || !op) {
       return new Response(
-        JSON.stringify({ error: "db-error", detail: insertError?.message }),
+        JSON.stringify({ error: "server-error" }),
         { status: 500, headers: CORS },
       );
     }
@@ -136,7 +140,7 @@ serve(async (req) => {
       JSON.stringify({ ok: true, opId: op.id, resolvesAt }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
+  } catch {
+    return new Response(JSON.stringify({ error: "server-error" }), { status: 500, headers: CORS });
   }
 });

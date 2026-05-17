@@ -20,14 +20,23 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: CORS });
     }
 
+    const VALID_PLATFORMS = new Set(["ios", "android", "web"]);
+    const MAX_VERSION_LEN = 64;
+
     const body = await req.json() as {
       platform?: string;
       osVersion?: string;
       appVersion?: string;
     };
 
-    if (!body.platform) {
-      return new Response(JSON.stringify({ error: "missing-platform" }), { status: 400, headers: CORS });
+    if (!body.platform || !VALID_PLATFORMS.has(body.platform)) {
+      return new Response(JSON.stringify({ error: "invalid-platform" }), { status: 400, headers: CORS });
+    }
+    if (body.osVersion && body.osVersion.length > MAX_VERSION_LEN) {
+      return new Response(JSON.stringify({ error: "field-too-long" }), { status: 400, headers: CORS });
+    }
+    if (body.appVersion && body.appVersion.length > MAX_VERSION_LEN) {
+      return new Response(JSON.stringify({ error: "field-too-long" }), { status: 400, headers: CORS });
     }
 
     const svc = createClient(
@@ -73,7 +82,7 @@ serve(async (req) => {
 
       if (insertError || !inserted) {
         return new Response(
-          JSON.stringify({ error: "db-error", detail: insertError?.message }),
+          JSON.stringify({ error: "server-error" }),
           { status: 500, headers: CORS },
         );
       }
@@ -84,7 +93,7 @@ serve(async (req) => {
       JSON.stringify({ deviceId }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
+  } catch {
+    return new Response(JSON.stringify({ error: "server-error" }), { status: 500, headers: CORS });
   }
 });

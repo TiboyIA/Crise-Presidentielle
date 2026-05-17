@@ -15,7 +15,10 @@ export async function loadStrategy(): Promise<StrategyGameState | null> {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StrategyGameState;
-    if (parsed.version !== CURRENT_VERSION) return null;
+    if (parsed.version !== CURRENT_VERSION) {
+      console.warn(`[strategyStorage] version mismatch (got ${parsed.version}, expected ${CURRENT_VERSION}) — discarding save`);
+      return null;
+    }
     return parsed;
   } catch {
     return null;

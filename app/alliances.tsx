@@ -38,6 +38,8 @@ function expiresLabel(expires_at: string | null): string {
 function inviteErrorMessage(error?: string): string {
   switch (error) {
     case "max-alliances-reached": return "Tu as déjà 3 alliances actives.";
+    case "cooldown-active":       return "Attends 48h avant de ré-inviter ce joueur.";
+    case "quota-exceeded":        return "Limite d'invitations atteinte pour aujourd'hui.";
     case "not-pending":           return "Cette invitation n'est plus en attente.";
     case "not-active":            return "Cette alliance n'est plus active.";
     case "network-unavailable":   return "Connexion indisponible.";

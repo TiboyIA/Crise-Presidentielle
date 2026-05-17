@@ -8,6 +8,20 @@ const CORS = {
 
 // ── Whitelists ────────────────────────────────────────────────────────────────
 
+// Internal IDs for snapshot / score_hint events (not news event IDs)
+const INTERNAL_EVENT_IDS = new Set([
+  "snapshot", "score_hint",
+]);
+
+// Entity-scoped event types: event_id is a buildingId / researchId / unitId.
+// Validated by regex, not whitelist (the server can't enumerate all game entities).
+const ENTITY_SCOPED_EVENT_TYPES = new Set([
+  "building_upgrade_started", "building_upgrade_completed",
+  "research_started", "research_completed",
+  "unit_training_started", "unit_training_completed",
+]);
+const ENTITY_ID_RE = /^[a-z][a-z0-9_]{0,63}$/;
+
 const KNOWN_EVENT_IDS = new Set([
   // Cyber
   "cyber_power_grid", "cyber_espionage_detected", "disinformation_wave", "cyber_banking",
@@ -55,6 +69,10 @@ const KNOWN_EVENT_IDS = new Set([
 const VALID_EVENT_TYPES = new Set([
   "crisis_choice", "reform_launched", "doctrine_set",
   "military_op", "game_over", "mandate_end",
+  "building_upgrade_started", "building_upgrade_completed",
+  "research_started", "research_completed",
+  "unit_training_started", "unit_training_completed",
+  "resource_snapshot_periodic", "operation_result", "ranked_score_hint",
 ]);
 
 // ── Score weights ─────────────────────────────────────────────────────────────
@@ -149,6 +167,7 @@ interface RunEvent {
   choice_id?: string;
   mandate_day: number;
   elapsed_ms: number;
+  payload?: Record<string, number | string | boolean>;
 }
 
 interface FinalIndicators {
@@ -177,7 +196,17 @@ function validateJournal(events: RunEvent[]): { ok: boolean; reason?: string } {
     if (!VALID_EVENT_TYPES.has(ev.event_type)) {
       return { ok: false, reason: `unknown-event-type-${ev.event_type}` };
     }
-    if (!KNOWN_EVENT_IDS.has(ev.event_id)) {
+    const isInternalType = ev.event_type === "resource_snapshot_periodic" || ev.event_type === "ranked_score_hint";
+    const isEntityType   = ENTITY_SCOPED_EVENT_TYPES.has(ev.event_type);
+    if (isInternalType) {
+      if (!INTERNAL_EVENT_IDS.has(ev.event_id)) {
+        return { ok: false, reason: `invalid_event_sequence` };
+      }
+    } else if (isEntityType) {
+      if (!ENTITY_ID_RE.test(ev.event_id)) {
+        return { ok: false, reason: `invalid_event_sequence` };
+      }
+    } else if (!KNOWN_EVENT_IDS.has(ev.event_id)) {
       return { ok: false, reason: `unknown-event-id-${ev.event_id}` };
     }
 
@@ -225,6 +254,97 @@ function computeScore(events: RunEvent[], mandateDays: number, ind: Partial<Fina
   return Math.max(0, score);
 }
 
+// ── Journal integrity hash (djb2, même algorithme que le client) ──────────────
+
+function computeJournalHash(events: RunEvent[]): string {
+  const str = JSON.stringify(events);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+    h = h >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+// ── Pairing started / completed ───────────────────────────────────────────────
+// Durées minimales en ms réels : UPGRADE_GAME_MIN[L] × 15000 ms/game-min × 0.85
+const UPGRADE_MIN_REAL_MS = [60,300,1200,3600,14400,28800,57600,115200,172800,259200]
+  .map((m) => m * 15_000 * 0.85);
+
+function validateStartCompletePairs(
+  events: RunEvent[],
+): { ok: boolean; suspect?: boolean; reason?: string } {
+  interface StartEntry { elapsedMs: number; targetLevel?: number; durationGameHours?: number; }
+  const buildingStarts = new Map<string, StartEntry>();
+  const researchStarts = new Map<string, { elapsedMs: number; mandateDay: number }>();
+  const trainingStarts = new Map<string, StartEntry>();
+  let missingStarts = 0;
+
+  for (const ev of events) {
+    const p = ev.payload ?? {};
+
+    if (ev.event_type === "building_upgrade_started") {
+      buildingStarts.set(ev.event_id, {
+        elapsedMs:   ev.elapsed_ms,
+        targetLevel: Number(p.targetLevel ?? 0),
+      });
+
+    } else if (ev.event_type === "building_upgrade_completed") {
+      const level = Number(p.level ?? 0);
+      const start = buildingStarts.get(ev.event_id);
+      if (!start) { missingStarts++; continue; }
+      if (start.targetLevel && start.targetLevel !== level) {
+        return { ok: false, reason: "invalid_event_sequence" };
+      }
+      const elapsed = ev.elapsed_ms - start.elapsedMs;
+      const minMs   = level >= 1 && level <= UPGRADE_MIN_REAL_MS.length
+        ? (UPGRADE_MIN_REAL_MS[level - 1] ?? 0) : 0;
+      if (minMs > 0 && elapsed < minMs) {
+        return { ok: false, reason: "impossible_timing" };
+      }
+      buildingStarts.delete(ev.event_id);
+
+    } else if (ev.event_type === "research_started") {
+      researchStarts.set(ev.event_id, { elapsedMs: ev.elapsed_ms, mandateDay: ev.mandate_day });
+
+    } else if (ev.event_type === "research_completed") {
+      const durationDays = Number(p.durationDays ?? 0);
+      const start = researchStarts.get(ev.event_id);
+      if (!start) { missingStarts++; }
+      if (durationDays < 1 || durationDays > 60) {
+        return { ok: false, reason: "impossible_timing" };
+      }
+      if (start && ev.mandate_day - start.mandateDay < 1) {
+        return { ok: false, reason: "impossible_timing" };
+      }
+      researchStarts.delete(ev.event_id);
+
+    } else if (ev.event_type === "unit_training_started") {
+      trainingStarts.set(ev.event_id, {
+        elapsedMs:        ev.elapsed_ms,
+        durationGameHours: Number(p.durationGameHours ?? 0),
+      });
+
+    } else if (ev.event_type === "unit_training_completed") {
+      const durationGameHours = Number(p.durationGameHours ?? 0);
+      const start = trainingStarts.get(ev.event_id);
+      if (!start) { missingStarts++; continue; }
+      if (durationGameHours < 0.1) {
+        return { ok: false, reason: "impossible_timing" };
+      }
+      // 1 game hour = 15 real min = 900 000 ms
+      const minRealMs = durationGameHours * 900_000 * 0.85;
+      if (ev.elapsed_ms - start.elapsedMs < minRealMs) {
+        return { ok: false, reason: "impossible_timing" };
+      }
+      trainingStarts.delete(ev.event_id);
+    }
+  }
+
+  // > 3 completed sans started = client très ancien ou tampon effacé — flag, pas rejet
+  return { ok: true, suspect: missingStarts > 3 };
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -242,11 +362,12 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { runId, events, finalIndicators, mandateDays, deviceId, appVersion } = body as {
+    const { runId, events, finalIndicators, mandateDays, journalHash, deviceId, appVersion } = body as {
       runId?: string;
       events?: RunEvent[];
       finalIndicators?: Partial<FinalIndicators>;
       mandateDays?: number;
+      journalHash?: string;
       deviceId?: string;
       appVersion?: string;
     };
@@ -288,6 +409,21 @@ serve(async (req) => {
 
     if (activeBan) {
       return new Response(JSON.stringify({ error: "player-banned" }), { status: 403, headers: CORS });
+    }
+
+    // Rate limit : max 1 run validée par account / 23h (duplicate_submit)
+    const since23h = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
+    const { count: recentValidated } = await service
+      .from("ranked_runs")
+      .select("*", { count: "exact", head: true })
+      .eq("player_id", user.id)
+      .eq("status", "validated")
+      .gte("submitted_at", since23h);
+    if ((recentValidated ?? 0) >= 1) {
+      return new Response(
+        JSON.stringify({ error: "rate-limited", reason: "duplicate_submit" }),
+        { status: 429, headers: CORS },
+      );
     }
 
     // Version blocklist — reject runs from outdated clients
@@ -351,6 +487,57 @@ serve(async (req) => {
         JSON.stringify({ ok: false, reason: validation.reason }),
         { status: 422, headers: { ...CORS, "Content-Type": "application/json" } },
       );
+    }
+
+    // Journal integrity hash (corruption detection — not a security proof)
+    if (journalHash) {
+      const expectedHash = computeJournalHash(events);
+      if (journalHash !== expectedHash) {
+        await service.from("sanctions").insert({
+          player_id: user.id,
+          run_id: runId,
+          reason: "journal-hash-mismatch",
+          severity: "flag",
+        });
+      }
+    } else {
+      // appVersion absent ou hash manquant → client très ancien → flag unknown_app_version
+      await service.from("sanctions").insert({
+        player_id: user.id,
+        run_id: runId,
+        reason: "unknown_app_version",
+        severity: "flag",
+      });
+    }
+
+    // Start / complete pairing check
+    const pairingCheck = validateStartCompletePairs(events);
+    if (!pairingCheck.ok) {
+      await service.from("ranked_runs").update({
+        status: "rejected",
+        reject_reason: pairingCheck.reason,
+        submitted_at: new Date().toISOString(),
+      }).eq("id", runId);
+
+      await service.from("sanctions").insert({
+        player_id: user.id,
+        run_id: runId,
+        reason: `pairing-rejected: ${pairingCheck.reason}`,
+        severity: "warn",
+      });
+
+      return new Response(
+        JSON.stringify({ ok: false, reason: pairingCheck.reason }),
+        { status: 422, headers: { ...CORS, "Content-Type": "application/json" } },
+      );
+    }
+    if (pairingCheck.suspect) {
+      await service.from("sanctions").insert({
+        player_id: user.id,
+        run_id: runId,
+        reason: "missing-start-events: possible old client",
+        severity: "flag",
+      });
     }
 
     // Indicator coherence check
@@ -471,7 +658,7 @@ serve(async (req) => {
       JSON.stringify({ ok: true, score: finalScore, ...(penaltyPct > 0 ? { penaltyPct } : {}) }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
+  } catch {
+    return new Response(JSON.stringify({ error: "server-error" }), { status: 500, headers: CORS });
   }
 });

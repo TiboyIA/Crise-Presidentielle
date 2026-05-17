@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import React, {
   createContext,
   useCallback,
@@ -210,8 +211,16 @@ export function EntitlementsProvider({
           realPacks = await readVerifiedCache();
         }
 
-        // Local debug grants (grantLocal) sit on top of real purchases.
-        const allPaid = Array.from(new Set<EventPack>([...stored.packs, ...realPacks]));
+        // When the server is reachable on a native build, trust server only.
+        // stored.packs (AsyncStorage, unencrypted) could be modified on rooted/jailbroken
+        // devices — merging it when we have a definitive server answer would let a tampered
+        // local grant override a "not purchased" server response.
+        // On web (preview/dev), the real RC SDK is unavailable so grantLocal() is used as
+        // a stub after onPurchase(); we preserve that behaviour by including stored.packs.
+        const useLocalGrants = !serverOnline || Platform.OS === "web";
+        const allPaid = useLocalGrants
+          ? Array.from(new Set<EventPack>([...stored.packs, ...realPacks]))
+          : realPacks;
         setPacks(mergeWithFree(allPaid));
         setLoaded(true);
       }),

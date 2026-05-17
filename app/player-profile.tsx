@@ -86,6 +86,7 @@ export default function PlayerProfileScreen() {
       case "max-alliances-reached":   return "Tu as déjà 3 alliances actives.";
       case "alliance-already-exists": return "Une relation d'alliance existe déjà avec ce joueur.";
       case "cooldown-active":         return "Attends 48h avant de ré-inviter ce joueur.";
+      case "quota-exceeded":          return "Limite d'invitations atteinte pour aujourd'hui.";
       case "network-unavailable":     return "Connexion indisponible.";
       default:                        return "Erreur lors de l'invitation.";
     }

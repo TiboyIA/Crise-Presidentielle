@@ -8,6 +8,11 @@ const CORS = {
 
 const MIN_SUBMIT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes entre soumissions
 
+// ZERO TRUST: cet endpoint acceptait un score soumis directement par le client,
+// contournant le système anti-triche de ranked-submit. Désactivé le 2026-05-18.
+// Ne réactiver que si le score est recalculé côté serveur avant insertion.
+const ENDPOINT_DISABLED = true;
+
 const VALID_COUNTRY_IDS = new Set([
   "france","usa","china","russia","germany","uk","india","japan","brazil",
   "turkey","iran","israel","south_korea","italy","saudi_arabia","australia",
@@ -26,6 +31,13 @@ function currentSeason(): number {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  if (ENDPOINT_DISABLED) {
+    return new Response(
+      JSON.stringify({ error: "endpoint-disabled", use: "ranked-submit" }),
+      { status: 410, headers: { ...CORS, "Content-Type": "application/json" } },
+    );
+  }
 
   try {
     const anonClient = createClient(
@@ -152,7 +164,7 @@ serve(async (req) => {
       JSON.stringify({ ok: true, score, improved: !existing || score > existing.score }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
+  } catch {
+    return new Response(JSON.stringify({ error: "server-error" }), { status: 500, headers: CORS });
   }
 });

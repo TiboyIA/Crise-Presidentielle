@@ -96,7 +96,7 @@ async function onAuthenticated(token: string, userId: string): Promise<void> {
 
   const appVersion = (Constants.expoConfig?.version ?? "0.0.0") as string;
   registerDevice(token, appVersion); // fire-and-forget
-  retryPendingSubmission();    // retry ranked submit if network was unavailable last time
+  retryPendingSubmission(token); // retry ranked submit if network was unavailable last time
 
   // Cloud save sync — restore cloud save if it's newer than local
   const local = await loadStrategy();
@@ -175,9 +175,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     type OAuthCreds = import("@supabase/supabase-js").SignInWithOAuthCredentials;
     const creds: OAuthCreds = { provider, options: { redirectTo } };
     const { data, error } = await sb.auth.linkIdentity(creds);
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      // Map Supabase SDK errors to internal codes — never forward error.message to UI
+      // (it can contain internal details like "invalid_grant", stack context, etc.).
+      const msg = error.message ?? "";
+      if (msg.toLowerCase().includes("already")) return { ok: false, error: "identity-already-linked" };
+      return { ok: false, error: "oauth-failed" };
+    }
     const url = (data as { url?: string })?.url;
     if (!url) return { ok: false, error: "no-url" };
+
+    // Defense in depth: verify the OAuth URL originates from our Supabase project.
+    // linkIdentity() returns a Supabase /auth/v1/authorize URL; an unexpected origin
+    // would indicate SDK tampering or a misconfigured project.
+    const expectedOrigin = SUPABASE_URL.replace(/\/$/, "");
+    if (!url.startsWith(expectedOrigin)) {
+      return { ok: false, error: "oauth-failed" };
+    }
+
     const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
     if (result.type !== "success") return { ok: false, error: "cancelled" };
     return { ok: true };

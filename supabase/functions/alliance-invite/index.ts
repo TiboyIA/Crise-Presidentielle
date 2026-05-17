@@ -7,7 +7,9 @@ const CORS = {
 };
 
 const MAX_ACTIVE_ALLIANCES = 3;
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_DAILY_INVITES    = 10;
+const INVITE_TTL_MS        = 7 * 24 * 60 * 60 * 1000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function sendPush(token: string | null | undefined, title: string, body: string): Promise<void> {
   if (!token?.startsWith("ExponentPushToken[")) return;
@@ -34,8 +36,8 @@ serve(async (req) => {
 
     const { targetPlayerId } = await req.json() as { targetPlayerId?: string };
 
-    if (!targetPlayerId) {
-      return new Response(JSON.stringify({ error: "missing-target" }), { status: 400, headers: CORS });
+    if (!targetPlayerId || !UUID_RE.test(targetPlayerId)) {
+      return new Response(JSON.stringify({ error: "invalid-target" }), { status: 400, headers: CORS });
     }
     if (targetPlayerId === user.id) {
       return new Response(JSON.stringify({ error: "cannot-invite-self" }), { status: 400, headers: CORS });
@@ -54,6 +56,17 @@ serve(async (req) => {
       .eq("status", "validated");
     if ((validRuns ?? 0) < 1) {
       return new Response(JSON.stringify({ error: "no-validated-run" }), { status: 403, headers: CORS });
+    }
+
+    // Daily invite quota: max 10 invitations per 24h regardless of outcome
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count: dailyInvites } = await service
+      .from("alliances")
+      .select("*", { count: "exact", head: true })
+      .eq("initiator_id", user.id)
+      .gte("created_at", since24h);
+    if ((dailyInvites ?? 0) >= MAX_DAILY_INVITES) {
+      return new Response(JSON.stringify({ error: "quota-exceeded" }), { status: 429, headers: CORS });
     }
 
     // Target must exist; fetch push_token in same query
@@ -111,7 +124,7 @@ serve(async (req) => {
 
     if (insertError || !alliance) {
       return new Response(
-        JSON.stringify({ error: "db-error", detail: insertError?.message }),
+        JSON.stringify({ error: "server-error" }),
         { status: 500, headers: CORS },
       );
     }
@@ -123,7 +136,7 @@ serve(async (req) => {
       JSON.stringify({ ok: true, allianceId: alliance.id }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
+  } catch {
+    return new Response(JSON.stringify({ error: "server-error" }), { status: 500, headers: CORS });
   }
 });

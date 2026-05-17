@@ -447,6 +447,10 @@ export interface StrategyGameState {
   playerUnits: import("@/types/units").PlayerUnit[];
   trainingQueue: import("@/types/units").TrainingQueueEntry[];
   militaryDoctrine: import("@/types/units").MilitaryDoctrineId;
+  // SECURITY NOTE: premiumGold lives in AsyncStorage (unencrypted game save) and
+  // can be modified on rooted devices. Any feature that consumes it MUST validate
+  // the entitlement server-side (player-entitlements Edge Function) before granting
+  // a gameplay advantage. Never gate a competitive benefit on this field alone.
   premiumGold: number;
   // Mémoire du peuple + opposition
   publicMemory: PublicMemory;

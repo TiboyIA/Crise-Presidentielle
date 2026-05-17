@@ -591,6 +591,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         gameDay:  state.mandateDay,
         metadata: { buildingId: id, toLevel: building.level + 1 },
       });
+      void rankRecord("building_upgrade_started", id, state.mandateDay, undefined, {
+        targetLevel: building.level + 1,
+      });
       return { success: true };
     },
     [state, update],
@@ -669,6 +672,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       });
 
       rankRecord("military_op", type, mandateDaySnap, undefined, { success: result.success });
+      void rankRecord("operation_result", type, mandateDaySnap, undefined, {
+        success:         result.success,
+        moneySpent:      op.cost.money ?? 0,
+        influenceSpent:  op.cost.influence ?? 0,
+        rankingGained:   result.rankingPoints,
+      });
       void telemetry("operation_launched", {
         gameDay:  mandateDaySnap,
         metadata: { operationType: type, success: result.success },
@@ -844,12 +853,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         totalCost[k] = (totalCost[k] ?? 0) + v * quantity;
       }
       if (!canAfford(totalCost, state.resources)) return { success: false, reason: "Ressources insuffisantes" };
+      // trainingTimeSec est en secondes jeu → convertir en heures jeu
+      const durationGameHours = (def.trainingTimeSec * quantity) / 3600;
       update((prev) => {
-        const resources         = deductCost(totalCost, prev.resources);
-        const now               = clockNow();
-        const gameHourNow       = currentGameHour(prev.startedAt);
-        // trainingTimeSec est en secondes jeu → convertir en heures jeu
-        const durationGameHours = (def.trainingTimeSec * quantity) / 3600;
+        const resources   = deductCost(totalCost, prev.resources);
+        const now         = clockNow();
+        const gameHourNow = currentGameHour(prev.startedAt);
         const entry: TrainingQueueEntry = {
           id:               `${unitId}_${now}`,
           unitId,
@@ -861,6 +870,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           status:           "training",
         };
         return withNews({ ...prev, resources, trainingQueue: [...prev.trainingQueue, entry] });
+      });
+      void rankRecord("unit_training_started", unitId, state.mandateDay, undefined, {
+        quantity,
+        durationGameHours,
       });
       return { success: true };
     },
@@ -971,6 +984,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       });
       void trackActionUsed(`research_${id}`);
       void telemetry("research_started", { gameDay: state.mandateDay, metadata: { researchId: id } });
+      void rankRecord("research_started", id, state.mandateDay, undefined, {
+        durationDays: def.durationDays,
+      });
       return { success: true };
     },
     [state, update],

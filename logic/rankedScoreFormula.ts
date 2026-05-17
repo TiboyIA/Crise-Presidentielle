@@ -2,8 +2,10 @@
  * rankedScoreFormula.ts — Formule de score classé robuste
  * ═══════════════════════════════════════════════════════════════════════════════
  *
- * SOURCE DE VÉRITÉ pour la formule côté client ET documentation de référence
- * pour l'implémentation serveur (ranked-submit Edge Function).
+ * DOCUMENTATION DE RÉFÉRENCE uniquement — aucun calcul de ce fichier n'est
+ * envoyé au serveur ni utilisé pour le classement. Le score affiché au joueur
+ * provient toujours de ranked-submit (serveur). Si la formule serveur change,
+ * mettre à jour ce fichier en parallèle pour la cohérence.
  *
  * PRINCIPE FONDAMENTAL
  *   Le score final N'EST PAS calculé côté client.

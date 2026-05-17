@@ -11,6 +11,8 @@ function currentSeason(): number {
   return now.getUTCFullYear() * 100 + (now.getUTCMonth() + 1);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -26,8 +28,8 @@ serve(async (req) => {
     }
 
     const { targetPlayerId } = await req.json() as { targetPlayerId?: string };
-    if (!targetPlayerId) {
-      return new Response(JSON.stringify({ error: "missing-fields" }), { status: 400, headers: CORS });
+    if (!targetPlayerId || !UUID_RE.test(targetPlayerId)) {
+      return new Response(JSON.stringify({ error: "invalid-target" }), { status: 400, headers: CORS });
     }
     if (targetPlayerId === user.id) {
       return new Response(JSON.stringify({ error: "self-attack" }), { status: 400, headers: CORS });
@@ -133,7 +135,7 @@ serve(async (req) => {
       JSON.stringify({ ok: true, resolvesAt }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: CORS });
+  } catch {
+    return new Response(JSON.stringify({ error: "server-error" }), { status: 500, headers: CORS });
   }
 });
