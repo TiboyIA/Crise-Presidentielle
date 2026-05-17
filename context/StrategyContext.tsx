@@ -58,7 +58,7 @@ import type { StrategyResearchId, StrategyResearchState } from "@/types/strategy
 import { trackGameStarted, trackCrisisResolved, trackActionUsed } from "@/storage/balanceStorage";
 import { track as telemetry } from "@/services/TelemetryService";
 import { COUNTRIES } from "@/data/countries";
-import { recordEvent as rankRecord } from "@/services/RankedService";
+import { recordEvent as rankRecord, isRankedIntended } from "@/services/RankedService";
 import type {
   AchievementId,
   BuildingId,
@@ -237,6 +237,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const auth = useAuth();
   const allianceBonusRef = useRef(0);
+  // Refs pour détection de complétion côté classé (comparaison inter-render)
+  const stateRef            = useRef<StrategyGameState | null>(null);
+  const prevBuildingsRef    = useRef<StrategyGameState["buildings"]>([]);
+  const prevResearchRef     = useRef<StrategyGameState["strategyResearch"]>(undefined);
 
   useEffect(() => {
     if (!auth.isEnabled || !auth.accessToken) { allianceBonusRef.current = 0; return; }
@@ -408,6 +412,52 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       };
     });
   }, [update]);
+
+  // ── Anti-triche classé : collecte d'événements côté client ──────────────────
+  // Aucune validation ici — les données sont envoyées au serveur à la soumission.
+
+  // Maintient stateRef à jour pour les intervalles sans recréer leur closure.
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  // Détecte les améliorations de bâtiments terminées (upgradeEndTime null → level++).
+  useEffect(() => {
+    if (!state || !isRankedIntended()) { prevBuildingsRef.current = state?.buildings ?? []; return; }
+    for (const b of state.buildings) {
+      const prev = prevBuildingsRef.current.find((p) => p.id === b.id);
+      if (prev && prev.upgradeEndTime !== null && b.upgradeEndTime === null && b.level > 0) {
+        void rankRecord("building_upgrade_completed", b.id, state.mandateDay, undefined, { level: b.level });
+      }
+    }
+    prevBuildingsRef.current = state.buildings;
+  }, [state?.buildings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Détecte les recherches terminées (inProgress → null + completed grandit).
+  useEffect(() => {
+    const curr = state?.strategyResearch;
+    const prev = prevResearchRef.current;
+    if (state && curr && isRankedIntended() && prev?.inProgress && !curr.inProgress) {
+      const newlyDone = curr.completed.find((id) => !prev.completed.includes(id));
+      if (newlyDone) void rankRecord("research_completed", newlyDone, state.mandateDay);
+    }
+    prevResearchRef.current = curr;
+  }, [state?.strategyResearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Snapshot de ressources toutes les 5 minutes (5 × 60 s) pour le mode classé.
+  useEffect(() => {
+    if (!loaded) return;
+    let count = 0;
+    const id = setInterval(() => {
+      count++;
+      if (count % 5 !== 0 || !isRankedIntended() || !stateRef.current) return;
+      const s = stateRef.current;
+      void rankRecord("resource_snapshot_periodic", "snapshot", s.mandateDay, undefined, {
+        money:    Math.round(s.resources.money),
+        influence: Math.round(s.resources.influence),
+        power:    s.stats.globalPower,
+      });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [loaded]);
 
   const tick = useCallback(() => {
     update((prev) => {
@@ -810,6 +860,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   );
 
   const collectTraining = useCallback(() => {
+    // Ranked: enregistrer les unités collectées avant la mise à jour d'état
+    if (isRankedIntended() && state) {
+      for (const entry of state.trainingQueue.filter((e) => e.status === "completed")) {
+        void rankRecord("unit_training_completed", entry.unitId, state.mandateDay, undefined, {
+          quantity: entry.quantity,
+        });
+      }
+    }
     update((prev) => {
       const completed = prev.trainingQueue.filter((e) => e.status === "completed");
       if (completed.length === 0) return prev;
@@ -825,7 +883,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       }
       return withNews(advanceMandateDay({ ...prev, trainingQueue: remaining, playerUnits: units }, 0));
     });
-  }, [update]);
+  }, [update, state]);
 
   const setMilitaryDoctrine = useCallback(
     (id: MilitaryDoctrineId): { success: boolean; reason?: string } => {

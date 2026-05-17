@@ -32,7 +32,11 @@ export type RankedEventType =
   | "doctrine_set"
   | "military_op"
   | "game_over"
-  | "mandate_end";
+  | "mandate_end"
+  | "building_upgrade_completed"   // bâtiment terminé — vérification durée minimale côté serveur
+  | "research_completed"           // recherche terminée — contrôle durationDays minimal
+  | "unit_training_completed"      // unités collectées — contrôle durée de formation
+  | "resource_snapshot_periodic";  // snapshot 5 min — détecte accumulation impossible
 
 export interface RunEvent {
   seq: number;
@@ -40,7 +44,8 @@ export interface RunEvent {
   event_id: string;
   choice_id?: string;
   mandate_day: number;
-  elapsed_ms: number; // ms since run startedAt
+  elapsed_ms: number;                                         // ms since run startedAt
+  payload?: Record<string, number | string | boolean>;        // contexte structuré, aucune PII
 }
 
 interface RunMeta {
@@ -151,12 +156,14 @@ export async function startRankedRun(
 /**
  * Records one game event to the local journal.
  * No-op if there is no active ranked run.
+ * payload : données structurées pour validation serveur — jamais de PII.
  */
 export async function recordEvent(
   eventType: RankedEventType,
   eventId: string,
   mandateDay: number,
   choiceId?: string,
+  payload?: Record<string, number | string | boolean>,
 ): Promise<void> {
   const meta = await loadMeta();
   if (!meta) return;
@@ -169,6 +176,7 @@ export async function recordEvent(
     choice_id: choiceId,
     mandate_day: mandateDay,
     elapsed_ms: Date.now() - meta.startedAt,
+    ...(payload ? { payload } : {}),
   });
 }
 
@@ -278,3 +286,53 @@ export async function hasPendingSubmission(): Promise<boolean> {
 export async function abandonRun(): Promise<void> {
   await clearRun();
 }
+
+// ── Notes serveur : validation anti-triche (ranked-submit) ───────────────────
+//
+// Le serveur reçoit { runId, events: RunEvent[], finalIndicators, mandateDays,
+// deviceId?, appVersion? }. Aucune validation définitive côté client.
+// Toute run rejetée retourne HTTP 422 ; suspecte retourne 200 ok:true + flag
+// "suspect:true" pour revue manuelle. Ne pas bannir automatiquement.
+//
+// 1. DURÉE MINIMALE PLAUSIBLE
+//    elapsed_ms du dernier événement doit être ≥ mandateDays × REAL_MS_PER_GAME_DAY
+//    (REAL_MS_PER_GAME_DAY = 6h = 21 600 000 ms côté serveur).
+//    Tolérance : −20 % pour les dérives d'horloge mobile.
+//    Seuil de rejet dur : elapsed_ms < mandateDays × 21_600_000 × 0.8
+//
+// 2. ACTIONS PAR MINUTE
+//    Calculer nb_events / (elapsed_ms / 60_000).
+//    Seuil d'alerte : > 3 events/min en moyenne sur plus de 10 min.
+//    Seuil de rejet : > 8 events/min (impossible humainement).
+//    Ne pas compter les "resource_snapshot_periodic" dans ce ratio.
+//
+// 3. PROGRESSION BÂTIMENTS IMPOSSIBLE
+//    Pour chaque "building_upgrade_completed", lire payload.level et l'elapsed_ms.
+//    Le niveau L d'un bâtiment a une upgradeDuration minimale connue côté serveur
+//    (table UPGRADE_DURATIONS_SEC : [60,300,1200,3600,14400,28800,57600,115200,172800,259200] sec jeu).
+//    Vérifier que l'écart en elapsed_ms entre le start et la completion de niveau L
+//    est ≥ UPGRADE_DURATIONS_SEC[L-1] × (1000/240) × 0.85 (tolérance 15 %).
+//    Si plusieurs niveaux max en moins de 10 min réelles → marquer suspect.
+//
+// 4. ACCUMULATION DE RESSOURCES INCOHÉRENTE
+//    Comparer les snapshots "resource_snapshot_periodic" successifs.
+//    Le gain max théorique entre deux snapshots (5 min = 300 000 ms) est :
+//      max_money_per_min ≈ 250 (central_bank lvl 10 + economy_ministry lvl 10)
+//      → gain_5min ≤ 250 × 5 = 1 250
+//    Si money augmente de plus de 2× le maximum théorique entre deux snapshots
+//    sans building_upgrade_completed ni crisis_choice dans l'intervalle → rejet.
+//    Même logique pour influence, military, cyberDefense.
+//
+// 5. SÉQUENCE IMPOSSIBLE
+//    "research_completed" sans "research_started" connu (non présent dans le journal
+//    car launchStrategyResearch ne fait pas encore rankRecord — à ajouter si besoin).
+//    "building_upgrade_completed" avec payload.level qui régresse → rejet.
+//    mandate_day qui régresse entre deux événements consécutifs → rejet.
+//
+// 6. POLITIQUE DE TRAITEMENT
+//    - Rejet dur (422) : durée impossible, actions/min > seuil dur, ressources × 10 max théorique.
+//    - Marquage suspect (200 + suspect:true) : accumulation 2×, séquence atypique, device récidiviste.
+//    - Ne pas bannir côté client. Le compte reste jouable en mode non classé.
+//    - Conserver les runs suspectes 30 jours pour revue manuelle.
+//    - Implémenter un rate-limit : max 1 soumission toutes les 23h par compte.
+
