@@ -11,6 +11,7 @@ import { MissionCard } from "@/components/MissionCard";
 import { Badge, Panel, SectionHeader } from "@/components/ui";
 import { StrategicClock } from "@/components/StrategicClock";
 import { BUILDINGS } from "@/data/buildings";
+import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { COUNTRIES } from "@/data/countries";
 import { DOCTRINES, DOCTRINE_LIST } from "@/data/doctrines";
 import { REFORMS, REFORM_LIST, CATEGORY_COLOR } from "@/data/reforms";
@@ -471,6 +472,11 @@ export default function NationScreen() {
             const unread = item.route === "/journal-crise" ? (state.news?.unreadCount ?? 0) : 0;
             const upgrades = item.route === "/buildings" && upgrading.length > 0 ? upgrading.length : 0;
             const claimable = item.route === "/missions" && pendingMissions.length > 0 ? pendingMissions.length : 0;
+            const hasCriticalPending = item.route === "/journal-crise" &&
+              (state.news?.pendingIds ?? []).some((id) => {
+                const e = NEWS_EVENT_MAP[id];
+                return e?.isInteractive && e?.urgency === "critique";
+              });
             const cellW = `${Math.floor(100 / navCols) - 1}%` as const;
             return (
               <Pressable
@@ -489,11 +495,15 @@ export default function NationScreen() {
                   <View style={[styles.navAccent, { backgroundColor: (item.tint ?? PALETTE.crimson) + "22" }]} />
                   <View style={styles.navIconRow}>
                     <MaterialCommunityIcons name={item.mcIcon} size={26} color={item.tint ?? PALETTE.gold} />
-                    {(unread > 0 || upgrades > 0 || claimable > 0) && (
+                    {hasCriticalPending ? (
+                      <View style={[styles.navBadge, styles.navBadgeCritique]}>
+                        <Text style={styles.navBadgeText}>CRITIQUE</Text>
+                      </View>
+                    ) : (unread > 0 || upgrades > 0 || claimable > 0) ? (
                       <View style={styles.navBadge}>
                         <Text style={styles.navBadgeText}>{unread > 9 ? "9+" : unread + upgrades + claimable}</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                   <Text style={styles.navLabel}>{item.label}</Text>
                 </LinearGradient>
@@ -645,6 +655,7 @@ const styles = StyleSheet.create({
   navAccent: { position: "absolute", top: 0, left: 0, right: 0, height: 3 },
   navIconRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" },
   navBadge: { backgroundColor: PALETTE.danger, borderRadius: 8, minWidth: 18, height: 18, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  navBadgeCritique: { backgroundColor: "#FF3040", borderRadius: 4, minWidth: 50, height: 16, paddingHorizontal: 5 },
   navBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: "#fff" },
   navLabel: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh, letterSpacing: 0.3 },
 

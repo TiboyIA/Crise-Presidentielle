@@ -17,6 +17,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CrisisAlertOverlay } from "@/components/CrisisAlertOverlay";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
@@ -49,6 +50,8 @@ function PushRegistrar() {
 
 function RootLayoutNav() {
   return (
+    <>
+    <CrisisAlertOverlay />
     <Stack
       screenOptions={{
         headerShown: false,
@@ -87,6 +90,7 @@ function RootLayoutNav() {
       <Stack.Screen name="game-over" />
       <Stack.Screen name="shop" options={{ presentation: "modal" }} />
     </Stack>
+    </>
   );
 }
 
