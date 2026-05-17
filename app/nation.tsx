@@ -28,6 +28,7 @@ import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
 import { isRankedIntended } from "@/services/RankedService";
 import { computeFrustration } from "@/logic/playerExperienceEngine";
+import { computePlayerStyle } from "@/logic/playerSegmentation";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -75,7 +76,8 @@ export default function NationScreen() {
   const [advisorDismissed, setAdvisorDismissed] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
 
-  const frustration = useMemo(() => (state ? computeFrustration(state) : null), [state]);
+  const frustration   = useMemo(() => (state ? computeFrustration(state) : null),   [state]);
+  const playerStyle   = useMemo(() => (state ? computePlayerStyle(state) : null),   [state]);
 
   if (!state) return null;
 
@@ -201,6 +203,20 @@ export default function NationScreen() {
               </View>
               <Text style={styles.xpVal}>{state.stats.presidentXP}/100</Text>
             </View>
+
+            {/* PROFIL STRATÉGIQUE — visible dès le jour 5 */}
+            {playerStyle && (
+              <View style={styles.styleChip}>
+                <MaterialCommunityIcons
+                  name={playerStyle.def.icon as any}
+                  size={10}
+                  color={playerStyle.def.color}
+                />
+                <Text style={[styles.styleChipText, { color: playerStyle.def.color }]}>
+                  Profil : {playerStyle.def.label}
+                </Text>
+              </View>
+            )}
           </View>
         </LinearGradient>
       </ImageBackground>
@@ -843,4 +859,20 @@ const styles = StyleSheet.create({
   advisorMissionLabel: { fontSize: 10, fontFamily: FONT.semi, color: "#4a9fff", flex: 1 },
   advisorAction: { flexDirection: "row", alignItems: "center", gap: 4, justifyContent: "flex-end" },
   advisorActionLabel: { fontSize: 10, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 0.5 },
+
+  // Style chip — profil stratégique discret dans le hero
+  styleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 5,
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  styleChipText: { fontSize: 9, fontFamily: FONT.med, letterSpacing: 0.8 },
 });
