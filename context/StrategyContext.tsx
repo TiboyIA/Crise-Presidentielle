@@ -425,7 +425,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     for (const b of state.buildings) {
       const prev = prevBuildingsRef.current.find((p) => p.id === b.id);
       if (prev && prev.upgradeEndTime !== null && b.upgradeEndTime === null && b.level > 0) {
-        void rankRecord("building_upgrade_completed", b.id, state.mandateDay, undefined, { level: b.level });
+        void rankRecord("building_upgrade_completed", b.id, state.mandateDay, undefined, {
+          level:         b.level,
+          durationRealMs: prev.upgradeStartTime ? Date.now() - prev.upgradeStartTime : 0,
+        });
       }
     }
     prevBuildingsRef.current = state.buildings;
@@ -437,7 +440,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     const prev = prevResearchRef.current;
     if (state && curr && isRankedIntended() && prev?.inProgress && !curr.inProgress) {
       const newlyDone = curr.completed.find((id) => !prev.completed.includes(id));
-      if (newlyDone) void rankRecord("research_completed", newlyDone, state.mandateDay);
+      if (newlyDone) void rankRecord("research_completed", newlyDone, state.mandateDay, undefined, {
+        durationDays: prev.inProgress.completesAtDay - prev.inProgress.startedAtDay,
+      });
     }
     prevResearchRef.current = curr;
   }, [state?.strategyResearch]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -451,9 +456,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       if (count % 5 !== 0 || !isRankedIntended() || !stateRef.current) return;
       const s = stateRef.current;
       void rankRecord("resource_snapshot_periodic", "snapshot", s.mandateDay, undefined, {
-        money:    Math.round(s.resources.money),
-        influence: Math.round(s.resources.influence),
-        power:    s.stats.globalPower,
+        money:         Math.round(s.resources.money),
+        influence:     Math.round(s.resources.influence),
+        military:      Math.round(s.resources.military),
+        cyberDefense:  Math.round(s.resources.cyberDefense),
+        power:         s.stats.globalPower,
+        rankingPoints: s.stats.rankingPoints,
       });
     }, 60_000);
     return () => clearInterval(id);
@@ -660,7 +668,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         return withNews(advanceMandateDay(baseOp, 0));
       });
 
-      rankRecord("military_op", type, mandateDaySnap);
+      rankRecord("military_op", type, mandateDaySnap, undefined, { success: result.success });
       void telemetry("operation_launched", {
         gameDay:  mandateDaySnap,
         metadata: { operationType: type, success: result.success },
@@ -864,7 +872,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     if (isRankedIntended() && state) {
       for (const entry of state.trainingQueue.filter((e) => e.status === "completed")) {
         void rankRecord("unit_training_completed", entry.unitId, state.mandateDay, undefined, {
-          quantity: entry.quantity,
+          quantity:         entry.quantity,
+          durationGameHours: entry.durationGameHours ?? 0,
         });
       }
     }

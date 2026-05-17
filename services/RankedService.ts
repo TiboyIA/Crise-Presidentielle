@@ -36,7 +36,8 @@ export type RankedEventType =
   | "building_upgrade_completed"   // bâtiment terminé — vérification durée minimale côté serveur
   | "research_completed"           // recherche terminée — contrôle durationDays minimal
   | "unit_training_completed"      // unités collectées — contrôle durée de formation
-  | "resource_snapshot_periodic";  // snapshot 5 min — détecte accumulation impossible
+  | "resource_snapshot_periodic"   // snapshot 5 min — détecte accumulation impossible
+  | "ranked_score_hint";           // résumé vérifiable juste avant soumission — croisé avec journal côté serveur
 
 export interface RunEvent {
   seq: number;
@@ -65,11 +66,14 @@ interface PendingSubmit {
 }
 
 export interface FinalIndicators {
-  popularity: number;
-  economy: number;
-  security: number;
-  ecology: number;
-  cohesion: number;
+  popularity:    number; // 0–100
+  economy:       number; // 0–100
+  security:      number; // 0–100
+  ecology:       number; // 0–100
+  cohesion:      number; // 0–100
+  globalPower:   number; // 0–∞  — ajouté pour la formule de score robuste
+  rankingPoints: number; // 0–∞  — cross-validation avec progression en jeu
+  publicBudget:  number; // −150–100 — pénalise les mandats en déficit
 }
 
 export interface SubmitResult {
@@ -294,45 +298,100 @@ export async function abandonRun(): Promise<void> {
 // Toute run rejetée retourne HTTP 422 ; suspecte retourne 200 ok:true + flag
 // "suspect:true" pour revue manuelle. Ne pas bannir automatiquement.
 //
+// ── PAYLOADS PAR TYPE D'ÉVÉNEMENT ────────────────────────────────────────────
+//
+//  building_upgrade_completed  { level: number, durationRealMs: number }
+//    → durationRealMs = Date.now() - upgradeStartTime (real ms, côté client)
+//    → valider que durationRealMs ≥ UPGRADE_DURATIONS_REAL_MS[level-1] × 0.85
+//    → UPGRADE_DURATIONS_REAL_MS[L] = UPGRADE_DURATIONS_SEC[L] × (3600000/240)
+//    → UPGRADE_DURATIONS_SEC = [60,300,1200,3600,14400,28800,57600,115200,172800,259200]
+//
+//  research_completed          { durationDays: number }
+//    → durationDays = completesAtDay − startedAtDay (jours de mandat)
+//    → durée minimale théorique par recherche : 1 jour (serveur connaît les defs)
+//    → rejet si durationDays < 1 ou > 60
+//
+//  unit_training_completed     { quantity: number, durationGameHours: number }
+//    → durationGameHours = durée prévue pour quantity unités (stockée côté client)
+//    → durée minimale : 1h jeu par unité de base (serveur connaît UNITS defs)
+//    → rejet si durationGameHours < 0.1
+//
+//  resource_snapshot_periodic  { money, influence, military, cyberDefense, power, rankingPoints }
+//    → snapshots toutes les 5 min réelles
+//    → comparer snapshots successifs pour détecter accumulation impossible
+//    → maxima théoriques par 5 min (lvl 10 tous bâtiments) :
+//        money       ≤ 1 250     influence  ≤ 400
+//        military    ≤ 600       cyberDefense ≤ 400
+//    → seuil suspect : gain > 2× max théorique sans event justificatif dans l'intervalle
+//    → seuil rejet   : gain > 10× max théorique
+//
+//  military_op                 payload { success: boolean }  — event_id = operationType
+//    → taux de succès côté serveur : if ops ≥ 5 and successRate > 0.95 → suspect
+//    → (la formule normale plafonne à ~0.90 avec tous les bâtiments max)
+//
+//  crisis_choice               choice_id = choiceId  — suffisant pour compter et croiser
+//  reform_launched             event_id = reformId   — comptage seul
+//  doctrine_set                event_id = doctrineId — comptage seul
+//  mandate_end                 aucun payload         — comptage seul
+//  ranked_score_hint           payload complet       — croiser avec score calculé
+//
+// ── CONTRÔLES ANTI-TRICHE ────────────────────────────────────────────────────
+//
 // 1. DURÉE MINIMALE PLAUSIBLE
-//    elapsed_ms du dernier événement doit être ≥ mandateDays × REAL_MS_PER_GAME_DAY
+//    elapsed_ms du dernier événement doit être ≥ mandateDays × 21_600_000 × 0.8
 //    (REAL_MS_PER_GAME_DAY = 6h = 21 600 000 ms côté serveur).
-//    Tolérance : −20 % pour les dérives d'horloge mobile.
-//    Seuil de rejet dur : elapsed_ms < mandateDays × 21_600_000 × 0.8
+//    Rejet dur (422) si la durée réelle est impossible.
 //
-// 2. ACTIONS PAR MINUTE
-//    Calculer nb_events / (elapsed_ms / 60_000).
-//    Seuil d'alerte : > 3 events/min en moyenne sur plus de 10 min.
-//    Seuil de rejet : > 8 events/min (impossible humainement).
-//    Ne pas compter les "resource_snapshot_periodic" dans ce ratio.
+// 2. ACTIONS PAR MINUTE (APM)
+//    nb_events_actifs / (elapsed_ms / 60_000)   — exclure resource_snapshot_periodic.
+//    Alerte : > 3 events/min sur plus de 10 min.
+//    Rejet   : > 8 events/min (impossible humainement).
 //
-// 3. PROGRESSION BÂTIMENTS IMPOSSIBLE
-//    Pour chaque "building_upgrade_completed", lire payload.level et l'elapsed_ms.
-//    Le niveau L d'un bâtiment a une upgradeDuration minimale connue côté serveur
-//    (table UPGRADE_DURATIONS_SEC : [60,300,1200,3600,14400,28800,57600,115200,172800,259200] sec jeu).
-//    Vérifier que l'écart en elapsed_ms entre le start et la completion de niveau L
-//    est ≥ UPGRADE_DURATIONS_SEC[L-1] × (1000/240) × 0.85 (tolérance 15 %).
-//    Si plusieurs niveaux max en moins de 10 min réelles → marquer suspect.
+// 3. PROGRESSION BÂTIMENTS
+//    Pour chaque building_upgrade_completed :
+//      vérifier payload.durationRealMs ≥ UPGRADE_DURATIONS_REAL_MS[level-1] × 0.85
+//    Régression de niveau (level[n] < level[n-1] même bâtiment) → rejet.
+//    Plusieurs upgrades level max en < 10 min réelles → suspect.
 //
-// 4. ACCUMULATION DE RESSOURCES INCOHÉRENTE
-//    Comparer les snapshots "resource_snapshot_periodic" successifs.
-//    Le gain max théorique entre deux snapshots (5 min = 300 000 ms) est :
-//      max_money_per_min ≈ 250 (central_bank lvl 10 + economy_ministry lvl 10)
-//      → gain_5min ≤ 250 × 5 = 1 250
-//    Si money augmente de plus de 2× le maximum théorique entre deux snapshots
-//    sans building_upgrade_completed ni crisis_choice dans l'intervalle → rejet.
-//    Même logique pour influence, military, cyberDefense.
+// 4. RECHERCHES
+//    durationDays < 1 → rejet.
+//    Plus de 15 research_completed (max théorique = 15 recherches) → rejet.
 //
-// 5. SÉQUENCE IMPOSSIBLE
-//    "research_completed" sans "research_started" connu (non présent dans le journal
-//    car launchStrategyResearch ne fait pas encore rankRecord — à ajouter si besoin).
-//    "building_upgrade_completed" avec payload.level qui régresse → rejet.
+// 5. ACCUMULATION DE RESSOURCES
+//    Comparer snapshots successifs — seuils ci-dessus (section PAYLOADS).
+//    Cohérence rankingPoints entre snapshots et ranked_score_hint.
+//
+// 6. SÉQUENCE IMPOSSIBLE
 //    mandate_day qui régresse entre deux événements consécutifs → rejet.
+//    ranked_score_hint absent ou incohérent avec finalIndicators → suspect.
 //
-// 6. POLITIQUE DE TRAITEMENT
-//    - Rejet dur (422) : durée impossible, actions/min > seuil dur, ressources × 10 max théorique.
-//    - Marquage suspect (200 + suspect:true) : accumulation 2×, séquence atypique, device récidiviste.
-//    - Ne pas bannir côté client. Le compte reste jouable en mode non classé.
-//    - Conserver les runs suspectes 30 jours pour revue manuelle.
-//    - Implémenter un rate-limit : max 1 soumission toutes les 23h par compte.
+// 7. OPÉRATIONS MILITAIRES
+//    Taux de succès calculé à partir des events military_op.success.
+//    > 95 % sur ≥ 5 ops → suspect (formule légitime plafonne à ≈ 90 %).
+//
+// ── SCORE DE CONFIANCE ───────────────────────────────────────────────────────
+//
+// Calculer un score 0–100 reflétant la fiabilité de la run avant de scorer.
+// Partir de 100 et soustraire des pénalités :
+//
+//   confiance -= 30  si durée impossible (→ rejet direct si < 0)
+//   confiance -= 20  si APM > seuil alerte (3/min sur > 10 min)
+//   confiance -= 20  si accumulation ressource 2× max théorique
+//   confiance -= 15  si upgrade trop rapide (durationRealMs < min × 0.85)
+//   confiance -= 10  si taux succès ops > 95 % (≥ 5 ops)
+//   confiance -= 10  si ranked_score_hint absent ou incohérent (écart > 20 pts)
+//   confiance -= 5   si device déjà marqué suspect dans les 30 derniers jours
+//
+// Politique :
+//   confiance ≥ 80 → run acceptée normalement
+//   confiance 50–79 → acceptée + flag suspect:true pour revue manuelle
+//   confiance < 50 → rejetée (422) même sans rejet dur individuel
+//
+// ── POLITIQUE DE TRAITEMENT ──────────────────────────────────────────────────
+//   - Rejet dur (422) : durée impossible, APM > 8/min, ressources × 10 max, confiance < 50.
+//   - Marquage suspect (200 + suspect:true) : confiance 50–79.
+//   - Ne pas bannir côté client. Le compte reste jouable en mode non classé.
+//   - Conserver les runs suspectes 30 jours pour revue manuelle.
+//   - Rate-limit : max 1 soumission par account toutes les 23h.
+//   - Rate-limit device : max 3 soumissions différents accounts / device / 24h.
 

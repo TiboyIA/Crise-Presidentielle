@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { computeMandateScore } from "@/context/StrategyContext";
 import { useAuth } from "@/context/AuthContext";
-import { submitRankedRun, hasActiveRun, isRankedIntended } from "@/services/RankedService";
+import { submitRankedRun, hasActiveRun, isRankedIntended, recordEvent as rankRecord } from "@/services/RankedService";
 import { getPlayerRank } from "@/logic/botEngine";
 import { DOCTRINES } from "@/data/doctrines";
 import { REFORMS } from "@/data/reforms";
@@ -88,14 +88,29 @@ export default function MandateReviewScreen() {
     // Submit ranked run if active
     if (auth.accessToken && (await hasActiveRun())) {
       setSubmitting(true);
+      // Enregistrer un résumé vérifiable juste avant soumission.
+      // Le serveur croise ces chiffres avec le journal pour détecter les incohérences.
+      await rankRecord("ranked_score_hint", "final_state", state.mandateDay, undefined, {
+        globalPower:         state.stats.globalPower,
+        rankingPoints:       state.stats.rankingPoints,
+        totalBuildingLevels: state.buildings.reduce((s, b) => s + b.level, 0),
+        researchCount:       (state.strategyResearch?.completed ?? []).length,
+        totalOperations:     state.stats.totalOperations,
+        operationsWon:       state.stats.operationsWon,
+        publicBudget:        ind.publicBudget,
+        mandateDay:          state.mandateDay,
+      });
       const result = await submitRankedRun(
         auth.accessToken,
         {
-          popularity: ind.popularity,
-          economy: ind.economy,
-          security: ind.security,
-          ecology: ind.ecology,
-          cohesion: ind.cohesion,
+          popularity:    ind.popularity,
+          economy:       ind.economy,
+          security:      ind.security,
+          ecology:       ind.ecology,
+          cohesion:      ind.cohesion,
+          globalPower:   state.stats.globalPower,
+          rankingPoints: state.stats.rankingPoints,
+          publicBudget:  ind.publicBudget,
         },
         state.mandateDay,
       );

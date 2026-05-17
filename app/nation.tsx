@@ -27,7 +27,7 @@ import type { ResourceKey } from "@/types/strategy";
 import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
 import { isRankedIntended } from "@/services/RankedService";
-import { computeFrustration } from "@/logic/playerExperienceEngine";
+import { computeFrustration, BAND_LABELS, BAND_COLORS } from "@/logic/frustrationEngine";
 import { computePlayerStyle } from "@/logic/playerSegmentation";
 import { generateRecommendations } from "@/logic/recommendationEngine";
 
@@ -173,6 +173,15 @@ export default function NationScreen() {
                     <MaterialCommunityIcons name="bug-outline" size={14} color="#a78bfa" />
                   </Pressable>
                 )}
+                {__DEV__ && (
+                  <Pressable
+                    onPress={() => router.push("/dev-stats" as any)}
+                    hitSlop={8}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 0.4 })}
+                  >
+                    <MaterialCommunityIcons name="chart-bar" size={14} color={PALETTE.info} />
+                  </Pressable>
+                )}
               </View>
             </View>
 
@@ -267,6 +276,14 @@ export default function NationScreen() {
             <View style={styles.advisorHeader}>
               <MaterialCommunityIcons name="lightbulb-outline" size={13} color="#e8a93a" />
               <Text style={styles.advisorKicker}>CONSEIL STRATÉGIQUE</Text>
+              <View style={[styles.advisorBandBadge, {
+                borderColor: BAND_COLORS[frustration.band] + "55",
+                backgroundColor: BAND_COLORS[frustration.band] + "18",
+              }]}>
+                <Text style={[styles.advisorBandText, { color: BAND_COLORS[frustration.band] }]}>
+                  {BAND_LABELS[frustration.band].toUpperCase()}
+                </Text>
+              </View>
               <Pressable
                 onPress={(e) => { e.stopPropagation(); setAdvisorDismissed(true); }}
                 hitSlop={10}
@@ -875,6 +892,8 @@ const styles = StyleSheet.create({
   },
   advisorHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   advisorKicker: { fontSize: 8, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 2, flex: 1 },
+  advisorBandBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: RADIUS.xs, borderWidth: 1 },
+  advisorBandText: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 0.6 },
   advisorDismissBtn: { padding: 2 },
   advisorConseil: { fontSize: 12, fontFamily: FONT.reg, color: "#d1d5db", lineHeight: 17 },
   advisorMission: {
