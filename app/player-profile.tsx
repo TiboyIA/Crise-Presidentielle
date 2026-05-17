@@ -316,7 +316,17 @@ export default function PlayerProfileScreen() {
                     })}
                   </View>
                   {Boolean(spyError) && <Text style={styles.spyErrText}>{spyError}</Text>}
-                  {spySentOp && <Text style={styles.spySentText}>Opération lancée — résultat dans 6h</Text>}
+                  {spySentOp && (
+                    <View style={styles.spySentRow}>
+                      <Text style={styles.spySentText}>Opération lancée — résultat dans 6h</Text>
+                      <Pressable
+                        onPress={() => router.push("/spy-ops")}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                      >
+                        <Text style={styles.spySentLink}>Voir mes opérations →</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </>
               ) : (
                 <Text style={styles.lockedNote}>Connecte-toi pour espionner ce joueur.</Text>
@@ -512,7 +522,9 @@ const styles = StyleSheet.create({
   spyChipSent: { borderColor: PALETTE.success + "55" },
   spyChipText: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold },
   spyErrText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.danger },
+  spySentRow: { gap: 4 },
   spySentText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, fontStyle: "italic" },
+  spySentLink: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 0.5 },
 
   cyberWrap: {
     backgroundColor: "#0d1119",
