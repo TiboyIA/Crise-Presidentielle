@@ -9,7 +9,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useAuth } from "@/context/AuthContext";
-import { fetchAlliances, respondToAlliance, type Alliance } from "@/services/AllianceService";
+import { fetchAlliances, respondToAlliance, computeAllianceBonuses, ALLIANCE_BONUS_PER_ACTIVE, type Alliance } from "@/services/AllianceService";
 
 const STATUS_ICONS: Record<string, React.ComponentProps<typeof MaterialCommunityIcons>["name"]> = {
   pending:  "clock-outline",
@@ -164,19 +164,32 @@ export default function AlliancesScreen() {
             </>
           )}
 
-          {active.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>ALLIANCES ACTIVES</Text>
-              {active.map((a) => (
-                <AllianceRow
-                  key={a.id}
-                  alliance={a}
-                  busy={responding === a.id}
-                  onBreak={() => handleRespond(a.id, "break")}
-                />
-              ))}
-            </>
-          )}
+          {active.length > 0 && (() => {
+            const { rate } = computeAllianceBonuses(active);
+            const bonusPct = Math.round(rate * 100);
+            return (
+              <>
+                <Text style={styles.sectionLabel}>ALLIANCES ACTIVES</Text>
+                <View style={styles.bonusEncart}>
+                  <MaterialCommunityIcons name="lightning-bolt" size={13} color={PALETTE.success} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.bonusTitle}>BONUS DIPLOMATIQUE ACTIF</Text>
+                    <Text style={styles.bonusDesc}>
+                      {`+${Math.round(ALLIANCE_BONUS_PER_ACTIVE * 100)}% par alliance — Bonus total : +${bonusPct}% production`}
+                    </Text>
+                  </View>
+                </View>
+                {active.map((a) => (
+                  <AllianceRow
+                    key={a.id}
+                    alliance={a}
+                    busy={responding === a.id}
+                    onBreak={() => handleRespond(a.id, "break")}
+                  />
+                ))}
+              </>
+            );
+          })()}
 
           {sent.length > 0 && (
             <>
@@ -204,12 +217,18 @@ function AllianceRow({
   const statusColor = STATUS_COLORS[alliance.status] ?? PALETTE.textMid;
   const icon = STATUS_ICONS[alliance.status] ?? "circle-outline";
   const expiresText = expiresLabel(alliance.expires_at);
+  const isActive = alliance.status === "active";
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, isActive && styles.rowActive]}>
       <MaterialCommunityIcons name={icon} size={20} color={statusColor} />
       <View style={{ flex: 1 }}>
         <Text style={styles.rowName} numberOfLines={1}>{alliance.partner_name || "Anonyme"}</Text>
+        {isActive && (
+          <View style={styles.bonusBadge}>
+            <Text style={styles.bonusBadgeText}>+{Math.round(ALLIANCE_BONUS_PER_ACTIVE * 100)}% PRODUCTION</Text>
+          </View>
+        )}
         {Boolean(expiresText) && <Text style={styles.rowMeta}>{expiresText}</Text>}
       </View>
       {busy ? (
@@ -260,6 +279,16 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5, marginTop: 12, marginBottom: 4,
   },
 
+  bonusEncart: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    backgroundColor: PALETTE.success + "12",
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.success + "44",
+    padding: 12, marginBottom: 4,
+  },
+  bonusTitle: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.success, letterSpacing: 2, marginBottom: 2 },
+  bonusDesc:  { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 },
+
   row: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: "#0d1119",
@@ -267,8 +296,17 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge,
     padding: 14,
   },
+  rowActive: { borderColor: PALETTE.success + "44" },
   rowName: { fontSize: 13, fontFamily: FONT.bold, color: PALETTE.textHigh },
   rowMeta: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2 },
+  bonusBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: PALETTE.success + "20",
+    borderRadius: 3,
+    paddingHorizontal: 5, paddingVertical: 2,
+    marginTop: 4,
+  },
+  bonusBadgeText: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.success, letterSpacing: 1 },
   rowActions: { flexDirection: "row", gap: 8, alignItems: "center" },
 
   actionBtn: {

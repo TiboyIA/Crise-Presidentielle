@@ -103,6 +103,7 @@ export function accumulateResources(
   buildings: PlayerBuilding[],
   resources: StrategyResources,
   lastTick: number,
+  productionBonus = 0, // additive multiplier from alliances, e.g. 0.04 = +4%
 ): StrategyResources {
   // La production de ressources reste en temps réel (par minute réelle).
   const now           = clockNow();
@@ -112,6 +113,7 @@ export function accumulateResources(
   if (elapsedMinutes < 0.5) return resources;
 
   const next = { ...resources };
+  const multiplier = 1 + Math.min(productionBonus, 0.06); // cap at 6%
 
   for (const building of buildings) {
     if (building.level === 0) continue;
@@ -120,7 +122,7 @@ export function accumulateResources(
     if (!levelData) continue;
 
     for (const [key, rate] of Object.entries(levelData.production) as [keyof StrategyResources, number][]) {
-      next[key] = Math.round((next[key] ?? 0) + rate * elapsedMinutes);
+      next[key] = Math.round((next[key] ?? 0) + rate * multiplier * elapsedMinutes);
     }
   }
 

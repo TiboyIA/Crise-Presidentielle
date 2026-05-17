@@ -172,6 +172,8 @@ export default function PlayerProfileScreen() {
     );
   }
 
+  const isOwnProfile = !!auth.user?.id && auth.user.id === entry.player_id;
+
   const flag = COUNTRY_FLAGS[entry.country_id] ?? "🏳️";
   const country = COUNTRY_LABELS[entry.country_id] ?? entry.country_id;
   const doctrine = DOCTRINE_LABELS[entry.doctrine] ?? entry.doctrine;
@@ -258,109 +260,147 @@ export default function PlayerProfileScreen() {
           />
         </View>
 
-        {/* Spy ops */}
-        {auth.isEnabled && auth.accessToken && entry.player_id !== auth.user?.id && (
-          <View style={styles.spyWrap}>
-            <Text style={styles.spySectionLabel}>OPÉRATION D'ESPIONNAGE</Text>
-            <View style={styles.spyChips}>
-              {(
-                [
-                  { type: "intel_probe"   as SpyOpType, label: "Intel",    icon: "magnify" },
-                  { type: "doctrine_scan" as SpyOpType, label: "Doctrine", icon: "eye-outline" },
-                  { type: "score_range"   as SpyOpType, label: "Score",    icon: "chart-line" },
-                ] as const
-              ).map(({ type, label, icon }) => {
-                const isSent    = spySentOp === type;
-                const isSending = spySending === type;
-                return (
-                  <Pressable
-                    key={type}
-                    onPress={() => void handleSpy(type)}
-                    disabled={!!spySending || !!spySentOp}
-                    style={({ pressed }) => [
-                      styles.spyChip,
-                      isSent && styles.spyChipSent,
-                      { opacity: pressed || (!!spySending && !isSending) || !!spySentOp ? 0.6 : 1 },
-                    ]}
-                  >
-                    {isSending
-                      ? <ActivityIndicator size="small" color={PALETTE.gold} />
-                      : <MaterialCommunityIcons
-                          name={icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                          size={14}
-                          color={isSent ? PALETTE.success : PALETTE.gold}
-                        />
-                    }
-                    <Text style={[styles.spyChipText, isSent && { color: PALETTE.success }]}>{label}</Text>
-                  </Pressable>
-                );
-              })}
+        {/* Interactions multijoueur — masquées sur son propre profil */}
+        {!isOwnProfile && auth.isEnabled && (
+          <>
+            <View style={styles.asyncNote}>
+              <MaterialCommunityIcons name="timer-sand" size={13} color={PALETTE.textMid} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.asyncNoteTitle}>INTERACTIONS MULTIJOUEUR</Text>
+                <Text style={styles.asyncNoteDesc}>
+                  Ces actions sont asynchrones — les résultats apparaissent dans l'écran dédié après un délai de traitement.
+                </Text>
+              </View>
             </View>
-            {Boolean(spyError) && <Text style={styles.spyErrText}>{spyError}</Text>}
-            {spySentOp && <Text style={styles.spySentText}>Opération lancée — résultat dans 6h</Text>}
-          </View>
-        )}
 
-        {/* Cyber attack */}
-        {auth.isEnabled && auth.isLinked && auth.accessToken && entry.player_id !== auth.user?.id && (
-          <View style={styles.cyberWrap}>
-            {cyberSent ? (
-              <View style={styles.cyberRow}>
-                <MaterialCommunityIcons name="check-circle" size={16} color={PALETTE.success} />
-                <Text style={[styles.cyberBtnText, { color: PALETTE.success }]}>Cyberattaque lancée — résultat dans 4h</Text>
+            {/* RENSEIGNEMENT */}
+            <View style={styles.spyWrap}>
+              <View style={styles.actionHeader}>
+                <MaterialCommunityIcons name="magnify" size={11} color={PALETTE.gold} />
+                <Text style={[styles.spySectionLabel, { color: PALETTE.gold }]}>RENSEIGNEMENT</Text>
               </View>
-            ) : (
-              <>
-                <Pressable
-                  onPress={() => void handleCyber()}
-                  disabled={cyberSending}
-                  style={({ pressed }) => [styles.cyberRow, { opacity: pressed || cyberSending ? 0.7 : 1 }]}
-                >
-                  {cyberSending
-                    ? <ActivityIndicator size="small" color={PALETTE.danger} />
-                    : <MaterialCommunityIcons name="lightning-bolt" size={16} color={PALETTE.danger} />
-                  }
-                  <Text style={styles.cyberBtnText}>
-                    {cyberSending ? "Lancement…" : "Lancer une cyberattaque"}
-                  </Text>
-                </Pressable>
-                {Boolean(cyberError) && (
-                  <Text style={styles.cyberErrText}>{cyberError}</Text>
-                )}
-              </>
-            )}
-          </View>
-        )}
+              {auth.accessToken ? (
+                <>
+                  <View style={styles.spyChips}>
+                    {(
+                      [
+                        { type: "intel_probe"   as SpyOpType, label: "Intel",    icon: "magnify" },
+                        { type: "doctrine_scan" as SpyOpType, label: "Doctrine", icon: "eye-outline" },
+                        { type: "score_range"   as SpyOpType, label: "Score",    icon: "chart-line" },
+                      ] as const
+                    ).map(({ type, label, icon }) => {
+                      const isSent    = spySentOp === type;
+                      const isSending = spySending === type;
+                      return (
+                        <Pressable
+                          key={type}
+                          onPress={() => void handleSpy(type)}
+                          disabled={!!spySending || !!spySentOp}
+                          style={({ pressed }) => [
+                            styles.spyChip,
+                            isSent && styles.spyChipSent,
+                            { opacity: pressed || (!!spySending && !isSending) || !!spySentOp ? 0.6 : 1 },
+                          ]}
+                        >
+                          {isSending
+                            ? <ActivityIndicator size="small" color={PALETTE.gold} />
+                            : <MaterialCommunityIcons
+                                name={icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+                                size={14}
+                                color={isSent ? PALETTE.success : PALETTE.gold}
+                              />
+                          }
+                          <Text style={[styles.spyChipText, isSent && { color: PALETTE.success }]}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {Boolean(spyError) && <Text style={styles.spyErrText}>{spyError}</Text>}
+                  {spySentOp && <Text style={styles.spySentText}>Opération lancée — résultat dans 6h</Text>}
+                </>
+              ) : (
+                <Text style={styles.lockedNote}>Connecte-toi pour espionner ce joueur.</Text>
+              )}
+            </View>
 
-        {/* Alliance invite */}
-        {auth.isEnabled && auth.isLinked && auth.accessToken && entry.player_id !== auth.user?.id && (
-          <View style={styles.inviteWrap}>
-            {inviteState === "sent" ? (
-              <View style={styles.inviteRow}>
-                <MaterialCommunityIcons name="check-circle" size={16} color={PALETTE.success} />
-                <Text style={[styles.inviteBtnText, { color: PALETTE.success }]}>Invitation envoyée</Text>
+            {/* CYBERGUERRE */}
+            <View style={styles.cyberWrap}>
+              <View style={styles.actionHeader}>
+                <MaterialCommunityIcons name="lightning-bolt" size={11} color={PALETTE.danger} />
+                <Text style={[styles.spySectionLabel, { color: PALETTE.danger }]}>CYBERGUERRE</Text>
               </View>
-            ) : (
-              <>
-                <Pressable
-                  onPress={() => void handleInvite()}
-                  disabled={inviteState === "sending"}
-                  style={({ pressed }) => [styles.inviteRow, { opacity: pressed || inviteState === "sending" ? 0.7 : 1 }]}
-                >
-                  {inviteState === "sending"
-                    ? <ActivityIndicator size="small" color={PALETTE.gold} />
-                    : <MaterialCommunityIcons name="handshake-outline" size={16} color={PALETTE.gold} />
-                  }
-                  <Text style={styles.inviteBtnText}>
-                    {inviteState === "sending" ? "Envoi…" : "Proposer une alliance"}
-                  </Text>
-                </Pressable>
-                {inviteState === "error" && (
-                  <Text style={styles.inviteErrText}>{inviteError}</Text>
-                )}
-              </>
-            )}
-          </View>
+              {auth.isLinked && auth.accessToken ? (
+                cyberSent ? (
+                  <View style={styles.cyberRow}>
+                    <MaterialCommunityIcons name="check-circle" size={16} color={PALETTE.success} />
+                    <Text style={[styles.cyberBtnText, { color: PALETTE.success }]}>Cyberattaque lancée — résultat dans 4h</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => void handleCyber()}
+                      disabled={cyberSending}
+                      style={({ pressed }) => [styles.cyberRow, { opacity: pressed || cyberSending ? 0.7 : 1 }]}
+                    >
+                      {cyberSending
+                        ? <ActivityIndicator size="small" color={PALETTE.danger} />
+                        : <MaterialCommunityIcons name="lightning-bolt" size={16} color={PALETTE.danger} />
+                      }
+                      <Text style={styles.cyberBtnText}>
+                        {cyberSending ? "Lancement…" : "Lancer une cyberattaque"}
+                      </Text>
+                    </Pressable>
+                    {Boolean(cyberError) && <Text style={styles.cyberErrText}>{cyberError}</Text>}
+                  </>
+                )
+              ) : (
+                <Text style={styles.lockedNote}>
+                  {auth.accessToken
+                    ? "Lie ton compte Google ou Apple pour activer les actions hostiles."
+                    : "Connecte-toi pour lancer une cyberattaque."}
+                </Text>
+              )}
+            </View>
+
+            {/* DIPLOMATIE */}
+            <View style={styles.inviteWrap}>
+              <View style={styles.actionHeader}>
+                <MaterialCommunityIcons name="handshake-outline" size={11} color={PALETTE.success} />
+                <Text style={[styles.spySectionLabel, { color: PALETTE.success }]}>DIPLOMATIE</Text>
+              </View>
+              {auth.isLinked && auth.accessToken ? (
+                inviteState === "sent" ? (
+                  <View style={styles.inviteRow}>
+                    <MaterialCommunityIcons name="check-circle" size={16} color={PALETTE.success} />
+                    <Text style={[styles.inviteBtnText, { color: PALETTE.success }]}>Invitation envoyée</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => void handleInvite()}
+                      disabled={inviteState === "sending"}
+                      style={({ pressed }) => [styles.inviteRow, { opacity: pressed || inviteState === "sending" ? 0.7 : 1 }]}
+                    >
+                      {inviteState === "sending"
+                        ? <ActivityIndicator size="small" color={PALETTE.gold} />
+                        : <MaterialCommunityIcons name="handshake-outline" size={16} color={PALETTE.gold} />
+                      }
+                      <Text style={styles.inviteBtnText}>
+                        {inviteState === "sending" ? "Envoi…" : "Proposer une alliance"}
+                      </Text>
+                    </Pressable>
+                    {inviteState === "error" && <Text style={styles.inviteErrText}>{inviteError}</Text>}
+                  </>
+                )
+              ) : (
+                <Text style={styles.lockedNote}>
+                  {auth.accessToken
+                    ? "Lie ton compte Google ou Apple pour les actions diplomatiques."
+                    : "Connecte-toi pour proposer une alliance."}
+                </Text>
+              )}
+            </View>
+          </>
         )}
 
         {/* Footer */}
@@ -444,6 +484,17 @@ const styles = StyleSheet.create({
   inviteBtnText: { fontSize: 13, fontFamily: FONT.bold, color: PALETTE.gold },
   inviteErrText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.danger, marginTop: 8 },
 
+  asyncNote: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    backgroundColor: "#0d1119",
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge,
+    padding: 14,
+  },
+  asyncNoteTitle: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 2.5, marginBottom: 4 },
+  asyncNoteDesc: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 16 },
+  actionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  lockedNote: { fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textLow, fontStyle: "italic" },
   spyWrap: {
     backgroundColor: "#0d1119",
     borderRadius: RADIUS.sm,

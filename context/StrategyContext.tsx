@@ -21,6 +21,8 @@ import {
 } from "@/logic/newsEngine";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { saveStrategy, loadStrategy } from "@/storage/strategyStorage";
+import { useAuth } from "@/context/AuthContext";
+import { fetchAlliances, computeAllianceBonuses } from "@/services/AllianceService";
 import {
   saveToSlot as storageSaveToSlot,
   loadFromSlot as storageLoadFromSlot,
@@ -231,6 +233,19 @@ const StrategyContext = createContext<StrategyContextValue | null>(null);
 export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<StrategyGameState | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const auth = useAuth();
+  const allianceBonusRef = useRef(0);
+
+  useEffect(() => {
+    if (!auth.isEnabled || !auth.accessToken) { allianceBonusRef.current = 0; return; }
+    const run = async () => {
+      const list = await fetchAlliances(auth.accessToken!);
+      allianceBonusRef.current = computeAllianceBonuses(list).rate;
+    };
+    void run();
+    const id = setInterval(() => void run(), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [auth.isEnabled, auth.accessToken]);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -401,7 +416,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       const buildings = collectUpgrades(prev.buildings, gameHourNow);
 
       // Accumulate offline resources
-      const resources = accumulateResources(buildings, prev.resources, prev.lastResourceTick);
+      const resources = accumulateResources(buildings, prev.resources, prev.lastResourceTick, allianceBonusRef.current);
 
       // Update bots (only if > 5min since last update)
       const shouldUpdateBots = now - prev.lastBotUpdate > 300000;

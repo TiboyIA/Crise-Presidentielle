@@ -14,6 +14,7 @@ import { getPlayerRank, getRankTitle, getTitleIcon } from "@/logic/botEngine";
 import { formatDuration } from "@/logic/buildingEngine";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { hasPendingSubmission } from "@/services/RankedService";
+import { fetchAlliances } from "@/services/AllianceService";
 
 const SEASON_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -32,6 +33,7 @@ export default function RankingScreen() {
   const { hPad } = useResponsive();
 
   const [rankedPending, setRankedPending] = useState(false);
+  const [pendingAllianceCount, setPendingAllianceCount] = useState(0);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -45,6 +47,14 @@ export default function RankingScreen() {
       setRankedPending(pending);
     });
   }, []);
+
+  useEffect(() => {
+    if (!auth.isEnabled || !auth.accessToken) return;
+    void fetchAlliances(auth.accessToken).then((list) => {
+      if (!mountedRef.current) return;
+      setPendingAllianceCount(list.filter((a) => a.status === "pending" && !a.is_initiator).length);
+    });
+  }, [auth.isEnabled, auth.accessToken]);
 
   if (!state) return null;
 
@@ -174,10 +184,22 @@ export default function RankingScreen() {
             style={({ pressed }) => [styles.leaderboardBtn, { opacity: pressed ? 0.75 : 1 }]}
           >
             <LinearGradient colors={["#0d1119", "#0d1119"]} style={styles.leaderboardBtnInner}>
-              <MaterialCommunityIcons name="handshake" size={20} color={PALETTE.gold} />
+              <View>
+                <MaterialCommunityIcons name="handshake" size={20} color={PALETTE.gold} />
+                {pendingAllianceCount > 0 && (
+                  <View style={styles.allianceDot} />
+                )}
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.leaderboardBtnTitle}>MES ALLIANCES</Text>
-                <Text style={styles.leaderboardBtnSub}>Gérer vos alliances diplomatiques</Text>
+                <Text style={[
+                  styles.leaderboardBtnSub,
+                  pendingAllianceCount > 0 && { color: PALETTE.gold },
+                ]}>
+                  {pendingAllianceCount > 0
+                    ? `${pendingAllianceCount} invitation${pendingAllianceCount > 1 ? "s" : ""} en attente`
+                    : "Gérer vos alliances diplomatiques"}
+                </Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textLow} />
             </LinearGradient>
@@ -335,4 +357,9 @@ const styles = StyleSheet.create({
   },
   leaderboardBtnTitle: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
   leaderboardBtnSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2 },
+  allianceDot: {
+    position: "absolute", top: -3, right: -3,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: PALETTE.gold,
+  },
 });

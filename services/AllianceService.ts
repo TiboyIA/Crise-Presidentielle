@@ -54,6 +54,19 @@ export async function inviteAlly(
   }
 }
 
+export const ALLIANCE_BONUS_PER_ACTIVE = 0.02;  // +2% par alliance
+export const MAX_ALLIANCE_BONUS        = 0.06;  // plafond 6% (3 alliances)
+
+export interface AllianceBonuses {
+  rate: number;   // multiplicateur total (ex. 0.04 pour 2 alliances)
+  count: number;  // nombre d'alliances actives prises en compte
+}
+
+export function computeAllianceBonuses(alliances: Alliance[]): AllianceBonuses {
+  const count = Math.min(alliances.filter((a) => a.status === "active").length, 3);
+  return { rate: count * ALLIANCE_BONUS_PER_ACTIVE, count };
+}
+
 export async function respondToAlliance(
   accessToken: string,
   allianceId: string,

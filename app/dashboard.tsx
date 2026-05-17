@@ -10,12 +10,14 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useGame, Gauges } from "@/context/GameContext";
+import { useAuth } from "@/context/AuthContext";
+import { fetchAlliances } from "@/services/AllianceService";
 import { MEDIA_OUTLETS } from "@/data/medias";
 import { OPPOSITION_STANCE_LABELS } from "@/lib/oppositionReaction";
 import { GaugeBar } from "@/components/GaugeBar";
@@ -122,6 +124,17 @@ export default function DashboardScreen() {
     check("ecology", (v) => v <= 20);
     check("debt", (v) => v >= 80);
   }, [state.gauges]);
+
+  const auth = useAuth();
+  const [pendingAllianceCount, setPendingAllianceCount] = useState(0);
+  const [activeAllianceCount, setActiveAllianceCount] = useState(0);
+  useEffect(() => {
+    if (!auth.isEnabled || !auth.accessToken) return;
+    void fetchAlliances(auth.accessToken).then((list) => {
+      setPendingAllianceCount(list.filter((a) => a.status === "pending" && !a.is_initiator).length);
+      setActiveAllianceCount(list.filter((a) => a.status === "active").length);
+    });
+  }, [auth.isEnabled, auth.accessToken]);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const webBottomInset = Platform.OS === "web" ? 34 : 0;
@@ -560,6 +573,34 @@ export default function DashboardScreen() {
           </View>
           <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
         </Pressable>
+
+        {auth.isEnabled && (
+          <Pressable
+            onPress={() => router.push("/alliances")}
+            style={({ pressed }) => [
+              styles.frontBtn,
+              { backgroundColor: colors.card, borderColor: pendingAllianceCount > 0 ? colors.primary + "99" : colors.border, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <View style={[styles.frontBtnIcon, styles.allianceBtnIconWrap]}>
+              <MaterialCommunityIcons name="handshake" size={22} color={colors.primary} />
+              {pendingAllianceCount > 0 && <View style={[styles.allianceDot, { backgroundColor: colors.primary }]} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.frontBtnLabel, { color: colors.foreground }]}>
+                Alliances diplomatiques
+              </Text>
+              <Text style={[styles.frontBtnSub, { color: pendingAllianceCount > 0 ? colors.primary : activeAllianceCount > 0 ? "#3fbe7a" : colors.mutedForeground }]}>
+                {pendingAllianceCount > 0
+                  ? `${pendingAllianceCount} invitation${pendingAllianceCount > 1 ? "s" : ""} en attente`
+                  : activeAllianceCount > 0
+                  ? `${activeAllianceCount} active${activeAllianceCount > 1 ? "s" : ""} — Bonus +${activeAllianceCount * 2}% production`
+                  : "Gérer vos alliances mondiales"}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
 
         {/* Module 6 — Encart compact « MENACES EXTÉRIEURES ».
             Retourne null si pas d'acteur hostile ou si tout est calme. */}
@@ -1055,6 +1096,19 @@ const styles = StyleSheet.create({
   frontBtnSub: {
     fontSize: 11,
     marginTop: 2,
+  },
+  allianceBtnIconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  allianceDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   navCard: {
     flexDirection: "row",
