@@ -133,6 +133,11 @@ function OpRow({ op }: { op: SpyOp }) {
           <Text style={styles.pendingText}>{countdownLabel(op.resolves_at)}</Text>
         ) : result ? (
           <ResultLine result={result} opType={op.op_type} />
+        ) : op.status === "blocked" ? (
+          <View style={styles.blockedBox}>
+            <MaterialCommunityIcons name="shield-alert-outline" size={12} color={PALETTE.textLow} />
+            <Text style={styles.resultBlocked}>{blockedReasonLabel(undefined)}</Text>
+          </View>
         ) : null}
       </View>
 
