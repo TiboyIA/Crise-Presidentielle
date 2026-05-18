@@ -8,15 +8,21 @@ import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS, RESOURCE_LABELS } from "@/types/strategy";
 import type { NewsChoice, NewsEvent, ResourceKey } from "@/types/strategy";
+import { getChaosWarning } from "@/logic/chaosAmplifier";
+import { getTensionLevel } from "@/logic/tensionEngine";
 
 interface Props {
   event: NewsEvent | null;
   visible: boolean;
   onChoose: (choiceId: string) => void;
   onDismiss: () => void;
+  /** Indice de tension nationale (0-100), passé depuis le contexte. Optionnel — pas d'avertissement si absent. */
+  tension?: number;
+  /** Nombre d'actions jouées — protège le début de partie (pas d'avertissement avant 15 actions). */
+  actionCount?: number;
 }
 
-export function InteractiveNewsModal({ event, visible, onChoose, onDismiss }: Props) {
+export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tension, actionCount = 0 }: Props) {
   const { height } = useWindowDimensions();
   const [preview, setPreview] = useState<NewsChoice | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -33,6 +39,9 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss }: Pr
 
   const urg = urgencyColor(event.urgency);
   const banner = NEWS_IMG[event.type];
+  const chaosWarning = tension != null
+    ? getChaosWarning(getTensionLevel(tension), event.urgency, actionCount)
+    : null;
 
   const handleChoose = (choice: NewsChoice) => {
     if (!preview || preview.id !== choice.id) {
@@ -83,6 +92,14 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss }: Pr
 
             <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
               <Text style={styles.description}>{event.description}</Text>
+
+              {/* Chaos warning — affiché uniquement si tension élevée et crise forte/critique */}
+              {chaosWarning && (
+                <View style={styles.chaosWarning}>
+                  <MaterialCommunityIcons name="lightning-bolt" size={13} color="#FF8040" />
+                  <Text style={styles.chaosWarningText}>{chaosWarning}</Text>
+                </View>
+              )}
 
               {/* Preview consequence */}
               {preview && (
@@ -191,6 +208,9 @@ const styles = StyleSheet.create({
   effectVal: { fontSize: 12, fontFamily: FONT.bold },
   confirmHint: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   confirmHintText: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.gold, letterSpacing: 0.5 },
+
+  chaosWarning: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 8, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: "#FF8040" + "55", backgroundColor: "#FF8040" + "12", marginBottom: 12 },
+  chaosWarningText: { flex: 1, fontSize: 11, fontFamily: FONT.semi, color: "#FF8040", lineHeight: 15 },
 
   choicesKicker: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 2, marginBottom: 8 },
   choiceBtn: { borderRadius: RADIUS.sm, borderWidth: 1, padding: 12, marginBottom: 8, gap: 5 },

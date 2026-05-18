@@ -16,6 +16,9 @@ import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useResponsive } from "@/utils/responsive";
 import type { DecisionTrace, NationalIndicators, PromiseDomain } from "@/types/strategy";
+import { computeNationalTension, getTensionLevel, getTensionColor } from "@/logic/tensionEngine";
+import { computeReputationProfile, getTopDimensions } from "@/logic/reputationVectorEngine";
+import { getTopDecisions, getWeightLabel, getDecisionTier, DECISION_TIER_COLOR } from "@/logic/decisionWeightEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -83,6 +86,17 @@ export default function MandateReviewScreen() {
   const allTraces = (state.publicMemory?.traces ?? []) as DecisionTrace[];
   const negativeTraces = allTraces.filter((t) => t.politicalImpact < 0);
   const positiveTraces = allTraces.filter((t) => t.politicalImpact > 0);
+  const mandateTension = computeNationalTension(state);
+  const mandateTensionLevel = getTensionLevel(mandateTension);
+  const mandateTensionColor = getTensionColor(mandateTensionLevel);
+  const reputation    = computeReputationProfile(state);
+  const topDims       = getTopDimensions(reputation.vector, 3);
+  const topDecisions  = getTopDecisions(
+    state.news.log,
+    allTraces,
+    state.campaignPromises ?? { selected: [], progress: {}, status: {} },
+    5,
+  );
 
   const handleNewMandate = async () => {
     // Submit ranked run if active
@@ -303,6 +317,28 @@ export default function MandateReviewScreen() {
           );
         })()}
 
+        {/* PROFIL DE RÉPUTATION */}
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account-star-outline" size={14} color={reputation.titleColor} />
+            <Text style={[styles.sectionTitle, { color: reputation.titleColor }]}>PROFIL DU DIRIGEANT</Text>
+          </View>
+          <Text style={[styles.repTitle, { color: reputation.titleColor }]}>{reputation.title}</Text>
+          <Text style={styles.repSubtitle}>{reputation.subtitle}</Text>
+          <View style={styles.repBars}>
+            {topDims.map(({ dim, value, meta }) => (
+              <View key={dim} style={styles.repBar}>
+                <MaterialCommunityIcons name={meta.icon as any} size={10} color={meta.color} />
+                <Text style={[styles.repBarLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
+                <View style={styles.repBarTrack}>
+                  <View style={[styles.repBarFill, { width: `${value}%`, backgroundColor: meta.color }]} />
+                </View>
+                <Text style={[styles.repBarVal, { color: meta.color }]}>{value}</Text>
+              </View>
+            ))}
+          </View>
+        </Panel>
+
         {/* BILAN OPPOSITION */}
         <Panel variant={oppositionPower >= 65 ? "danger" : undefined} style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
@@ -354,6 +390,52 @@ export default function MandateReviewScreen() {
                 <Text style={styles.memTraceImpact}>{trace.politicalImpact}</Text>
               </View>
             ))}
+          </Panel>
+        )}
+
+        {/* DÉCISIONS STRATÉGIQUES — top 3-5 décisions par poids */}
+        {topDecisions.length > 0 && (
+          <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="chess-queen" size={14} color="#a78bfa" />
+              <Text style={[styles.sectionTitle, { color: "#a78bfa" }]}>DÉCISIONS STRATÉGIQUES</Text>
+              <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid }}>{topDecisions.length}</Text>
+            </View>
+            {topDecisions.map((d) => {
+              const tier = getDecisionTier(d.weight);
+              const color = DECISION_TIER_COLOR[tier];
+              return (
+                <View key={`${d.entry.eventId}_${d.entry.timestamp}`} style={styles.decisionRow}>
+                  {/* Poids */}
+                  <View style={[styles.decisionWeight, { borderColor: color + "55", backgroundColor: color + "18" }]}>
+                    <Text style={[styles.decisionWeightNum, { color }]}>{d.weight}</Text>
+                  </View>
+                  {/* Contenu */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.decisionTitle} numberOfLines={1}>{d.entry.title}</Text>
+                    {d.entry.choiceLabel && (
+                      <Text style={styles.decisionChoice} numberOfLines={1}>→ {d.entry.choiceLabel}</Text>
+                    )}
+                    <Text style={[styles.decisionLabel, { color }]}>{getWeightLabel(d)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </Panel>
+        )}
+
+        {/* TENSION NATIONALE — note de bilan si tension ≥ 70 en fin de mandat */}
+        {mandateTension >= 70 && (
+          <Panel variant={mandateTensionLevel === "explosive" ? "danger" : undefined} style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="lightning-bolt" size={14} color={mandateTensionColor} />
+              <Text style={[styles.sectionTitle, { color: mandateTensionColor }]}>BILAN — TENSION NATIONALE</Text>
+            </View>
+            <Text style={{ fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 }}>
+              {mandateTensionLevel === "explosive"
+                ? `Ce mandat s'achève dans une situation de tension extrême (${mandateTension}/100). L'accumulation des crises, des scandales et de la fatigue populaire laisse le pays au bord du point de rupture.`
+                : `La fin de ce mandat est marquée par une tension nationale élevée (${mandateTension}/100), reflet de pressions persistantes sur la cohésion, la confiance et les institutions.`}
+            </Text>
           </Panel>
         )}
 
@@ -517,6 +599,22 @@ const styles = StyleSheet.create({
   traceStatCell: { flex: 1, alignItems: "center", gap: 2, paddingVertical: 8, borderRadius: RADIUS.xs, backgroundColor: PALETTE.panelHi, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge },
   traceStatNum: { fontSize: 18, fontFamily: FONT.bold },
   traceStatLabel: { fontSize: 7, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5, textAlign: "center" },
+
+  decisionRow:       { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  decisionWeight:    { width: 38, height: 38, borderRadius: RADIUS.xs, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  decisionWeightNum: { fontSize: 14, fontFamily: FONT.bold },
+  decisionTitle:     { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 15 },
+  decisionChoice:    { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14, marginTop: 1 },
+  decisionLabel:     { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.8, marginTop: 2 },
+
+  repTitle:    { fontSize: 15, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  repSubtitle: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 15, marginBottom: 4 },
+  repBars:     { gap: 5 },
+  repBar:      { flexDirection: "row", alignItems: "center", gap: 6 },
+  repBarLabel: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1, width: 80 },
+  repBarTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  repBarFill:  { height: "100%", borderRadius: 2 },
+  repBarVal:   { fontSize: 10, fontFamily: FONT.bold, width: 28, textAlign: "right" },
 
   memTraceRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   memorySeverityDot: { width: 7, height: 7, borderRadius: 4, marginTop: 4 },

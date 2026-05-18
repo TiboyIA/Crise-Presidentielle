@@ -1,5 +1,6 @@
 import { BOTS } from "@/data/bots";
-import type { RankEntry } from "@/types/strategy";
+import type { CountryRelation, RankEntry } from "@/types/strategy";
+import { computeBotDecisions, applyStrategyGrowthMults } from "@/logic/botStrategyEngine";
 
 const MAX_OFFLINE_HOURS = 48;
 
@@ -8,36 +9,31 @@ export function updateBotRanking(
   playerPower: number,
   playerPoints: number,
   lastBotUpdate: number,
+  playerRelations: CountryRelation[] = [],
 ): RankEntry[] {
-  const now = Date.now();
+  const now          = Date.now();
   const elapsedHours = Math.min((now - lastBotUpdate) / 3600000, MAX_OFFLINE_HOURS);
 
-  const updated = ranking.map((entry) => {
-    if (entry.id === "player") {
-      const prev = entry.power;
-      return {
-        ...entry,
-        power: playerPower,
-        points: playerPoints,
-        trend: playerPower > prev ? ("up" as const) : playerPower < prev ? ("down" as const) : ("stable" as const),
-      };
-    }
-
-    const bot = BOTS.find((b) => b.id === entry.id);
-    if (!bot) return entry;
-
-    const growthVariance = 0.8 + Math.random() * 0.4; // ±20% variance
-    const growth = bot.growthPerHour * elapsedHours * growthVariance;
-    const newPower = Math.round(entry.power + growth);
-    const prevPower = entry.power;
-
+  // Mise à jour du joueur
+  const withPlayer = ranking.map((entry) => {
+    if (entry.id !== "player") return entry;
+    const prev = entry.power;
     return {
       ...entry,
-      power: newPower,
-      points: newPower * 2,
-      trend: newPower > prevPower ? ("up" as const) : ("stable" as const),
+      power:  playerPower,
+      points: playerPoints,
+      trend: playerPower > prev ? ("up" as const) : playerPower < prev ? ("down" as const) : ("stable" as const),
     };
   });
+
+  // Décisions stratégiques des bots pour ce cycle
+  const decisions = computeBotDecisions(withPlayer, playerPower, playerRelations, now);
+
+  // Table de croissance de base (par bot)
+  const baseGrowth = new Map(BOTS.map((b) => [b.id, b.growthPerHour]));
+
+  // Application des multiplicateurs stratégiques + mise à jour du classement
+  const updated = applyStrategyGrowthMults(withPlayer, decisions, baseGrowth, elapsedHours);
 
   return updated.sort((a, b) => b.power - a.power);
 }

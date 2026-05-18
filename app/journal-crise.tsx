@@ -9,6 +9,7 @@ import { InteractiveNewsModal } from "@/components/InteractiveNewsModal";
 import { Badge, Panel, ScreenHeader, SectionHeader } from "@/components/ui";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { typeIcon, urgencyColor } from "@/logic/newsEngine";
+import { computeNationalTension } from "@/logic/tensionEngine";
 import { FONT, PALETTE } from "@/constants/uiTokens";
 import type { NewsType } from "@/types/strategy";
 
@@ -153,6 +154,8 @@ export default function JournalDeCriseScreen() {
       <InteractiveNewsModal
         event={activeEvent}
         visible={!!activeModal}
+        tension={state ? computeNationalTension(state) : undefined}
+        actionCount={news.actionCount}
         onChoose={(id) => {
           if (!activeModal) return;
           resolveInteractiveNews(activeModal, id);

@@ -1,9 +1,11 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COUNTRIES } from "@/data/countries";
 import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS, STATUS_COLORS } from "@/constants/uiTokens";
+import { getStrategicBadges, BADGE_META } from "@/logic/worldGraphEngine";
 import type { CountryId, CountryRelation, RelationStatus } from "@/types/strategy";
 
 interface Props {
@@ -23,6 +25,7 @@ const STATUS_LABELS: Record<RelationStatus, string> = {
 export function CountryCard({ countryId, relation, onPress }: Props) {
   const country = COUNTRIES[countryId];
   const statusColor = STATUS_COLORS[relation.status];
+  const badges = getStrategicBadges(countryId);
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.wrap, { opacity: pressed ? 0.85 : 1 }]}>
@@ -65,6 +68,21 @@ export function CountryCard({ countryId, relation, onPress }: Props) {
               </Text>
             </View>
           </View>
+
+          {/* Badges stratégiques — visibles uniquement si le pays en possède */}
+          {badges.length > 0 && (
+            <View style={styles.badgeRow}>
+              {badges.map((badge) => {
+                const meta = BADGE_META[badge];
+                return (
+                  <View key={badge} style={[styles.strategicBadge, { borderColor: meta.color + "55", backgroundColor: meta.color + "18" }]}>
+                    <MaterialCommunityIcons name={meta.icon as any} size={9} color={meta.color} />
+                    <Text style={[styles.strategicBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       </LinearGradient>
     </Pressable>
@@ -109,4 +127,11 @@ const styles = StyleSheet.create({
   metricVal: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh },
   bar: { width: 56, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 2 },
+  badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
+  strategicBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: 3, borderWidth: StyleSheet.hairlineWidth,
+  },
+  strategicBadgeText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
 });

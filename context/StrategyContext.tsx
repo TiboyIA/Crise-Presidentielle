@@ -58,6 +58,10 @@ import type { StrategyResearchId, StrategyResearchState } from "@/types/strategy
 import { trackGameStarted, trackCrisisResolved, trackActionUsed } from "@/storage/balanceStorage";
 import { track as telemetry } from "@/services/TelemetryService";
 import { COUNTRIES } from "@/data/countries";
+import { computeCrossImpacts } from "@/logic/crossImpactEngine";
+import { rollCascades } from "@/logic/cascadeProbabilityEngine";
+import { computeNationalTension, getTensionLevel } from "@/logic/tensionEngine";
+import { computeChaosModifier } from "@/logic/chaosAmplifier";
 import { recordEvent as rankRecord, isRankedIntended } from "@/services/RankedService";
 import type {
   AchievementId,
@@ -487,7 +491,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       let ranking = prev.ranking;
       let lastBotUpdate = prev.lastBotUpdate;
       if (shouldUpdateBots) {
-        ranking = updateBotRanking(prev.ranking, power, prev.stats.rankingPoints, prev.lastBotUpdate);
+        ranking = updateBotRanking(prev.ranking, power, prev.stats.rankingPoints, prev.lastBotUpdate, prev.relations);
         lastBotUpdate = now;
       }
 
@@ -692,17 +696,48 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       update((prev) => {
         const event = NEWS_EVENT_MAP[eventId];
         if (!event) return prev;
-        const { news, resources } = applyInteractiveNews(prev, event, choiceId);
-
         const choice = event.choices?.find((c) => c.id === choiceId);
 
-        const nationalIndicators = choice?.indicatorEffects
-          ? applyIndicatorEffects(prev.nationalIndicators, choice.indicatorEffects)
+        // Amplification chaotique — active uniquement sur forte/critique et après 15 actions.
+        // Amplifie les effets négatifs (jusqu'à +15 %) et atténue les positifs (-5 %) selon la tension.
+        const tensionLevel = getTensionLevel(computeNationalTension(prev));
+        const chaos = computeChaosModifier(
+          tensionLevel,
+          event,
+          prev.news.actionCount,
+          choice?.effects ?? {},
+          choice?.indicatorEffects ?? {},
+          choice?.hiddenPoliticsEffects ?? {},
+        );
+
+        // Ressources de base (effets normaux du choix) + delta chaos appliqué séparément.
+        const applied = applyInteractiveNews(prev, event, choiceId);
+        const { news } = applied;
+        let { resources } = applied;
+        if (chaos.isActive) {
+          for (const [key, delta] of Object.entries(chaos.resourceDelta) as [keyof typeof resources, number][]) {
+            resources = { ...resources, [key]: Math.max(0, Math.round(resources[key] + delta)) };
+          }
+        }
+
+        // Indicateurs et politique cachée : version amplifiée remplace l'originale.
+        let nationalIndicators = Object.keys(chaos.indicatorEffects).length > 0
+          ? applyIndicatorEffects(prev.nationalIndicators, chaos.indicatorEffects)
           : prev.nationalIndicators;
 
-        const hiddenPolitics = choice?.hiddenPoliticsEffects
-          ? applyHiddenPoliticsEffects(prev.hiddenPolitics, choice.hiddenPoliticsEffects)
+        let hiddenPolitics = Object.keys(chaos.hiddenEffects).length > 0
+          ? applyHiddenPoliticsEffects(prev.hiddenPolitics, chaos.hiddenEffects)
           : prev.hiddenPolitics;
+
+        // Effets croisés : conséquences secondaires basées sur l'état courant.
+        // S'appliquent après les effets primaires (et après amplification), toujours dans [-3, +3] par jauge.
+        const cross = computeCrossImpacts(prev, event, chaos.indicatorEffects, chaos.hiddenEffects);
+        if (Object.keys(cross.indicatorEffects).length > 0) {
+          nationalIndicators = applyIndicatorEffects(nationalIndicators, cross.indicatorEffects);
+        }
+        if (Object.keys(cross.hiddenEffects).length > 0) {
+          hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, cross.hiddenEffects);
+        }
 
         const relations = choice?.relationDelta
           ? prev.relations.map((r) => {
@@ -724,6 +759,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             payload: q.payload,
           };
           delayedConsequences = [...delayedConsequences, newConsequence];
+        }
+
+        const cascades = rollCascades(prev, event, choice, prev.news.actionCount, delayedConsequences, chaos.cascadeBoost);
+        if (cascades.length > 0) {
+          delayedConsequences = [...delayedConsequences, ...cascades];
         }
 
         return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 0);

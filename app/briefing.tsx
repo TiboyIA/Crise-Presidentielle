@@ -10,6 +10,7 @@ import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useResponsive } from "@/utils/responsive";
 import type { DecisionTrace, HiddenPolitics, NationalIndicators, PromiseDomain, PromiseStatus } from "@/types/strategy";
+import { computeNationalTension, getTensionLevel, getTensionLabel, getTensionColor } from "@/logic/tensionEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -124,6 +125,10 @@ export default function BriefingScreen() {
     .filter((t: DecisionTrace) => t.politicalImpact < -8)
     .slice(-3)
     .reverse();
+  const tension = computeNationalTension(state);
+  const tensionLevel = getTensionLevel(tension);
+  const tensionLabel = getTensionLabel(tensionLevel);
+  const tensionColor = getTensionColor(tensionLevel);
 
   const handleAcknowledgePoll = () => {
     acknowledgePoll();
@@ -360,6 +365,34 @@ export default function BriefingScreen() {
             >
               <Text style={styles.alertCtaText}>Voir le Journal →</Text>
             </Pressable>
+          </Panel>
+        )}
+
+        {/* TENSION NATIONALE — visible uniquement si tension ≥ 60 */}
+        {tension >= 60 && (
+          <Panel variant={tensionLevel === "explosive" ? "danger" : undefined} style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="lightning-bolt" size={14} color={tensionColor} />
+              <Text style={[styles.sectionTitle, { color: tensionColor }]}>TENSION NATIONALE</Text>
+            </View>
+            <View style={styles.indicatorRow}>
+              <MaterialCommunityIcons name="thermometer-alert" size={14} color={tensionColor} style={{ width: 18 }} />
+              <Text style={styles.indicatorLabel}>{tensionLabel}</Text>
+              <View style={styles.indicatorTrack}>
+                <View style={[styles.indicatorFill, { width: `${tension}%`, backgroundColor: tensionColor }]} />
+              </View>
+              <Text style={[styles.indicatorVal, { color: tensionColor }]}>{tension}</Text>
+            </View>
+            {tensionLevel === "risque" && (
+              <Text style={[styles.oppositionAlert, { color: tensionColor }]}>
+                Les tensions internes fragilisent la cohésion nationale. Des décisions structurantes s'imposent.
+              </Text>
+            )}
+            {tensionLevel === "explosive" && (
+              <Text style={[styles.oppositionAlert, { color: tensionColor }]}>
+                Situation critique. Une crise majeure est imminente si aucune mesure n'est prise immédiatement.
+              </Text>
+            )}
           </Panel>
         )}
 

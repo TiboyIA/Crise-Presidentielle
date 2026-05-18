@@ -1,5 +1,7 @@
 import { NEWS_EVENTS } from "@/data/newsEvents";
 import type { NewsEvent, NewsLogEntry, NewsState, StrategyGameState, StrategyResources } from "@/types/strategy";
+import { computeNationalTension } from "@/logic/tensionEngine";
+import { applyCooldownFilter, rarityScoreBonus } from "@/logic/rarityEngine";
 
 // ── Profil de faiblesses joueur ───────────────────────────────────────────────
 //
@@ -87,6 +89,7 @@ export function selectNextNews(
   // Evaluate explicit conditions and player weakness profile
   const conditionResults = evaluateConditions(state);
   const weakProfile = computePlayerWeaknessProfile(state);
+  const tension = computeNationalTension(state);
 
   // Filter candidates
   const candidates = NEWS_EVENTS.filter((e) => {
@@ -96,7 +99,12 @@ export function selectNextNews(
     return true;
   });
 
-  if (candidates.length === 0) {
+  // Filtre de rareté : retire les événements en cooldown (common = jamais filtré)
+  const cooldownFiltered = applyCooldownFilter(candidates.map((e) => e.id), news.log);
+  const rarityFiltered   = candidates.filter((e) => cooldownFiltered.includes(e.id));
+  const pool             = rarityFiltered.length > 0 ? rarityFiltered : candidates;
+
+  if (pool.length === 0) {
     // Fallback: reset seen and try again (excluding log entries from last session)
     const recentSeen = new Set(news.log.slice(-10).map((l) => l.eventId));
     const fallback = NEWS_EVENTS.filter(
@@ -107,9 +115,14 @@ export function selectNextNews(
 
   // Priority: conditional (+10) > interactive (+5) > urgency (1–4)
   // + weakness tilt (+0–8, always below conditionKey bonus to avoid forcing worst events)
-  const sorted = candidates.sort((a, b) => {
-    const aScore = urgencyScore(a) + (a.conditionKey ? 10 : 0) + (a.isInteractive ? 5 : 0) + weaknessWeight(a, weakProfile);
-    const bScore = urgencyScore(b) + (b.conditionKey ? 10 : 0) + (b.isInteractive ? 5 : 0) + weaknessWeight(b, weakProfile);
+  // + tension tilt (+0–3 for national/social events when tension ≥ 60)
+  // + rarity bonus (+2–12 quand un événement rare devient enfin éligible)
+  const tensionBonus = tension >= 60 ? Math.round((tension - 60) / 40 * 3) : 0;
+  const sorted = pool.sort((a, b) => {
+    const aTension = tensionBonus > 0 && (a.type === "national" || a.type === "social") ? tensionBonus : 0;
+    const bTension = tensionBonus > 0 && (b.type === "national" || b.type === "social") ? tensionBonus : 0;
+    const aScore = urgencyScore(a) + (a.conditionKey ? 10 : 0) + (a.isInteractive ? 5 : 0) + weaknessWeight(a, weakProfile) + aTension + rarityScoreBonus(a.id, news.log);
+    const bScore = urgencyScore(b) + (b.conditionKey ? 10 : 0) + (b.isInteractive ? 5 : 0) + weaknessWeight(b, weakProfile) + bTension + rarityScoreBonus(b.id, news.log);
     return bScore - aScore;
   });
 
