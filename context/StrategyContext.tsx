@@ -70,6 +70,10 @@ import { computeNationalTension, getTensionLevel } from "@/logic/tensionEngine";
 import { computeChaosModifier } from "@/logic/chaosAmplifier";
 import { computePresidentialClarity } from "@/logic/discourseEngine";
 import {
+  computeMisinterpretationRisk,
+  generateMisinterpretation,
+} from "@/logic/mediaMisinterpretationEngine";
+import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
   computePathologyThresholdEffects,
@@ -742,7 +746,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
 
         // Ressources de base (effets normaux du choix) + delta chaos appliqué séparément.
         const applied = applyInteractiveNews(prev, event, choiceId);
-        const { news } = applied;
+        let news = applied.news;
         let { resources } = applied;
         if (chaos.isActive) {
           for (const [key, delta] of Object.entries(chaos.resourceDelta) as [keyof typeof resources, number][]) {
@@ -770,12 +774,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Indice de Clarté Présidentielle — effets additifs sur hiddenPolitics uniquement si clarityProfile défini.
+        let clarityScore: number | undefined;
         if (choice?.clarityProfile) {
           const clarity = computePresidentialClarity(
             choice.clarityProfile,
             { urgency: event.urgency, newsType: event.type },
             { hiddenPolitics, nationalIndicators, governanceDoctrine: prev.governanceDoctrine, mandateDay: prev.mandateDay },
           );
+          clarityScore = clarity.clarityScore;
           if (Object.keys(clarity.hiddenPoliticsEffects).length > 0) {
             hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, clarity.hiddenPoliticsEffects);
           }
@@ -789,6 +795,25 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           if (Object.keys(thresholdEffects).length > 0) {
             hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, thresholdEffects);
           }
+        }
+
+        // Malentendu médiatique — titre alternatif fictif ajouté à l'entrée de log si risque suffisant.
+        const anyPromiseBroken = Object.values(prev.campaignPromises.status).some((s) => s === "trahie");
+        const misinRisk = computeMisinterpretationRisk({
+          hiddenPolitics,
+          urgency: event.urgency,
+          clarityScore,
+          anyPromiseBroken,
+        });
+        const misinterpretation = generateMisinterpretation(misinRisk, event.type);
+        if (misinterpretation && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          const patchedLog = news.log.map((e, i) =>
+            i === lastIdx
+              ? { ...e, misinterpretedTitle: misinterpretation.headline, misinterpretationType: misinterpretation.type }
+              : e,
+          );
+          news = { ...news, log: patchedLog };
         }
 
         const relations = choice?.relationDelta

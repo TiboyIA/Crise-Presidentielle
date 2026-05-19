@@ -6,7 +6,7 @@ import { NEWS_IMG } from "@/constants/assets";
 import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS, URGENCY_COLORS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS } from "@/types/strategy";
-import type { NewsLogEntry, ResourceKey } from "@/types/strategy";
+import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/strategy";
 
 interface Props {
   entry: NewsLogEntry;
@@ -82,11 +82,27 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.misinterpretedTitle && (
+            <View style={[styles.misinterpBox, { borderColor: misinterpColor(entry.misinterpretationType) + "55", backgroundColor: misinterpColor(entry.misinterpretationType) + "12" }]}>
+              <Text style={[styles.misinterpKicker, { color: misinterpColor(entry.misinterpretationType) }]}>PRESSE HOSTILE</Text>
+              <Text style={[styles.misinterpTitle, { color: misinterpColor(entry.misinterpretationType) }]} numberOfLines={2}>{entry.misinterpretedTitle}</Text>
+            </View>
+          )}
+
           <Text style={styles.time}>{formatRelativeTime(entry.timestamp)}</Text>
         </View>
       </LinearGradient>
     </Pressable>
   );
+}
+
+function misinterpColor(type?: MisinterpretationType): string {
+  switch (type) {
+    case "trust_crisis": return PALETTE.danger;
+    case "rumor":        return "#e54848";
+    case "polemic":      return "#FF8040";
+    default:             return "#e8a93a";
+  }
 }
 
 function mapUrgency(u: string): "neutral" | "warning" | "danger" | "gold" {
@@ -138,4 +154,8 @@ const styles = StyleSheet.create({
   effectText: { fontSize: 11, fontFamily: FONT.bold },
 
   time: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5, textAlign: "right" },
+
+  misinterpBox: { borderRadius: 4, padding: 8, gap: 3, borderWidth: 1 },
+  misinterpKicker: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2 },
+  misinterpTitle: { fontSize: 11, fontFamily: FONT.semi, lineHeight: 15, fontStyle: "italic" },
 });

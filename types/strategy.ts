@@ -239,6 +239,8 @@ export type NewsType =
 
 export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
 
+export type MisinterpretationType = "distorted" | "polemic" | "rumor" | "trust_crisis";
+
 export type GovernanceDoctrine =
   | "democratique" | "technocratique" | "securitaire" | "populiste" | "autoritaire"
   | "souverainiste" | "ecologiste" | "liberal";
@@ -442,6 +444,9 @@ export interface NewsLogEntry {
   choiceLabel?: string;
   consequence?: string;
   effects: Partial<StrategyResources>;
+  /** Titre alternatif généré par la presse hostile — absent si risque insuffisant. */
+  misinterpretedTitle?: string;
+  misinterpretationType?: MisinterpretationType;
 }
 
 export interface NewsState {
