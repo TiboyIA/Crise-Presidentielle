@@ -349,6 +349,21 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Pathologies du discours politique ────────────────────────────────────────
+
+/** Six déformations rhétoriques accumulées au fil des choix présidentiels (0-100 chacune). */
+export interface DiscoursePathology {
+  doubleSpeak:          number;
+  fearSpeech:           number;
+  minimization:         number;
+  scapegoating:         number;
+  technocraticColdness: number;
+  contradictionRisk:    number;
+}
+
+/** Deltas appliqués à DiscoursePathology par un choix de crise. */
+export type PathologyDelta = Partial<DiscoursePathology>;
+
 // ── Indice de Clarté Présidentielle ──────────────────────────────────────────
 
 /** Profil statique de clarté d'un message présidentiel, défini par choix dans newsEvents.ts. */
@@ -391,6 +406,8 @@ export interface NewsChoice {
   hiddenPoliticsEffects?: Partial<HiddenPolitics>;
   /** Profil de clarté optionnel — active l'Indice de Clarté Présidentielle pour ce choix. */
   clarityProfile?: ClarityProfile;
+  /** Delta de pathologies rhétoriques — accumulé discrètement, affecte hiddenPolitics sur seuil. */
+  pathologyDelta?: PathologyDelta;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -496,4 +513,6 @@ export interface StrategyGameState {
   dailyLoginReward?: DailyLoginRewardState;
   // Cosmic entities layer — optional for backward compat
   cosmicInfluence?: CosmicInfluence;
+  // Pathologies du discours — optional for backward compat
+  discoursePathology?: DiscoursePathology;
 }

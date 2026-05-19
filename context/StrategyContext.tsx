@@ -69,6 +69,12 @@ import { computeMandateScore } from "@/core/gameSelectors";
 import { computeNationalTension, getTensionLevel } from "@/logic/tensionEngine";
 import { computeChaosModifier } from "@/logic/chaosAmplifier";
 import { computePresidentialClarity } from "@/logic/discourseEngine";
+import {
+  DEFAULT_PATHOLOGY,
+  applyPathologyDelta,
+  computePathologyThresholdEffects,
+  decayPathologies,
+} from "@/logic/discoursePathologyEngine";
 import { recordEvent as rankRecord, isRankedIntended } from "@/services/RankedService";
 import type {
   AchievementId,
@@ -210,6 +216,7 @@ function buildInitialState(
     realTime: initRealTime(now),
     strategyResearch: { ...DEFAULT_RESEARCH_STATE },
     cosmicInfluence: { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
+    discoursePathology: { ...DEFAULT_PATHOLOGY },
   };
 }
 
@@ -774,6 +781,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Pathologies du discours — accumulation discrète + effets sur seuil.
+        let discoursePathology = prev.discoursePathology ?? { ...DEFAULT_PATHOLOGY };
+        if (choice?.pathologyDelta) {
+          discoursePathology = applyPathologyDelta(discoursePathology, choice.pathologyDelta);
+          const thresholdEffects = computePathologyThresholdEffects(discoursePathology);
+          if (Object.keys(thresholdEffects).length > 0) {
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, thresholdEffects);
+          }
+        }
+
         const relations = choice?.relationDelta
           ? prev.relations.map((r) => {
               if (r.countryId !== choice.relationDelta!.countryId) return r;
@@ -801,7 +818,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           delayedConsequences = [...delayedConsequences, ...cascades];
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences }, 0);
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -1225,6 +1242,11 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
   // Apply doctrine drift + minister bonuses + debt update every 10 days
   if (Math.floor(newDay / 10) > Math.floor(prevDay / 10)) {
+    // Décroissance naturelle des pathologies discursives (-2 par palier de 10 jours)
+    if (s.discoursePathology) {
+      s = { ...s, discoursePathology: decayPathologies(s.discoursePathology, 2) };
+    }
+
     const doctrineDef = DOCTRINES[s.governanceDoctrine];
     s = {
       ...s,
