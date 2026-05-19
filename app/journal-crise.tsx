@@ -163,6 +163,12 @@ export default function JournalDeCriseScreen() {
         visible={!!activeModal}
         tension={state ? computeNationalTension(state) : undefined}
         actionCount={news.actionCount}
+        clarityContext={state ? {
+          hiddenPolitics: state.hiddenPolitics,
+          nationalIndicators: state.nationalIndicators,
+          governanceDoctrine: state.governanceDoctrine,
+          mandateDay: state.mandateDay,
+        } : undefined}
         onChoose={(id) => {
           if (!activeModal) return;
           resolveInteractiveNews(activeModal, id);

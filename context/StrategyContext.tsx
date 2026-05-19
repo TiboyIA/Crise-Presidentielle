@@ -68,6 +68,7 @@ import {
 import { computeMandateScore } from "@/core/gameSelectors";
 import { computeNationalTension, getTensionLevel } from "@/logic/tensionEngine";
 import { computeChaosModifier } from "@/logic/chaosAmplifier";
+import { computePresidentialClarity } from "@/logic/discourseEngine";
 import { recordEvent as rankRecord, isRankedIntended } from "@/services/RankedService";
 import type {
   AchievementId,
@@ -759,6 +760,18 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         }
         if (Object.keys(cross.hiddenEffects).length > 0) {
           hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, cross.hiddenEffects);
+        }
+
+        // Indice de Clarté Présidentielle — effets additifs sur hiddenPolitics uniquement si clarityProfile défini.
+        if (choice?.clarityProfile) {
+          const clarity = computePresidentialClarity(
+            choice.clarityProfile,
+            { urgency: event.urgency, newsType: event.type },
+            { hiddenPolitics, nationalIndicators, governanceDoctrine: prev.governanceDoctrine, mandateDay: prev.mandateDay },
+          );
+          if (Object.keys(clarity.hiddenPoliticsEffects).length > 0) {
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, clarity.hiddenPoliticsEffects);
+          }
         }
 
         const relations = choice?.relationDelta

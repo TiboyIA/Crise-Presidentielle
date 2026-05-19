@@ -10,6 +10,15 @@ import { RESOURCE_ICONS, RESOURCE_LABELS } from "@/types/strategy";
 import type { NewsChoice, NewsEvent, ResourceKey } from "@/types/strategy";
 import { getChaosWarning } from "@/logic/chaosAmplifier";
 import { getTensionLevel } from "@/logic/tensionEngine";
+import { computePresidentialClarity } from "@/logic/discourseEngine";
+import type { HiddenPolitics, NationalIndicators } from "@/types/strategy";
+
+interface ClarityContext {
+  hiddenPolitics: HiddenPolitics;
+  nationalIndicators: NationalIndicators;
+  governanceDoctrine: string;
+  mandateDay: number;
+}
 
 interface Props {
   event: NewsEvent | null;
@@ -20,9 +29,11 @@ interface Props {
   tension?: number;
   /** Nombre d'actions jouées — protège le début de partie (pas d'avertissement avant 15 actions). */
   actionCount?: number;
+  /** Contexte politique pour calculer l'Indice de Clarté Présidentielle. Optionnel. */
+  clarityContext?: ClarityContext;
 }
 
-export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tension, actionCount = 0 }: Props) {
+export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tension, actionCount = 0, clarityContext }: Props) {
   const { height } = useWindowDimensions();
   const [preview, setPreview] = useState<NewsChoice | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -119,6 +130,19 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                       ))}
                     </View>
                   )}
+                  {preview.clarityProfile && clarityContext && (() => {
+                    const clarity = computePresidentialClarity(
+                      preview.clarityProfile,
+                      { urgency: event.urgency, newsType: event.type },
+                      clarityContext,
+                    );
+                    return (
+                      <View style={[styles.clarityBadge, { borderColor: clarity.color + "66", backgroundColor: clarity.color + "18" }]}>
+                        <Text style={[styles.clarityLabel, { color: clarity.color }]}>{clarity.label.toUpperCase()}</Text>
+                        <Text style={[styles.clarityScore, { color: clarity.color }]}>{clarity.clarityScore}/100</Text>
+                      </View>
+                    );
+                  })()}
                   <View style={styles.confirmHint}>
                     <MaterialCommunityIcons name="gesture-tap" size={12} color={PALETTE.gold} />
                     <Text style={styles.confirmHintText}>Toucher à nouveau pour confirmer</Text>
@@ -208,6 +232,9 @@ const styles = StyleSheet.create({
   effectVal: { fontSize: 12, fontFamily: FONT.bold },
   confirmHint: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   confirmHintText: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.gold, letterSpacing: 0.5 },
+  clarityBadge: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: RADIUS.xs, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
+  clarityLabel: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 1.5 },
+  clarityScore: { fontSize: 9, fontFamily: FONT.bold },
 
   chaosWarning: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 8, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: "#FF8040" + "55", backgroundColor: "#FF8040" + "12", marginBottom: 12 },
   chaosWarningText: { flex: 1, fontSize: 11, fontFamily: FONT.semi, color: "#FF8040", lineHeight: 15 },

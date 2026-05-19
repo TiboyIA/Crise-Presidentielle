@@ -16,6 +16,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         label: "Mobiliser la cyberdéfense nationale",
         consequence: "Vos équipes contiennent l'attaque. Les systèmes reviennent progressivement en ligne.",
         effects: { cyberDefense: -20, money: -500, military: 5 },
+        clarityProfile: { coherence: 8, precision: 7, transparency: 6, jargon: 4, evasion: 2 },
       },
       {
         id: "accuse_foreign",
@@ -23,6 +24,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "La communauté internationale prend note. Les tensions diplomatiques s'intensifient.",
         effects: { influence: 10, money: -100, intelligence: -10 },
         relationDelta: { countryId: "russia", delta: -15 },
+        clarityProfile: { coherence: 4, precision: 3, transparency: 2, jargon: 2, evasion: 7 },
       },
       {
         id: "hire_private",
@@ -46,12 +48,14 @@ export const NEWS_EVENTS: NewsEvent[] = [
         label: "Purge silencieuse des systèmes infectés",
         consequence: "L'ennemi ignore que nous avons découvert sa présence. Avantage tactique préservé.",
         effects: { cyberDefense: 10, intelligence: 20, technology: -10 },
+        clarityProfile: { coherence: 7, precision: 5, transparency: 0, jargon: 5, evasion: 6 },
       },
       {
         id: "public_disclosure",
         label: "Annoncer publiquement l'intrusion",
         consequence: "La transparence est saluée mais révèle nos vulnérabilités.",
         effects: { influence: 15, cyberDefense: -10, intelligence: -15 },
+        clarityProfile: { coherence: 9, precision: 8, transparency: 10, jargon: 2, evasion: 1 },
       },
       {
         id: "counter_hack",
@@ -81,6 +85,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         label: "Restreindre temporairement certaines plateformes",
         consequence: "La désinformation ralentit mais la liberté d'expression est questionnée.",
         effects: { cyberDefense: 10, influence: -20, military: 5 },
+        clarityProfile: { coherence: 5, precision: 4, transparency: 2, jargon: 3, evasion: 5 },
       },
     ],
   },

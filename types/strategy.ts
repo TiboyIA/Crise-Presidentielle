@@ -349,6 +349,37 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Indice de Clarté Présidentielle ──────────────────────────────────────────
+
+/** Profil statique de clarté d'un message présidentiel, défini par choix dans newsEvents.ts. */
+export interface ClarityProfile {
+  /** Cohérence interne — 0 (contradictoire) à 10 (parfaitement cohérent). */
+  coherence:    number;
+  /** Précision des termes — 0 (vague) à 10 (précis et factuel). */
+  precision:    number;
+  /** Transparence — 0 (opaque) à 10 (pleinement transparent). */
+  transparency: number;
+  /** Niveau de jargon — 0 (accessible) à 10 (incompréhensible). Pénalise le score. */
+  jargon:       number;
+  /** Niveau d'évitement — 0 (direct) à 10 (esquive totale). Pénalise le score. */
+  evasion:      number;
+}
+
+/** Contexte de crise transmis à computePresidentialClarity. */
+export interface ClarityContext {
+  urgency: NewsUrgency;
+  newsType?: NewsType;
+}
+
+/** Résultat complet retourné par computePresidentialClarity. */
+export interface ClarityResult {
+  clarityScore:          number;               // 0-100
+  band:                  "clear" | "ambiguous" | "confused";
+  label:                 string;               // ex. "Message clair"
+  color:                 string;               // hex PALETTE
+  hiddenPoliticsEffects: Partial<HiddenPolitics>;
+}
+
 export interface NewsChoice {
   id: string;
   label: string;
@@ -358,6 +389,8 @@ export interface NewsChoice {
   relationDelta?: { countryId: CountryId; delta: number };
   indicatorEffects?: Partial<NationalIndicators>;
   hiddenPoliticsEffects?: Partial<HiddenPolitics>;
+  /** Profil de clarté optionnel — active l'Indice de Clarté Présidentielle pour ce choix. */
+  clarityProfile?: ClarityProfile;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
