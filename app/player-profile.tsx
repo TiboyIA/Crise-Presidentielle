@@ -6,9 +6,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useAuth } from "@/context/AuthContext";
-import { inviteAlly } from "@/services/AllianceService";
+import { enqueueAllianceInvite } from "@/services/OfflineQueue";
 import { launchSpyOp, type SpyOpType } from "@/services/SpyService";
 import { launchCyberOp } from "@/services/CyberService";
+import { type LeaderboardEntry } from "@/utils/validators";
 
 const DOCTRINE_LABELS: Record<string, string> = {
   democratique:   "Réformateur",
@@ -51,19 +52,6 @@ function rankMedal(rank: number): string {
   return `#${rank}`;
 }
 
-interface LeaderboardEntry {
-  id: string;
-  player_id: string;
-  display_name: string;
-  country_id: string;
-  doctrine: string;
-  score: number;
-  mandate_days: number;
-  created_at: string;
-  season: number;
-  rank_title: string;
-  global_power: number;
-}
 
 export default function PlayerProfileScreen() {
   const router = useRouter();
@@ -77,7 +65,7 @@ export default function PlayerProfileScreen() {
 
   const rank = parseInt(params.rank ?? "0", 10);
   const auth = useAuth();
-  const [inviteState, setInviteState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [inviteState, setInviteState] = useState<"idle" | "sending" | "sent" | "queued" | "error">("idle");
   const [inviteError, setInviteError] = useState("");
 
   function inviteErrorLabel(error?: string): string {
@@ -154,12 +142,14 @@ export default function PlayerProfileScreen() {
   async function handleInvite() {
     if (!auth.accessToken || !entry || inviteState === "sending") return;
     setInviteState("sending");
-    const result = await inviteAlly(auth.accessToken, entry.player_id);
-    if (result.ok) {
+    const outcome = await enqueueAllianceInvite(entry.player_id, auth.accessToken);
+    if (outcome === "sent") {
       setInviteState("sent");
+    } else if (outcome === "queued") {
+      setInviteState("queued");
     } else {
       setInviteState("error");
-      setInviteError(inviteErrorLabel(result.error));
+      setInviteError(inviteErrorLabel("network-unavailable"));
     }
   }
 
@@ -384,6 +374,13 @@ export default function PlayerProfileScreen() {
                   <View style={styles.inviteRow}>
                     <MaterialCommunityIcons name="check-circle" size={16} color={PALETTE.success} />
                     <Text style={[styles.inviteBtnText, { color: PALETTE.success }]}>Invitation envoyée</Text>
+                  </View>
+                ) : inviteState === "queued" ? (
+                  <View style={styles.inviteRow}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color={PALETTE.warning} />
+                    <Text style={[styles.inviteBtnText, { color: PALETTE.warning }]}>
+                      Invitation enregistrée — envoi automatique dès que tu seras en ligne
+                    </Text>
                   </View>
                 ) : (
                   <>

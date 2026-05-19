@@ -9,6 +9,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { validateCloudSave } from "@/utils/validators";
 
 const PENDING_UPLOAD_KEY = "sync_pending_upload_v1";
 const DEVICE_ID_KEY = "sync_device_id_v1";
@@ -164,9 +165,8 @@ export async function downloadSave(accessToken: string): Promise<CloudSave | nul
       headers: headers(accessToken),
     });
     if (!res.ok) return null;
-    const data = await res.json() as { save?: unknown; saveVersion?: number; savedAt?: string };
-    if (!data.save) return null;
-    return { save: data.save, saveVersion: data.saveVersion ?? 1, savedAt: data.savedAt ?? "" };
+    const data = await res.json();
+    return validateCloudSave(data);
   } catch {
     return null;
   }

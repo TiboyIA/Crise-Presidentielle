@@ -12,6 +12,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import { FEATURES } from "@/config/features";
 
 const STORAGE_KEY = "@telemetry_buffer_v1";
 const MAX_BUFFER   = 200;
@@ -95,6 +96,7 @@ export async function track(
     metadata?: Record<string, string | number | boolean>;
   },
 ): Promise<void> {
+  if (!FEATURES.enableTelemetryLocal) return;
   try {
     const event: TelemetryEvent = {
       eventType,

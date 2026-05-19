@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useAuth } from "@/context/AuthContext";
+import { filterValid, validateLeaderboardEntry, type LeaderboardEntry } from "@/utils/validators";
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -29,20 +30,6 @@ const COUNTRY_FLAGS: Record<string, string> = {
   north_korea: "🇰🇵", nigeria: "🇳🇬", pakistan: "🇵🇰",
 };
 
-interface LeaderboardEntry {
-  id: string;
-  player_id: string;
-  display_name: string;
-  country_id: string;
-  doctrine: string;
-  score: number;
-  mandate_days: number;
-  created_at: string;
-  season: number;
-  rank_title: string;
-  global_power: number;
-}
-
 async function fetchLeaderboard(offset = 0): Promise<LeaderboardEntry[]> {
   if (!SUPABASE_URL) return [];
   const res = await fetch(
@@ -50,8 +37,8 @@ async function fetchLeaderboard(offset = 0): Promise<LeaderboardEntry[]> {
     { headers: { apikey: SUPABASE_ANON_KEY } },
   );
   if (!res.ok) return [];
-  const data = await res.json() as { entries?: LeaderboardEntry[] };
-  return data.entries ?? [];
+  const data = await res.json() as { entries?: unknown[] };
+  return filterValid(data.entries ?? [], validateLeaderboardEntry);
 }
 
 export default function RankingGlobalScreen() {

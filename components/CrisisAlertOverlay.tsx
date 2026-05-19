@@ -10,6 +10,7 @@ import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useStrategy } from "@/context/StrategyContext";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { typeIcon } from "@/logic/newsEngine";
+import { FEATURES } from "@/config/features";
 
 const TYPE_LABELS: Record<string, string> = {
   cyber:         "CYBERMENACE",
@@ -58,6 +59,8 @@ export function CrisisAlertOverlay() {
       break; // one alert at a time
     }
   }, [pendingIds]);
+
+  if (!FEATURES.enableCrisisOverlay) return null;
 
   function dismiss() {
     Animated.timing(opacity, {

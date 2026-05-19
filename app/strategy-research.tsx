@@ -17,6 +17,8 @@ import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import type { StrategyResearchCategory, StrategyResearchId } from "@/types/strategyResearch";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { canAfford } from "@/logic/buildingEngine";
+import { useCommand } from "@/hooks/useCommand";
+import { commandId } from "@/core/commands";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -36,6 +38,7 @@ export default function StrategyResearchScreen() {
   const [activeCategory, setActiveCategory] = useState<StrategyResearchCategory | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { run, isPending } = useCommand();
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   if (!state) return null;
@@ -55,7 +58,14 @@ export default function StrategyResearchScreen() {
   );
 
   function handleLaunch(id: StrategyResearchId) {
-    const result = launchStrategyResearch(id);
+    const cid = commandId("start_research", id);
+    const result = run(cid, () => launchStrategyResearch(id));
+    if (result === null) {
+      setToast({ msg: "Action en cours…", ok: false });
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), 1500);
+      return;
+    }
     const msg = result.success ? "Recherche lancée !" : (result.reason ?? "Impossible");
     setToast({ msg, ok: result.success });
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -143,7 +153,8 @@ export default function StrategyResearchScreen() {
           const hasOtherInProgress = !!ip && !isInProgress;
           const prereqsMet = item.prerequisites.every((p) => research.completed.includes(p));
           const affordable = canAfford(item.cost, state.resources);
-          const disabled = isCompleted || isInProgress || hasOtherInProgress || !prereqsMet || !affordable;
+          const cmdPending = isPending(commandId("start_research", item.id));
+          const disabled = isCompleted || isInProgress || hasOtherInProgress || !prereqsMet || !affordable || cmdPending;
           const catColor = RESEARCH_CATEGORY_COLORS[item.category];
 
           let statusLabel = `${item.durationDays}j · Lancer`;

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { StrategyGameState } from "@/types/strategy";
+import { migrateSave, isSaveCurrent } from "@/storage/saveMigrations";
 
 export type SlotNumber = 1 | 2 | 3 | 4 | 5 | 6;
 /** Base slots — always available. */
@@ -41,7 +42,11 @@ export async function loadFromSlot(slot: SlotNumber): Promise<StrategyGameState 
     const raw = await AsyncStorage.getItem(slotKey(slot));
     if (!raw) return null;
     const data = JSON.parse(raw) as Partial<SlotData>;
-    return data.state ?? null;
+    const rawState = data.state;
+    if (!rawState) return null;
+    if (isSaveCurrent(rawState)) return rawState;
+    const result = migrateSave(rawState);
+    return result ? result.state : null;
   } catch {
     return null;
   }

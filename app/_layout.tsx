@@ -84,6 +84,7 @@ function RootLayoutNav() {
       <Stack.Screen name="saves" />
       <Stack.Screen name="strategy-debug" />
       <Stack.Screen name="chat" />
+      <Stack.Screen name="recovery" />
       {/* Classic game screens */}
       <Stack.Screen name="tutorial" />
       <Stack.Screen name="create" />

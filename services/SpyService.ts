@@ -1,3 +1,5 @@
+import { filterValid, validateSpyOp } from "@/utils/validators";
+
 const BASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
@@ -63,8 +65,8 @@ export async function fetchSpyOps(accessToken: string): Promise<SpyOp[]> {
   try {
     const res = await fetch(efUrl("/spy-resolve"), { headers: authHeaders(accessToken) });
     if (!res.ok) return [];
-    const data = await res.json() as { ops?: SpyOp[] };
-    return data.ops ?? [];
+    const data = await res.json() as { ops?: unknown[] };
+    return filterValid(data.ops ?? [], validateSpyOp);
   } catch {
     return [];
   }

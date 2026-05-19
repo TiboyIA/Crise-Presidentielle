@@ -64,7 +64,7 @@ function HeaderContent({ compact }: { compact?: boolean }) {
 export default function StartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, loaded, startNewGame } = useStrategy();
+  const { state, loaded, saveStatus, startNewGame } = useStrategy();
   const auth = useAuth();
 
   const [step, setStep] = useState<Step>("home");
@@ -76,6 +76,12 @@ export default function StartScreen() {
   const isLandscape = width > height;
 
   if (!loaded) return null;
+
+  // Save was unrecoverable — show dedicated recovery screen immediately
+  if (saveStatus === "recovered") {
+    router.replace("/recovery" as any);
+    return null;
+  }
 
   const hasSave = state !== null;
 

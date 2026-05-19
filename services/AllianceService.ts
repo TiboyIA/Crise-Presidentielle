@@ -1,3 +1,5 @@
+import { filterValid, validateAlliance } from "@/utils/validators";
+
 const BASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
@@ -29,8 +31,8 @@ export async function fetchAlliances(accessToken: string): Promise<Alliance[]> {
   try {
     const res = await fetch(efUrl("/alliance-list"), { headers: authHeaders(accessToken) });
     if (!res.ok) return [];
-    const data = await res.json() as { alliances?: Alliance[] };
-    return data.alliances ?? [];
+    const data = await res.json() as { alliances?: unknown[] };
+    return filterValid(data.alliances ?? [], validateAlliance);
   } catch {
     return [];
   }

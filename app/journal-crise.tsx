@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,17 +36,24 @@ export default function JournalDeCriseScreen() {
     if (state) markNewsRead();
   }, []);
 
+  const pendingInteractive = useMemo(() => {
+    if (!state) return [];
+    return state.news.pendingIds
+      .map((id) => NEWS_EVENT_MAP[id])
+      .filter(Boolean)
+      .filter((e) => e.isInteractive);
+  }, [state]);
+
+  const filteredLog = useMemo(() => {
+    if (!state) return [];
+    const log = state.news.log;
+    return filter === "all"
+      ? [...log].reverse()
+      : log.filter((e) => e.type === filter).reverse();
+  }, [state, filter]);
+
   if (!state) return null;
   const { news } = state;
-
-  const pendingInteractive = news.pendingIds
-    .map((id) => NEWS_EVENT_MAP[id])
-    .filter(Boolean)
-    .filter((e) => e.isInteractive);
-
-  const filteredLog = filter === "all"
-    ? [...news.log].reverse()
-    : [...news.log].filter((e) => e.type === filter).reverse();
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 

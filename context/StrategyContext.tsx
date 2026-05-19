@@ -60,6 +60,12 @@ import { track as telemetry } from "@/services/TelemetryService";
 import { COUNTRIES } from "@/data/countries";
 import { computeCrossImpacts } from "@/logic/crossImpactEngine";
 import { rollCascades } from "@/logic/cascadeProbabilityEngine";
+import {
+  applyHiddenPoliticsEffects,
+  applyIndicatorEffects,
+  applyRewards,
+} from "@/core/computeState";
+import { computeMandateScore } from "@/core/gameSelectors";
 import { computeNationalTension, getTensionLevel } from "@/logic/tensionEngine";
 import { computeChaosModifier } from "@/logic/chaosAmplifier";
 import { recordEvent as rankRecord, isRankedIntended } from "@/services/RankedService";
@@ -206,9 +212,13 @@ function buildInitialState(
   };
 }
 
+export type SaveStatus = "ok" | "migrated" | "recovered";
+
 interface StrategyContextValue {
   state: StrategyGameState | null;
   loaded: boolean;
+  saveStatus: SaveStatus;
+  saveWarnings: string[];
   shouldShowPoll: boolean;
   shouldShowBilan: boolean;
   startNewGame: (playerName: string, doctrine?: GovernanceDoctrine, countryId?: CountryId) => void;
@@ -239,6 +249,8 @@ const StrategyContext = createContext<StrategyContextValue | null>(null);
 export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<StrategyGameState | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("ok");
+  const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
   const auth = useAuth();
   const allianceBonusRef = useRef(0);
   // Refs pour détection de complétion côté classé (comparaison inter-render)
@@ -259,8 +271,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadStrategy().then((saved) => {
-      if (saved) {
+    loadStrategy().then((result) => {
+      if (result) {
+        // Migration runs in loadStrategy — state already has all fields filled.
+        // Keep ?? guards here only as a final safety net against future schema changes.
+        const saved = result.state;
         const merged: StrategyGameState = {
           ...saved,
           news:                saved.news                ?? { ...DEFAULT_NEWS_STATE },
@@ -309,9 +324,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             };
           }),
         });
+        // Reflect migration status in context so recovery screen can act on it
+        if (result.usedFallback) {
+          setSaveStatus("recovered");
+          setSaveWarnings(result.warnings);
+        } else if (result.wasMigrated) {
+          setSaveStatus("migrated");
+        }
       }
       setLoaded(true);
-    });
+    }).catch(() => setLoaded(true));
   }, []);
 
   const scheduleSave = useCallback((s: StrategyGameState) => {
@@ -1068,7 +1090,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<StrategyContextValue>(
     () => ({
-      state, loaded, shouldShowPoll, shouldShowBilan,
+      state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan,
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
@@ -1077,7 +1099,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       claimDailyReward,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state, loaded, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
+    [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
@@ -1273,45 +1295,8 @@ function withNews(state: StrategyGameState): StrategyGameState {
   return stateWithCount;
 }
 
-function applyHiddenPoliticsEffects(
-  hp: HiddenPolitics,
-  effects: Partial<HiddenPolitics>,
-): HiddenPolitics {
-  const clamp = (v: number) => Math.min(100, Math.max(0, Math.round(v)));
-  return {
-    eliteTrust:              clamp(hp.eliteTrust              + (effects.eliteTrust              ?? 0)),
-    scandalRisk:             clamp(hp.scandalRisk             + (effects.scandalRisk             ?? 0)),
-    mediaMood:               clamp(hp.mediaMood               + (effects.mediaMood               ?? 0)),
-    popularFatigue:          clamp(hp.popularFatigue          + (effects.popularFatigue          ?? 0)),
-    regionalTension:         clamp(hp.regionalTension         + (effects.regionalTension         ?? 0)),
-    institutionalStability:  clamp(hp.institutionalStability  + (effects.institutionalStability  ?? 0)),
-  };
-}
 
-function applyIndicatorEffects(
-  indicators: NationalIndicators,
-  effects: Partial<NationalIndicators>,
-): NationalIndicators {
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(v)));
-  return {
-    popularity:   clamp(indicators.popularity   + (effects.popularity   ?? 0), 0, 100),
-    economy:      clamp(indicators.economy       + (effects.economy      ?? 0), 0, 100),
-    security:     clamp(indicators.security      + (effects.security     ?? 0), 0, 100),
-    ecology:      clamp(indicators.ecology       + (effects.ecology      ?? 0), 0, 100),
-    cohesion:     clamp(indicators.cohesion      + (effects.cohesion     ?? 0), 0, 100),
-    publicBudget: clamp(indicators.publicBudget  + (effects.publicBudget ?? 0), -150, 100),
-  };
-}
-
-export function computeMandateScore(ind: NationalIndicators): number {
-  return Math.round(
-    ind.popularity * 0.35 +
-    ind.economy    * 0.25 +
-    ind.security   * 0.15 +
-    ind.ecology    * 0.10 +
-    ind.cohesion   * 0.15,
-  );
-}
+export { computeMandateScore } from "@/core/gameSelectors";
 
 function evaluateOppositionPressure(state: StrategyGameState): number {
   const ind = state.nationalIndicators;
@@ -1347,10 +1332,3 @@ function addDecisionTrace(
   return { ...state, publicMemory: { traces } };
 }
 
-function applyRewards(resources: StrategyResources, rewards: Partial<StrategyResources>): StrategyResources {
-  const next = { ...resources };
-  for (const [key, amount] of Object.entries(rewards) as [keyof StrategyResources, number][]) {
-    next[key] = Math.round((next[key] ?? 0) + amount);
-  }
-  return next;
-}

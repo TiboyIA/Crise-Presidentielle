@@ -1,3 +1,5 @@
+import { filterValid, validateCyberOp } from "@/utils/validators";
+
 const BASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
@@ -55,7 +57,12 @@ export async function fetchCyberOps(accessToken: string): Promise<CyberOpsResult
   try {
     const res = await fetch(efUrl("/cyber-resolve"), { headers: authHeaders(accessToken) });
     if (!res.ok) return { sent: [], received: [], pending_debuff_pct: null };
-    return await res.json() as CyberOpsResult;
+    const data = await res.json() as { sent?: unknown[]; received?: unknown[]; pending_debuff_pct?: number | null };
+    return {
+      sent:               filterValid(data.sent ?? [], validateCyberOp),
+      received:           filterValid(data.received ?? [], validateCyberOp),
+      pending_debuff_pct: typeof data.pending_debuff_pct === "number" ? data.pending_debuff_pct : null,
+    };
   } catch {
     return { sent: [], received: [], pending_debuff_pct: null };
   }

@@ -14,7 +14,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "play-store:assets": "node scripts/generate-play-store-assets.js",
     "assets:compress": "node scripts/compress-assets.js",
-    "assets:compress:dry": "node scripts/compress-assets.js --dry-run"
+    "assets:compress:dry": "node scripts/compress-assets.js --dry-run",
+    "test:golden": "tsx --tsconfig tsconfig.json tests/run.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

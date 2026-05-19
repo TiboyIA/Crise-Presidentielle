@@ -11,6 +11,8 @@ import { FACTIONS, FACTION_STATUS_COLORS, FACTION_STATUS_LABELS, getFactionStatu
 import type { FactionDef } from "@/data/factions";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { StrategyGameState } from "@/types/strategy";
+import { FEATURES } from "@/config/features";
+import { FeatureUnavailable } from "@/components/FeatureUnavailable";
 
 function computeAuroriaScore(state: StrategyGameState): number {
   const base = state.cosmicInfluence?.auroria ?? 10;
@@ -63,6 +65,7 @@ export default function EntitiesScreen() {
   const insets = useSafeAreaInsets();
   const { state } = useStrategy();
 
+  if (!FEATURES.enableEntities) return <FeatureUnavailable onBack={() => router.back()} />;
   if (!state) return null;
 
   const auroriaScore = computeAuroriaScore(state);

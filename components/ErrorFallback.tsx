@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -15,6 +16,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { deleteGame } from "@/storage/gameStorage";
+import { deleteStrategy } from "@/storage/strategyStorage";
+import { downloadSave, getAccessToken } from "@/services/SyncService";
+import { migrateSave } from "@/storage/saveMigrations";
+import { saveStrategy } from "@/storage/strategyStorage";
 
 export type ErrorFallbackProps = {
   error: Error;
@@ -27,6 +32,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
   const handleRestart = async () => {
     try {
@@ -80,6 +86,72 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         },
       },
     ]);
+  };
+
+  const handleExportDiagnostic = async () => {
+    const details = [
+      "=== DIAGNOSTIC ERREUR — PRÉSIDENT : NATION EN CRISE ===",
+      `Date : ${new Date().toISOString()}`,
+      `Plateforme : ${Platform.OS} ${Platform.Version}`,
+      "",
+      `Erreur : ${error.message}`,
+      "",
+      error.stack ? `Stack :\n${error.stack}` : "(stack indisponible)",
+    ].join("\n");
+    try {
+      await Share.share({ message: details, title: "Diagnostic erreur" });
+    } catch {
+      // User dismissed — not an error
+    }
+  };
+
+  const handleCloudRestore = async () => {
+    const token = getAccessToken();
+    if (!token) {
+      Alert.alert(
+        "Non connecté",
+        "Connectez-vous à votre compte pour restaurer une sauvegarde cloud.",
+        [{ text: "OK" }],
+      );
+      return;
+    }
+    setCloudStatus("loading");
+    try {
+      const cloud = await downloadSave(token);
+      if (!cloud?.save) { setCloudStatus("error"); return; }
+      const result = migrateSave(cloud.save);
+      if (!result) { setCloudStatus("error"); return; }
+      await saveStrategy(result.state);
+      setCloudStatus("done");
+      setTimeout(() => reloadAppAsync(), 1000);
+    } catch {
+      setCloudStatus("error");
+    }
+  };
+
+  const handleNewGame = () => {
+    const msg =
+      "Cela efface la sauvegarde stratégie et redémarre l'application. Vos statistiques et packs débloqués sont conservés.";
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(`Nouvelle partie ?\n\n${msg}`)) {
+        void newGameAndRestart();
+      }
+      return;
+    }
+    Alert.alert("Nouvelle partie ?", msg, [
+      { text: "Annuler", style: "cancel" },
+      { text: "Confirmer", style: "destructive", onPress: () => void newGameAndRestart() },
+    ]);
+  };
+
+  const newGameAndRestart = async () => {
+    setIsWiping(true);
+    try {
+      await deleteStrategy().catch(() => {});
+      await handleRestart();
+    } finally {
+      setIsWiping(false);
+    }
   };
 
   const formatErrorDetails = (): string => {
@@ -148,6 +220,48 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           </Text>
         </Pressable>
 
+        {/* Cloud restore */}
+        <Pressable
+          onPress={handleCloudRestore}
+          disabled={isWiping || cloudStatus === "loading" || cloudStatus === "done"}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            {
+              borderColor: colors.border,
+              backgroundColor: colors.card,
+              opacity: pressed || isWiping || cloudStatus === "loading" ? 0.6 : 1,
+            },
+          ]}
+        >
+          <Feather name="cloud" size={13} color={colors.blue} />
+          <Text style={[styles.secondaryButtonText, { color: colors.blue }]}>
+            {cloudStatus === "loading" ? "RESTAURATION…"
+              : cloudStatus === "done" ? "RESTAURÉ ✓"
+              : cloudStatus === "error" ? "CLOUD INDISPONIBLE"
+              : "RESTAURER SAUVEGARDE CLOUD"}
+          </Text>
+        </Pressable>
+
+        {/* Export diagnostic */}
+        <Pressable
+          onPress={handleExportDiagnostic}
+          disabled={isWiping}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            {
+              borderColor: colors.border,
+              backgroundColor: colors.card,
+              opacity: pressed || isWiping ? 0.6 : 1,
+            },
+          ]}
+        >
+          <Feather name="share" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.secondaryButtonText, { color: colors.mutedForeground }]}>
+            EXPORTER LE DIAGNOSTIC
+          </Text>
+        </Pressable>
+
+        {/* Wipe save (classic game) */}
         <Pressable
           onPress={handleWipeSave}
           disabled={isWiping}
@@ -165,6 +279,26 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             EFFACER LA SAUVEGARDE
           </Text>
         </Pressable>
+
+        {/* New game (last resort) */}
+        <Pressable
+          onPress={handleNewGame}
+          disabled={isWiping}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            {
+              borderColor: colors.danger,
+              backgroundColor: colors.card,
+              opacity: pressed || isWiping ? 0.6 : 1,
+            },
+          ]}
+        >
+          <Feather name="plus-circle" size={13} color={colors.danger} />
+          <Text style={[styles.secondaryButtonText, { color: colors.danger }]}>
+            NOUVELLE PARTIE
+          </Text>
+        </Pressable>
+
         <Text style={[styles.helpText, { color: colors.mutedForeground }]}>
           Vos statistiques et packs débloqués sont conservés.
         </Text>

@@ -8,6 +8,7 @@ import { retryPendingSubmission } from "@/services/RankedService";
 import { setEntitlementToken } from "@/lib/entitlements";
 import { loginRevenueCat, logoutRevenueCat } from "@/lib/purchases";
 import { loadStrategy, saveStrategy } from "@/storage/strategyStorage";
+import { migrateSave } from "@/storage/saveMigrations";
 import Constants from "expo-constants";
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
@@ -100,11 +101,14 @@ async function onAuthenticated(token: string, userId: string): Promise<void> {
 
   // Cloud save sync — restore cloud save if it's newer than local
   const local = await loadStrategy();
-  const localSavedAt = local ? (local.startedAt ?? 0) : 0;
+  const localSavedAt = local ? (local.state.startedAt ?? 0) : 0;
   const { cloudSaveToRestore } = await syncOnLaunch(token, localSavedAt);
   if (cloudSaveToRestore) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await saveStrategy(cloudSaveToRestore as any);
+    // Migrate cloud save before persisting — it may be an older version
+    const migrated = migrateSave(cloudSaveToRestore);
+    if (migrated) {
+      await saveStrategy(migrated.state);
+    }
   }
 }
 

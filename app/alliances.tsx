@@ -10,6 +10,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useAuth } from "@/context/AuthContext";
 import { fetchAlliances, respondToAlliance, computeAllianceBonuses, ALLIANCE_BONUS_PER_ACTIVE, type Alliance } from "@/services/AllianceService";
+import { FEATURES } from "@/config/features";
+import { FeatureUnavailable } from "@/components/FeatureUnavailable";
 
 const STATUS_ICONS: Record<string, React.ComponentProps<typeof MaterialCommunityIcons>["name"]> = {
   pending:  "clock-outline",
@@ -74,6 +76,8 @@ export default function AlliancesScreen() {
   }, [auth.accessToken]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (!FEATURES.enableAlliances) return <FeatureUnavailable onBack={() => router.back()} />;
 
   const onRefresh = () => { setRefreshing(true); load(); };
 

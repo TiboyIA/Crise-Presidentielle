@@ -903,7 +903,7 @@ interface NavCardProps {
   onPress: () => void;
 }
 
-function NavCard({ iconSource, label, value, onPress }: NavCardProps) {
+const NavCard = React.memo(function NavCard({ iconSource, label, value, onPress }: NavCardProps) {
   const colors = useColors();
   return (
     <Pressable
@@ -929,9 +929,9 @@ function NavCard({ iconSource, label, value, onPress }: NavCardProps) {
       <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
     </Pressable>
   );
-}
+});
 
-function SectionHeading({
+const SectionHeading = React.memo(function SectionHeading({
   image,
   title,
 }: {
@@ -965,7 +965,7 @@ function SectionHeading({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -14,6 +14,8 @@ import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
 import { OPERATION_IMG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { CountryId, OperationType, ResourceKey } from "@/types/strategy";
+import { useCommand } from "@/hooks/useCommand";
+import { commandId } from "@/core/commands";
 
 export default function OperationsScreen() {
   const insets = useSafeAreaInsets();
@@ -22,7 +24,7 @@ export default function OperationsScreen() {
   const { hPad } = useResponsive();
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId | null>(params.countryId ?? null);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [loading, setLoading] = useState<OperationType | null>(null);
+  const { run, isPending } = useCommand();
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (resultTimerRef.current) clearTimeout(resultTimerRef.current); }, []);
 
@@ -33,10 +35,15 @@ export default function OperationsScreen() {
 
   const handleLaunch = (type: OperationType) => {
     if (!selectedCountryId) return;
-    setLoading(type);
-    const res = launchOperation(type, selectedCountryId);
+    const cid = commandId("launch_operation", `${type}:${selectedCountryId}`);
+    const res = run(cid, () => launchOperation(type, selectedCountryId));
+    if (res === null) {
+      setResult({ success: false, message: "Action en cours…" });
+      if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
+      resultTimerRef.current = setTimeout(() => setResult(null), 1500);
+      return;
+    }
     setResult(res);
-    setLoading(null);
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
     resultTimerRef.current = setTimeout(() => setResult(null), 4000);
   };
@@ -89,7 +96,7 @@ export default function OperationsScreen() {
 
             {ops.map((op) => {
               const check = canLaunchOperation(op.id, selectedRelation, state.buildings, state.resources);
-              const isLoading = loading === op.id;
+              const isLoading = isPending(commandId("launch_operation", `${op.id}:${selectedCountryId}`));
               const cooldownExpiry = selectedRelation.operationCooldowns[op.id];
               const onCooldown = !!(cooldownExpiry && Date.now() < cooldownExpiry);
               const blocked = !check.allowed || onCooldown;

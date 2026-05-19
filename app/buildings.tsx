@@ -9,6 +9,8 @@ import { BUILDINGS, BUILDING_LIST } from "@/data/buildings";
 import { canAfford, isUnlocked } from "@/logic/buildingEngine";
 import { FONT, PALETTE } from "@/constants/uiTokens";
 import type { BuildingId } from "@/types/strategy";
+import { useCommand } from "@/hooks/useCommand";
+import { commandId } from "@/core/commands";
 
 const CATEGORIES: { label: string; ids: BuildingId[] }[] = [
   { label: "Pouvoir & Économie", ids: ["presidential_palace", "economy_ministry", "central_bank", "media_agency"] },
@@ -22,17 +24,24 @@ export default function BuildingsScreen() {
   const { hPad } = useResponsive();
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { run } = useCommand();
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   if (!state) return null;
 
+  const showToast = (msg: string, durationMs = 3000) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), durationMs);
+  };
+
   const handleUpgrade = (id: BuildingId) => {
-    const result = upgradeBuilding(id);
-    if (!result.success) {
-      setToast(result.reason ?? "Action impossible");
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+    const result = run(commandId("upgrade_building", id), () => upgradeBuilding(id));
+    if (result === null) {
+      showToast("Action en cours…", 1500);
+      return;
     }
+    if (!result.success) showToast(result.reason ?? "Action impossible");
   };
 
   const buildingMap = Object.fromEntries(state.buildings.map((b) => [b.id, b]));
