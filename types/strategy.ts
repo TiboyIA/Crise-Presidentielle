@@ -325,6 +325,8 @@ export type PromiseDomain =
   | "securite" | "economie" | "ecologie"
   | "souverainete" | "pouvoir_achat" | "innovation" | "diplomatie";
 
+export type PromiseClarityLevel = "floue" | "mesurable" | "risquée";
+
 export type PromiseStatus = "tenue" | "partielle" | "trahie" | "en cours";
 
 export interface CampaignPromises {

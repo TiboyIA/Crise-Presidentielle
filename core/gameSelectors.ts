@@ -4,19 +4,22 @@ import { canAfford, isUnlocked } from "@/logic/buildingEngine";
 import { BUILDINGS } from "@/data/buildings";
 import { STRATEGY_RESEARCH } from "@/data/strategyResearch";
 import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
-import type { NationalIndicators, OperationType, PlayerBuilding, StrategyGameState } from "@/types/strategy";
+import type { CampaignPromises, NationalIndicators, OperationType, PlayerBuilding, StrategyGameState } from "@/types/strategy";
+import { computePromiseBilanBonus } from "@/logic/promiseQualityEngine";
 import type { StrategyResearchId } from "@/types/strategyResearch";
 
 // Pure read-only selectors — derive values from state, no side effects.
 
-export function computeMandateScore(ind: NationalIndicators): number {
-  return Math.round(
+export function computeMandateScore(ind: NationalIndicators, promises?: CampaignPromises): number {
+  const base = Math.round(
     ind.popularity * 0.35 +
     ind.economy    * 0.25 +
     ind.security   * 0.15 +
     ind.ecology    * 0.10 +
     ind.cohesion   * 0.15,
   );
+  const promiseBonus = computePromiseBilanBonus(promises).total;
+  return Math.max(0, Math.min(100, base + promiseBonus));
 }
 
 export function computeGlobalPower(

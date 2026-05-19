@@ -16,6 +16,8 @@ import { Panel } from "@/components/ui";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useResponsive } from "@/utils/responsive";
 import type { DecisionTrace, NationalIndicators, PromiseDomain } from "@/types/strategy";
+import { computePromiseBilanBonus } from "@/logic/promiseQualityEngine";
+import { PROMISE_QUALITY, CLARITY_BADGE_COLOR, CLARITY_BADGE_LABEL } from "@/data/promiseQuality";
 import { computeNationalTension, getTensionLevel, getTensionColor } from "@/logic/tensionEngine";
 import { computeReputationProfile, getTopDimensions } from "@/logic/reputationVectorEngine";
 import { getTopDecisions, getWeightLabel, getDecisionTier, DECISION_TIER_COLOR } from "@/logic/decisionWeightEngine";
@@ -76,7 +78,7 @@ export default function MandateReviewScreen() {
   if (!state) return null;
 
   const ind = state.nationalIndicators;
-  const score = computeMandateScore(ind);
+  const score = computeMandateScore(ind, state.campaignPromises);
   const mandate = getMandateTitle(score);
   const reward = getMandateReward(score);
   const playerRank = getPlayerRank(state.ranking);
@@ -297,22 +299,41 @@ export default function MandateReviewScreen() {
                   </View>
                 </View>
               )}
-              {promises.selected.length > 0 && (
-                <View style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2, marginTop: 4 }}>PROMESSES DE CAMPAGNE</Text>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-                    {promises.selected.map((domain) => {
-                      const status = promises.status[domain] ?? "en cours";
-                      const color = status === "tenue" ? "#3fbe7a" : status === "trahie" ? PALETTE.danger : status === "partielle" ? PALETTE.warning : "#4a9fff";
-                      return (
-                        <View key={domain} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: color + "44", backgroundColor: color + "11" }}>
-                          <Text style={{ fontSize: 9, fontFamily: FONT.bold, color }}>{PROMISE_LABELS[domain]}</Text>
-                        </View>
-                      );
-                    })}
+              {promises.selected.length > 0 && (() => {
+                const promiseBilan = computePromiseBilanBonus(promises);
+                return (
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2, marginTop: 4 }}>PROMESSES DE CAMPAGNE</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                      {promises.selected.map((domain) => {
+                        const status   = promises.status[domain] ?? "en cours";
+                        const quality  = PROMISE_QUALITY[domain];
+                        const bilanItem = promiseBilan.breakdown.find((b) => b.domain === domain);
+                        const statusColor = status === "tenue" ? "#3fbe7a" : status === "trahie" ? PALETTE.danger : status === "partielle" ? PALETTE.warning : "#4a9fff";
+                        const clarityColor = CLARITY_BADGE_COLOR[quality.clarityLevel];
+                        return (
+                          <View key={domain} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: statusColor + "44", backgroundColor: statusColor + "11", gap: 2 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                              <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: statusColor }}>{PROMISE_LABELS[domain]}</Text>
+                              <Text style={{ fontSize: 7, fontFamily: FONT.bold, color: clarityColor, letterSpacing: 0.8 }}>{CLARITY_BADGE_LABEL[quality.clarityLevel]}</Text>
+                            </View>
+                            {bilanItem && bilanItem.bonus !== 0 && (
+                              <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: bilanItem.bonus > 0 ? "#3fbe7a" : PALETTE.danger }}>
+                                {bilanItem.bonus > 0 ? "+" : ""}{bilanItem.bonus} pts
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                    {promiseBilan.total !== 0 && (
+                      <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: promiseBilan.total > 0 ? "#3fbe7a" : PALETTE.danger, marginTop: 2 }}>
+                        Impact promesses : {promiseBilan.total > 0 ? "+" : ""}{promiseBilan.total} pts au bilan
+                      </Text>
+                    )}
                   </View>
-                </View>
-              )}
+                );
+              })()}
             </Panel>
           );
         })()}
