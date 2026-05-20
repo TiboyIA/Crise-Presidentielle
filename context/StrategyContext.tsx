@@ -86,6 +86,17 @@ import {
 } from "@/logic/ministerSpeechEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
+  addContradictionToHistory,
+  addPendingDeclaration,
+  computeContradictionEffects,
+  computeContradictionMediaRisk,
+  computeSurfaceEffects,
+  detectContradiction,
+  markContradictionSurfaced,
+  shouldSurfaceContradiction,
+} from "@/logic/contradictionMemoryEngine";
+import type { ContradictionRecord } from "@/types/strategy";
+import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
   computePathologyThresholdEffects,
@@ -940,7 +951,57 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower }, 0);
+        // Mémoire des contradictions publiques
+        let pendingDeclarations = prev.pendingDeclarations ?? [];
+        let contradictionHistory = prev.contradictionHistory ?? [];
+        let contradictionAlertForLog: { theme: import("@/types/strategy").ContradictionTheme; pastStatement: string } | undefined;
+        if (choice?.declarationTheme && choice.declarationStance) {
+          const incoming = {
+            theme: choice.declarationTheme,
+            stance: choice.declarationStance,
+            statementLabel: choice.label,
+            eventId: event.id,
+            actionCount: prev.news.actionCount,
+          };
+          const contradicted = detectContradiction(incoming, pendingDeclarations);
+          if (contradicted) {
+            const mediaRisk = computeContradictionMediaRisk(prev.news.actionCount - contradicted.actionCount, hiddenPolitics);
+            const record: ContradictionRecord = {
+              id: `ctr_${event.id}_${prev.news.actionCount}`,
+              theme: choice.declarationTheme,
+              pastStatement: contradicted.statementLabel,
+              pastEventId: contradicted.eventId,
+              pastActionCount: contradicted.actionCount,
+              currentStatement: choice.label,
+              currentEventId: event.id,
+              currentActionCount: prev.news.actionCount,
+              mediaRisk,
+              surfaced: false,
+            };
+            contradictionHistory = addContradictionToHistory(contradictionHistory, record);
+            const fx = computeContradictionEffects(mediaRisk);
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, fx.hiddenPoliticsEffects);
+            oppositionPower = Math.min(100, Math.max(0, oppositionPower + fx.oppositionPowerDelta));
+            contradictionAlertForLog = { theme: choice.declarationTheme, pastStatement: contradicted.statementLabel };
+          }
+          pendingDeclarations = addPendingDeclaration(pendingDeclarations, incoming);
+        }
+        if (!contradictionAlertForLog) {
+          const toSurface = shouldSurfaceContradiction(contradictionHistory, hiddenPolitics, prev.news.actionCount);
+          if (toSurface) {
+            const sfx = computeSurfaceEffects();
+            nationalIndicators = applyIndicatorEffects(nationalIndicators, sfx.indicatorEffects);
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, sfx.hiddenPoliticsEffects);
+            contradictionHistory = markContradictionSurfaced(contradictionHistory, toSurface.id, prev.news.actionCount);
+            contradictionAlertForLog = { theme: toSurface.theme, pastStatement: toSurface.pastStatement };
+          }
+        }
+        if (contradictionAlertForLog && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, contradictionAlert: contradictionAlertForLog } : e) };
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {

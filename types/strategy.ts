@@ -355,6 +355,37 @@ export type DiplomaticWordingId =
   | "proposer_mediation"
   | "garder_silence";
 
+export type ContradictionTheme =
+  | "fiscalite"
+  | "securite"
+  | "ecologie"
+  | "transparence"
+  | "depenses_publiques"
+  | "liberte_civile"
+  | "relations_internationales";
+
+export interface PendingDeclaration {
+  theme:          ContradictionTheme;
+  stance:         "pro" | "contre";
+  statementLabel: string;
+  eventId:        string;
+  actionCount:    number;
+}
+
+export interface ContradictionRecord {
+  id:                 string;
+  theme:              ContradictionTheme;
+  pastStatement:      string;
+  pastEventId:        string;
+  pastActionCount:    number;
+  currentStatement:   string;
+  currentEventId:     string;
+  currentActionCount: number;
+  mediaRisk:          number;
+  surfaced:           boolean;
+  surfacedAtAction?:  number;
+}
+
 export type PromiseStatus = "tenue" | "partielle" | "trahie" | "en cours";
 
 export interface CampaignPromises {
@@ -458,6 +489,10 @@ export interface NewsChoice {
   semanticThemes?: string[];
   /** Formulation diplomatique — produit des effets sur les relations, la tension et l'opinion. */
   diplomaticWording?: DiplomaticWordingId;
+  /** Thème de la déclaration publique — alimente la mémoire des contradictions. */
+  declarationTheme?: ContradictionTheme;
+  /** Position sur le thème : "pro" = pour, "contre" = contre. */
+  declarationStance?: "pro" | "contre";
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -501,6 +536,8 @@ export interface NewsLogEntry {
   ministerGaffe?: MinisterGaffeEntry;
   /** Formulation diplomatique utilisée — enregistrée dans le journal pour traçabilité. */
   diplomaticWording?: DiplomaticWordingId;
+  /** Alerte contradiction — déclaration passée contredite par ce choix. */
+  contradictionAlert?: { theme: ContradictionTheme; pastStatement: string };
 }
 
 export interface NewsState {
@@ -576,4 +613,7 @@ export interface StrategyGameState {
   discoursePathology?: DiscoursePathology;
   // Contamination sémantique — optional for backward compat
   semanticContamination?: SemanticContaminationState;
+  // Mémoire des contradictions — optional for backward compat
+  pendingDeclarations?: PendingDeclaration[];
+  contradictionHistory?: ContradictionRecord[];
 }

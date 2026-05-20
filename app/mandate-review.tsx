@@ -21,6 +21,7 @@ import { PROMISE_QUALITY, CLARITY_BADGE_COLOR, CLARITY_BADGE_LABEL } from "@/dat
 import { computeNationalTension, getTensionLevel, getTensionColor } from "@/logic/tensionEngine";
 import { computeReputationProfile, getTopDimensions } from "@/logic/reputationVectorEngine";
 import { getTopDecisions, getWeightLabel, getDecisionTier, DECISION_TIER_COLOR } from "@/logic/decisionWeightEngine";
+import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -85,6 +86,7 @@ export default function MandateReviewScreen() {
   const bilanNumber = Math.floor(state.mandateDay / 100);
   const oppositionPower = state.oppositionPower ?? 35;
   const oppositionColor = oppositionPower >= 65 ? PALETTE.danger : oppositionPower >= 40 ? PALETTE.warning : PALETTE.success;
+  const contradictions = (state.contradictionHistory ?? []).filter((c) => c.mediaRisk > 40);
   const allTraces = (state.publicMemory?.traces ?? []) as DecisionTrace[];
   const negativeTraces = allTraces.filter((t) => t.politicalImpact < 0);
   const positiveTraces = allTraces.filter((t) => t.politicalImpact > 0);
@@ -390,6 +392,28 @@ export default function MandateReviewScreen() {
           </View>
         </Panel>
 
+        {/* CONTRADICTIONS DE DISCOURS */}
+        {contradictions.length > 0 && (
+          <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="repeat-variant" size={14} color="#c44b4b" />
+              <Text style={[styles.sectionTitle, { color: "#c44b4b" }]}>CONTRADICTIONS DE DISCOURS</Text>
+              <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid }}>{contradictions.length}</Text>
+            </View>
+            {contradictions.map((c) => (
+              <View key={c.id} style={styles.contradictionRow}>
+                <View style={[styles.contradictionDot, { backgroundColor: c.mediaRisk >= 75 ? PALETTE.danger : c.mediaRisk >= 50 ? PALETTE.warning : "#c44b4b" }]} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.contradictionTheme}>{THEME_LABELS[c.theme].toUpperCase()}</Text>
+                  <Text style={styles.contradictionStmt} numberOfLines={1}>« {c.pastStatement} »</Text>
+                  <Text style={styles.contradictionStmt} numberOfLines={1}>→ « {c.currentStatement} »</Text>
+                </View>
+                <Text style={[styles.contradictionRisk, { color: c.mediaRisk >= 75 ? PALETTE.danger : c.mediaRisk >= 50 ? PALETTE.warning : "#c44b4b" }]}>{c.mediaRisk}%</Text>
+              </View>
+            ))}
+          </Panel>
+        )}
+
         {/* MÉMOIRE DU PEUPLE */}
         {negativeTraces.length > 0 && (
           <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
@@ -642,4 +666,10 @@ const styles = StyleSheet.create({
   memTraceTitle: { fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textHigh },
   memTraceDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13 },
   memTraceImpact: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.danger, minWidth: 24, textAlign: "right" },
+
+  contradictionRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 4 },
+  contradictionDot: { width: 7, height: 7, borderRadius: 4, marginTop: 4 },
+  contradictionTheme: { fontSize: 8, fontFamily: FONT.bold, color: "#c44b4b", letterSpacing: 1.5 },
+  contradictionStmt: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 13, fontStyle: "italic" },
+  contradictionRisk: { fontSize: 11, fontFamily: FONT.bold, minWidth: 32, textAlign: "right" },
 });

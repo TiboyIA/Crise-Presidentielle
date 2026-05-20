@@ -9,6 +9,7 @@ import { RESOURCE_ICONS } from "@/types/strategy";
 import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/strategy";
 import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
 import { WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
+import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
 
 interface Props {
   entry: NewsLogEntry;
@@ -112,6 +113,13 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.contradictionAlert && (
+            <View style={styles.contradictionBox}>
+              <Text style={styles.contradictionKicker}>CONTRADICTION · {THEME_LABELS[entry.contradictionAlert.theme].toUpperCase()}</Text>
+              <Text style={styles.contradictionPast} numberOfLines={2}>« {entry.contradictionAlert.pastStatement} »</Text>
+            </View>
+          )}
+
           <Text style={styles.time}>{formatRelativeTime(entry.timestamp)}</Text>
         </View>
       </LinearGradient>
@@ -193,4 +201,8 @@ const styles = StyleSheet.create({
   gaffeKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1.5 },
   gaffeQuote: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 16, fontStyle: "italic" },
   gaffeSpeaker: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid },
+
+  contradictionBox: { borderRadius: 4, padding: 8, gap: 3, borderWidth: 1, borderColor: "#c44b4b55", backgroundColor: "#c44b4b0d" },
+  contradictionKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#c44b4b", letterSpacing: 1.5 },
+  contradictionPast: { fontSize: 11, fontFamily: FONT.semi, color: "#c44b4b99", lineHeight: 15, fontStyle: "italic" },
 });
