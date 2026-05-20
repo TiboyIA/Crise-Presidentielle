@@ -89,6 +89,13 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.contaminatedThemes && entry.contaminatedThemes.length > 0 && (
+            <View style={styles.contaminationBox}>
+              <Text style={styles.contaminationKicker}>THÈME TOXIQUE</Text>
+              <Text style={styles.contaminationThemes}>{entry.contaminatedThemes.join(" · ")}</Text>
+            </View>
+          )}
+
           <Text style={styles.time}>{formatRelativeTime(entry.timestamp)}</Text>
         </View>
       </LinearGradient>
@@ -158,4 +165,8 @@ const styles = StyleSheet.create({
   misinterpBox: { borderRadius: 4, padding: 8, gap: 3, borderWidth: 1 },
   misinterpKicker: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2 },
   misinterpTitle: { fontSize: 11, fontFamily: FONT.semi, lineHeight: 15, fontStyle: "italic" },
+
+  contaminationBox: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#e8a93a44", backgroundColor: "#e8a93a0d" },
+  contaminationKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 1.5 },
+  contaminationThemes: { fontSize: 10, fontFamily: FONT.semi, color: "#e8a93a99", flexShrink: 1 },
 });

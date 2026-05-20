@@ -75,6 +75,12 @@ import {
 } from "@/logic/mediaMisinterpretationEngine";
 import { computeRegisterEffects } from "@/logic/registerEngine";
 import {
+  checkChoiceContamination,
+  computeContaminationEffects,
+  decayContamination,
+  generateContaminationFromEvent,
+} from "@/logic/semanticContaminationEngine";
+import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
   computePathologyThresholdEffects,
@@ -222,6 +228,7 @@ function buildInitialState(
     strategyResearch: { ...DEFAULT_RESEARCH_STATE },
     cosmicInfluence: { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
     discoursePathology: { ...DEFAULT_PATHOLOGY },
+    semanticContamination: [],
   };
 }
 
@@ -809,6 +816,31 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Contamination sémantique — mots-clés toxiques actifs détectés sur le choix ; génère un nouveau mot-clé si conditions remplies.
+        const currentContamination = prev.semanticContamination ?? [];
+        const activeContamination = decayContamination(currentContamination, prev.news.actionCount);
+        const newContaminationKeyword = generateContaminationFromEvent(
+          { newsType: event.type, nationalIndicators, hiddenPolitics, governanceDoctrine: prev.governanceDoctrine, actionCount: prev.news.actionCount },
+          activeContamination,
+        );
+        const semanticContamination = newContaminationKeyword
+          ? [...activeContamination, newContaminationKeyword]
+          : activeContamination;
+        const matchedContamination = checkChoiceContamination(choice?.semanticThemes ?? [], activeContamination);
+        const contaminationFx = computeContaminationEffects(matchedContamination);
+        if (Object.keys(contaminationFx).length > 0) {
+          hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, contaminationFx);
+        }
+        if (matchedContamination.length > 0 && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = {
+            ...news,
+            log: news.log.map((e, i) =>
+              i === lastIdx ? { ...e, contaminatedThemes: matchedContamination.map((k) => k.keyword) } : e,
+            ),
+          };
+        }
+
         // Malentendu médiatique — titre alternatif fictif ajouté à l'entrée de log si risque suffisant.
         const anyPromiseBroken = Object.values(prev.campaignPromises.status).some((s) => s === "trahie");
         const misinRisk = computeMisinterpretationRisk({
@@ -855,7 +887,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           delayedConsequences = [...delayedConsequences, ...cascades];
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology }, 0);
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {

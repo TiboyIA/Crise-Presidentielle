@@ -18,6 +18,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         effects: { cyberDefense: -20, money: -500, military: 5 },
         clarityProfile: { coherence: 8, precision: 7, transparency: 6, jargon: 4, evasion: 2 },
         communicationRegister: "scientifique",
+        semanticThemes: ["securite"],
       },
       {
         id: "accuse_foreign",
@@ -135,6 +136,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Les marchés se rassurent. La population gronde mais les finances se stabilisent.",
         effects: { money: 800, influence: -30, military: -10 },
         communicationRegister: "technocratique",
+        semanticThemes: ["dette", "austerite"],
       },
       {
         id: "borrow_more",
@@ -142,6 +144,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "L'urgence est évitée mais la dette s'alourdit. Solution temporaire.",
         effects: { money: 400, technology: -10, energy: -10 },
         communicationRegister: "populaire",
+        semanticThemes: ["dette"],
       },
       {
         id: "restructure",
@@ -149,6 +152,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Les créanciers acceptent après des semaines de négociation. L'image internationale souffre.",
         effects: { money: 600, influence: -20, military: -5 },
         communicationRegister: "diplomatique",
+        semanticThemes: ["dette"],
       },
     ],
   },
@@ -220,6 +224,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Un accord partiel est signé. Le mouvement s'essouffre progressivement.",
         effects: { money: -300, influence: 20, military: -5 },
         communicationRegister: "empathique",
+        semanticThemes: ["reforme"],
       },
       {
         id: "firm_stance",
@@ -234,6 +239,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Les manifestants sont partiellement satisfaits. La contestation diminue sans coût majeur.",
         effects: { money: -150, influence: 10, technology: 5 },
         communicationRegister: "populaire",
+        semanticThemes: ["reforme"],
       },
     ],
   },
@@ -283,6 +289,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Message dissuasif envoyé. Le risque d'incident augmente.",
         effects: { military: 20, money: -400, influence: -10 },
         communicationRegister: "martial",
+        semanticThemes: ["securite"],
       },
       {
         id: "request_nato",
@@ -418,12 +425,14 @@ export const NEWS_EVENTS: NewsEvent[] = [
         label: "Lancer la réforme complète immédiatement",
         consequence: "L'administration est modernisée malgré des résistances. Économies réalisées.",
         effects: { money: 300, influence: -20, technology: 10 },
+        semanticThemes: ["reforme"],
       },
       {
         id: "phased_reform",
         label: "Réforme progressive sur trois ans",
         consequence: "Moins de résistances. Les gains arrivent plus lentement.",
         effects: { money: 150, influence: -5, technology: 5 },
+        semanticThemes: ["reforme"],
       },
     ],
   },
@@ -537,6 +546,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Une cellule de crise mobilise toutes les ressources. La réponse est salutée malgré son coût.",
         effects: { money: -600, energy: -10 },
         indicatorEffects: { popularity: 8, ecology: 5, publicBudget: -8 },
+        semanticThemes: ["ecologie"],
       },
       {
         id: "targeted_aid",
@@ -551,6 +561,7 @@ export const NEWS_EVENTS: NewsEvent[] = [
         consequence: "Le déni choque l'opinion. La presse internationale critique vivement la posture gouvernementale.",
         effects: { influence: -20 },
         indicatorEffects: { popularity: -12, ecology: -5, cohesion: -5 },
+        semanticThemes: ["ecologie"],
       },
     ],
   },

@@ -357,6 +357,18 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Contamination sémantique ──────────────────────────────────────────────────
+
+export interface ToxicKeyword {
+  keyword: string;              // label affiché (ex: "Réforme")
+  themeKey: string;             // identifiant interne (ex: "reforme")
+  toxicity: number;             // 0-100
+  source: "media" | "opposition" | "obscurium" | "crisis";
+  expiresAfterActions: number;  // actionCount absolu à partir duquel le mot-clé n'est plus actif
+}
+
+export type SemanticContaminationState = ToxicKeyword[];
+
 // ── Pathologies du discours politique ────────────────────────────────────────
 
 /** Six déformations rhétoriques accumulées au fil des choix présidentiels (0-100 chacune). */
@@ -418,6 +430,8 @@ export interface NewsChoice {
   pathologyDelta?: PathologyDelta;
   /** Registre de communication — produit des effets supplémentaires selon le type de crise. */
   communicationRegister?: CommunicationRegister;
+  /** Thèmes sémantiques du choix — utilisés pour détecter une contamination active. */
+  semanticThemes?: string[];
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -455,6 +469,8 @@ export interface NewsLogEntry {
   /** Titre alternatif généré par la presse hostile — absent si risque insuffisant. */
   misinterpretedTitle?: string;
   misinterpretationType?: MisinterpretationType;
+  /** Thèmes sémantiques contaminés détectés lors du choix — affichés discrètement dans le journal. */
+  contaminatedThemes?: string[];
 }
 
 export interface NewsState {
@@ -528,4 +544,6 @@ export interface StrategyGameState {
   cosmicInfluence?: CosmicInfluence;
   // Pathologies du discours — optional for backward compat
   discoursePathology?: DiscoursePathology;
+  // Contamination sémantique — optional for backward compat
+  semanticContamination?: SemanticContaminationState;
 }
