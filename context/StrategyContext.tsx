@@ -84,6 +84,7 @@ import {
   computeGaffeEffects,
   generateMinisterGaffe,
 } from "@/logic/ministerSpeechEngine";
+import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
@@ -864,7 +865,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           news = { ...news, log: patchedLog };
         }
 
-        const relations = choice?.relationDelta
+        let relations = choice?.relationDelta
           ? prev.relations.map((r) => {
               if (r.countryId !== choice.relationDelta!.countryId) return r;
               const { score, status } = updateRelationScore(r.score, choice.relationDelta!.delta);
@@ -889,6 +890,36 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const cascades = rollCascades(prev, event, choice, prev.news.actionCount, delayedConsequences, chaos.cascadeBoost);
         if (cascades.length > 0) {
           delayedConsequences = [...delayedConsequences, ...cascades];
+        }
+
+        // Formulation diplomatique — effets additifs sur relations, tension et opinion + risque de riposte.
+        if (choice?.diplomaticWording) {
+          const wordingDef = getDiplomaticWording(choice.diplomaticWording);
+          if (Object.keys(wordingDef.hiddenPoliticsEffects).length > 0)
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, wordingDef.hiddenPoliticsEffects);
+          if (Object.keys(wordingDef.indicatorEffects).length > 0)
+            nationalIndicators = applyIndicatorEffects(nationalIndicators, wordingDef.indicatorEffects);
+          if (wordingDef.relationDelta !== 0 && choice.relationDelta) {
+            const cid = choice.relationDelta.countryId;
+            relations = relations.map((r) => {
+              if (r.countryId !== cid) return r;
+              const { score, status } = updateRelationScore(r.score, wordingDef.relationDelta);
+              return { ...r, score, status };
+            });
+          }
+          if (Math.random() * 100 < wordingDef.riposteProbability) {
+            delayedConsequences = [...delayedConsequences, {
+              id: `riposte_${event.id}_${prev.news.actionCount}`,
+              source: event.id,
+              triggerAfterActions: prev.news.actionCount + 3 + Math.floor(Math.random() * 5),
+              effectType: "hidden_politics" as const,
+              payload: { regionalTension: 10, scandalRisk: 5 },
+            }];
+          }
+          if (news.log.length > 0) {
+            const lastIdx = news.log.length - 1;
+            news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, diplomaticWording: choice.diplomaticWording } : e) };
+          }
         }
 
         // Gaffe ministérielle — rare, déclenchée en fin de résolution de crise.

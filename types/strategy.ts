@@ -346,6 +346,15 @@ export type CommunicationRegister =
   | "populaire" | "institutionnel" | "technocratique" | "martial"
   | "empathique" | "diplomatique" | "scientifique" | "offensif";
 
+export type DiplomaticWordingId =
+  | "exprimer_inquietude"
+  | "appeler_au_calme"
+  | "condamner_fermement"
+  | "accuser_publiquement"
+  | "menacer_sanctions"
+  | "proposer_mediation"
+  | "garder_silence";
+
 export type PromiseStatus = "tenue" | "partielle" | "trahie" | "en cours";
 
 export interface CampaignPromises {
@@ -447,6 +456,8 @@ export interface NewsChoice {
   communicationRegister?: CommunicationRegister;
   /** Thèmes sémantiques du choix — utilisés pour détecter une contamination active. */
   semanticThemes?: string[];
+  /** Formulation diplomatique — produit des effets sur les relations, la tension et l'opinion. */
+  diplomaticWording?: DiplomaticWordingId;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -488,6 +499,8 @@ export interface NewsLogEntry {
   contaminatedThemes?: string[];
   /** Gaffe ministérielle survenue après la résolution de la crise — rare. */
   ministerGaffe?: MinisterGaffeEntry;
+  /** Formulation diplomatique utilisée — enregistrée dans le journal pour traçabilité. */
+  diplomaticWording?: DiplomaticWordingId;
 }
 
 export interface NewsState {

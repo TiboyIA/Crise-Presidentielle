@@ -8,6 +8,7 @@ import { FONT, PALETTE, RADIUS, URGENCY_COLORS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS } from "@/types/strategy";
 import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/strategy";
 import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
+import { WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
 
 interface Props {
   entry: NewsLogEntry;
@@ -97,6 +98,12 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.diplomaticWording && (
+            <View style={[styles.wordingChip, { borderColor: WORDING_COLORS[entry.diplomaticWording] + "55", backgroundColor: WORDING_COLORS[entry.diplomaticWording] + "0d" }]}>
+              <Text style={[styles.wordingChipText, { color: WORDING_COLORS[entry.diplomaticWording] }]}>🌐 {WORDING_LABELS[entry.diplomaticWording]}</Text>
+            </View>
+          )}
+
           {entry.ministerGaffe && (
             <View style={styles.gaffeBox}>
               <Text style={styles.gaffeKicker}>{GAFFE_LABELS[entry.ministerGaffe.gaffeType].toUpperCase()}</Text>
@@ -178,6 +185,9 @@ const styles = StyleSheet.create({
   contaminationBox: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#e8a93a44", backgroundColor: "#e8a93a0d" },
   contaminationKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 1.5 },
   contaminationThemes: { fontSize: 10, fontFamily: FONT.semi, color: "#e8a93a99", flexShrink: 1 },
+
+  wordingChip: { borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 4, alignSelf: "flex-start" },
+  wordingChipText: { fontSize: 10, fontFamily: FONT.semi },
 
   gaffeBox: { borderLeftWidth: 2, borderLeftColor: "#e54848aa", paddingLeft: 10, paddingVertical: 6, gap: 3, backgroundColor: "#e548480a" },
   gaffeKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1.5 },

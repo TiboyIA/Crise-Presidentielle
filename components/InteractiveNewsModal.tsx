@@ -12,6 +12,7 @@ import { getChaosWarning } from "@/logic/chaosAmplifier";
 import { getTensionLevel } from "@/logic/tensionEngine";
 import { computePresidentialClarity } from "@/logic/discourseEngine";
 import { REGISTER_LABELS, REGISTER_COLORS } from "@/logic/registerEngine";
+import { getDiplomaticWording, WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
 import type { HiddenPolitics, NationalIndicators } from "@/types/strategy";
 
 interface ClarityContext {
@@ -144,6 +145,15 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                       </View>
                     );
                   })()}
+                  {preview.diplomaticWording && (() => {
+                    const rp = getDiplomaticWording(preview.diplomaticWording).riposteProbability;
+                    return rp > 10 ? (
+                      <View style={styles.riposteWarning}>
+                        <MaterialCommunityIcons name="alert-octagon-outline" size={12} color="#FF8040" />
+                        <Text style={styles.riposteWarningText}>Risque de riposte internationale : {rp}%</Text>
+                      </View>
+                    ) : null;
+                  })()}
                   <View style={styles.confirmHint}>
                     <MaterialCommunityIcons name="gesture-tap" size={12} color={PALETTE.gold} />
                     <Text style={styles.confirmHintText}>Toucher à nouveau pour confirmer</Text>
@@ -176,6 +186,11 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                       {choice.communicationRegister && (
                         <View style={[styles.registerChip, { borderColor: REGISTER_COLORS[choice.communicationRegister] + "66", backgroundColor: REGISTER_COLORS[choice.communicationRegister] + "18" }]}>
                           <Text style={[styles.registerLabel, { color: REGISTER_COLORS[choice.communicationRegister] }]}>{REGISTER_LABELS[choice.communicationRegister].toUpperCase()}</Text>
+                        </View>
+                      )}
+                      {choice.diplomaticWording && (
+                        <View style={[styles.wordingChip, { borderColor: WORDING_COLORS[choice.diplomaticWording] + "66", backgroundColor: WORDING_COLORS[choice.diplomaticWording] + "18" }]}>
+                          <Text style={[styles.wordingLabel, { color: WORDING_COLORS[choice.diplomaticWording] }]}>{WORDING_LABELS[choice.diplomaticWording].toUpperCase()}</Text>
                         </View>
                       )}
                     </View>
@@ -255,4 +270,9 @@ const styles = StyleSheet.create({
 
   registerChip: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 1 },
   registerLabel: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 1 },
+
+  wordingChip: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 1 },
+  wordingLabel: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 1 },
+  riposteWarning: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 3, borderWidth: 1, borderColor: "#FF8040" + "55", backgroundColor: "#FF8040" + "0d" },
+  riposteWarningText: { flex: 1, fontSize: 10, fontFamily: FONT.semi, color: "#FF8040" },
 });
