@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS, URGENCY_COLORS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS } from "@/types/strategy";
 import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/strategy";
+import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
 
 interface Props {
   entry: NewsLogEntry;
@@ -96,6 +97,14 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.ministerGaffe && (
+            <View style={styles.gaffeBox}>
+              <Text style={styles.gaffeKicker}>{GAFFE_LABELS[entry.ministerGaffe.gaffeType].toUpperCase()}</Text>
+              <Text style={styles.gaffeQuote}>« {entry.ministerGaffe.quote} »</Text>
+              <Text style={styles.gaffeSpeaker}>— {entry.ministerGaffe.ministerName}</Text>
+            </View>
+          )}
+
           <Text style={styles.time}>{formatRelativeTime(entry.timestamp)}</Text>
         </View>
       </LinearGradient>
@@ -169,4 +178,9 @@ const styles = StyleSheet.create({
   contaminationBox: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#e8a93a44", backgroundColor: "#e8a93a0d" },
   contaminationKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e8a93a", letterSpacing: 1.5 },
   contaminationThemes: { fontSize: 10, fontFamily: FONT.semi, color: "#e8a93a99", flexShrink: 1 },
+
+  gaffeBox: { borderLeftWidth: 2, borderLeftColor: "#e54848aa", paddingLeft: 10, paddingVertical: 6, gap: 3, backgroundColor: "#e548480a" },
+  gaffeKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1.5 },
+  gaffeQuote: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 16, fontStyle: "italic" },
+  gaffeSpeaker: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid },
 });

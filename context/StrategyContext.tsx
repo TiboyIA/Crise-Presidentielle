@@ -81,6 +81,10 @@ import {
   generateContaminationFromEvent,
 } from "@/logic/semanticContaminationEngine";
 import {
+  computeGaffeEffects,
+  generateMinisterGaffe,
+} from "@/logic/ministerSpeechEngine";
+import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
   computePathologyThresholdEffects,
@@ -887,7 +891,25 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           delayedConsequences = [...delayedConsequences, ...cascades];
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination }, 0);
+        // Gaffe ministérielle — rare, déclenchée en fin de résolution de crise.
+        const resolvedMinisters = prev.strategyMinisters.map((m) => ({
+          ...m,
+          name: m.name ?? STRATEGY_MINISTERS[m.id as StrategyMinisterId]?.name,
+        }));
+        const ministerGaffe = generateMinisterGaffe(resolvedMinisters, hiddenPolitics, event.urgency);
+        let oppositionPower = prev.oppositionPower;
+        if (ministerGaffe) {
+          const gaffeFx = computeGaffeEffects(ministerGaffe);
+          nationalIndicators = applyIndicatorEffects(nationalIndicators, gaffeFx.indicatorEffects);
+          hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, gaffeFx.hiddenPoliticsEffects);
+          oppositionPower = Math.min(100, Math.max(0, oppositionPower + gaffeFx.oppositionPowerDelta));
+          if (news.log.length > 0) {
+            const lastIdx = news.log.length - 1;
+            news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, ministerGaffe } : e) };
+          }
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {

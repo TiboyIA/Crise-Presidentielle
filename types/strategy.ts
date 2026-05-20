@@ -241,6 +241,21 @@ export type NewsUrgency = "faible" | "moyenne" | "forte" | "critique";
 
 export type MisinterpretationType = "distorted" | "polemic" | "rumor" | "trust_crisis";
 
+export type GaffeType =
+  | "condescendance"
+  | "contradiction"
+  | "minimisation"
+  | "chiffre_faux"
+  | "attaque_maladroite"
+  | "silence_embarrassant";
+
+export interface MinisterGaffeEntry {
+  ministerId:   string;
+  ministerName: string;
+  gaffeType:    GaffeType;
+  quote:        string;
+}
+
 export type GovernanceDoctrine =
   | "democratique" | "technocratique" | "securitaire" | "populiste" | "autoritaire"
   | "souverainiste" | "ecologiste" | "liberal";
@@ -471,6 +486,8 @@ export interface NewsLogEntry {
   misinterpretationType?: MisinterpretationType;
   /** Thèmes sémantiques contaminés détectés lors du choix — affichés discrètement dans le journal. */
   contaminatedThemes?: string[];
+  /** Gaffe ministérielle survenue après la résolution de la crise — rare. */
+  ministerGaffe?: MinisterGaffeEntry;
 }
 
 export interface NewsState {
