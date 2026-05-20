@@ -327,6 +327,10 @@ export type PromiseDomain =
 
 export type PromiseClarityLevel = "floue" | "mesurable" | "risquée";
 
+export type CommunicationRegister =
+  | "populaire" | "institutionnel" | "technocratique" | "martial"
+  | "empathique" | "diplomatique" | "scientifique" | "offensif";
+
 export type PromiseStatus = "tenue" | "partielle" | "trahie" | "en cours";
 
 export interface CampaignPromises {
@@ -412,6 +416,8 @@ export interface NewsChoice {
   clarityProfile?: ClarityProfile;
   /** Delta de pathologies rhétoriques — accumulé discrètement, affecte hiddenPolitics sur seuil. */
   pathologyDelta?: PathologyDelta;
+  /** Registre de communication — produit des effets supplémentaires selon le type de crise. */
+  communicationRegister?: CommunicationRegister;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;

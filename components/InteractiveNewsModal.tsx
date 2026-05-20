@@ -11,6 +11,7 @@ import type { NewsChoice, NewsEvent, ResourceKey } from "@/types/strategy";
 import { getChaosWarning } from "@/logic/chaosAmplifier";
 import { getTensionLevel } from "@/logic/tensionEngine";
 import { computePresidentialClarity } from "@/logic/discourseEngine";
+import { REGISTER_LABELS, REGISTER_COLORS } from "@/logic/registerEngine";
 import type { HiddenPolitics, NationalIndicators } from "@/types/strategy";
 
 interface ClarityContext {
@@ -172,6 +173,11 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                     <View style={styles.choiceTopRow}>
                       <Text style={[styles.choiceNum, { color: isSelected ? PALETTE.crimson : PALETTE.gold }]}>{String(idx + 1).padStart(2, "0")}</Text>
                       <Text style={[styles.choiceLabel, { color: isConfirming ? "#fff" : PALETTE.textHigh }]}>{choice.label}</Text>
+                      {choice.communicationRegister && (
+                        <View style={[styles.registerChip, { borderColor: REGISTER_COLORS[choice.communicationRegister] + "66", backgroundColor: REGISTER_COLORS[choice.communicationRegister] + "18" }]}>
+                          <Text style={[styles.registerLabel, { color: REGISTER_COLORS[choice.communicationRegister] }]}>{REGISTER_LABELS[choice.communicationRegister].toUpperCase()}</Text>
+                        </View>
+                      )}
                     </View>
                     {effects.length > 0 && (
                       <View style={styles.inlineEffects}>
@@ -246,4 +252,7 @@ const styles = StyleSheet.create({
   choiceLabel: { flex: 1, fontSize: 13, fontFamily: FONT.semi, lineHeight: 18 },
   inlineEffects: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginLeft: 26 },
   inlineEffectText: { fontSize: 11, fontFamily: FONT.bold },
+
+  registerChip: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 1 },
+  registerLabel: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 1 },
 });

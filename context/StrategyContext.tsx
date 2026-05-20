@@ -73,6 +73,7 @@ import {
   computeMisinterpretationRisk,
   generateMisinterpretation,
 } from "@/logic/mediaMisinterpretationEngine";
+import { computeRegisterEffects } from "@/logic/registerEngine";
 import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
@@ -794,6 +795,17 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           const thresholdEffects = computePathologyThresholdEffects(discoursePathology);
           if (Object.keys(thresholdEffects).length > 0) {
             hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, thresholdEffects);
+          }
+        }
+
+        // Registre de communication — effets additifs selon le type de crise.
+        if (choice?.communicationRegister) {
+          const regFx = computeRegisterEffects(choice.communicationRegister, event.type, prev.resources.cyberDefense);
+          if (Object.keys(regFx.indicatorEffects).length > 0) {
+            nationalIndicators = applyIndicatorEffects(nationalIndicators, regFx.indicatorEffects);
+          }
+          if (Object.keys(regFx.hiddenPoliticsEffects).length > 0) {
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, regFx.hiddenPoliticsEffects);
           }
         }
 
