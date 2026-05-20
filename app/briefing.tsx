@@ -11,6 +11,7 @@ import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useResponsive } from "@/utils/responsive";
 import type { DecisionTrace, HiddenPolitics, NationalIndicators, PromiseDomain, PromiseStatus } from "@/types/strategy";
 import { computeNationalTension, getTensionLevel, getTensionLabel, getTensionColor } from "@/logic/tensionEngine";
+import { generateStateBriefing } from "@/logic/briefingTextEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -126,6 +127,7 @@ export default function BriefingScreen() {
     .slice(-3)
     .reverse();
   const tension = computeNationalTension(state);
+  const compressedBriefing = generateStateBriefing(ind, hp, state.news.pendingIds.length, oppositionPower, tension);
   const tensionLevel = getTensionLevel(tension);
   const tensionLabel = getTensionLabel(tensionLevel);
   const tensionColor = getTensionColor(tensionLevel);
@@ -396,15 +398,27 @@ export default function BriefingScreen() {
           </Panel>
         )}
 
-        {/* RECOMMANDATION STRATÉGIQUE */}
+        {/* BRIEFING COMPRESSÉ */}
         <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons name="lightbulb-on-outline" size={14} color={PALETTE.gold} />
-            <Text style={styles.sectionTitle}>RECOMMANDATION STRATÉGIQUE</Text>
+            <MaterialCommunityIcons name="lightning-bolt-outline" size={14} color={PALETTE.gold} />
+            <Text style={styles.sectionTitle}>BRIEFING COMPRESSÉ</Text>
           </View>
-          <View style={styles.recRow}>
-            <MaterialCommunityIcons name={recommendation.icon} size={22} color={PALETTE.gold} style={{ marginTop: 2 }} />
-            <Text style={styles.recText}>{recommendation.text}</Text>
+          <View style={styles.briefingRow}>
+            <Text style={styles.briefingLabel}>SITUATION</Text>
+            <Text style={styles.briefingText}>{compressedBriefing.situation}</Text>
+          </View>
+          <View style={[styles.briefingRow, styles.briefingDivider]}>
+            <Text style={[styles.briefingLabel, { color: PALETTE.danger }]}>RISQUE</Text>
+            <Text style={styles.briefingText}>{compressedBriefing.risque}</Text>
+          </View>
+          <View style={[styles.briefingRow, styles.briefingDivider]}>
+            <Text style={[styles.briefingLabel, { color: "#4a9fff" }]}>FENÊTRE</Text>
+            <Text style={styles.briefingText}>{compressedBriefing.fenetreAction}</Text>
+          </View>
+          <View style={[styles.briefingRow, styles.briefingDivider]}>
+            <Text style={[styles.briefingLabel, { color: PALETTE.gold }]}>DÉCISION</Text>
+            <Text style={[styles.briefingText, { color: PALETTE.gold }]}>{compressedBriefing.recommandation}</Text>
           </View>
         </Panel>
 
@@ -483,6 +497,11 @@ const styles = StyleSheet.create({
 
   recRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   recText: { flex: 1, fontSize: 13, fontFamily: FONT.reg, color: PALETTE.textHigh, lineHeight: 19 },
+
+  briefingRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  briefingDivider: { paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: PALETTE.panelEdge },
+  briefingLabel: { fontSize: 7, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1.5, width: 56, marginTop: 2 },
+  briefingText: { flex: 1, fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textHigh, lineHeight: 17 },
 
   actions: { gap: 8, marginTop: 4 },
   ctaBtn: { borderRadius: RADIUS.sm, overflow: "hidden" },
