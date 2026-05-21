@@ -113,6 +113,12 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.resiliencePayout != null && entry.resiliencePayout > 0 && (
+            <View style={styles.resilienceChip}>
+              <Text style={styles.resilienceChipText}>🛡 Réserve absorbée : {entry.resiliencePayout} M€</Text>
+            </View>
+          )}
+
           {entry.contradictionAlert && (
             <View style={styles.contradictionBox}>
               <Text style={styles.contradictionKicker}>CONTRADICTION · {THEME_LABELS[entry.contradictionAlert.theme].toUpperCase()}</Text>
@@ -201,6 +207,9 @@ const styles = StyleSheet.create({
   gaffeKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1.5 },
   gaffeQuote: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 16, fontStyle: "italic" },
   gaffeSpeaker: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid },
+
+  resilienceChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#3fbe7a44", backgroundColor: "#3fbe7a0d" },
+  resilienceChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#3fbe7a" },
 
   contradictionBox: { borderRadius: 4, padding: 8, gap: 3, borderWidth: 1, borderColor: "#c44b4b55", backgroundColor: "#c44b4b0d" },
   contradictionKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#c44b4b", letterSpacing: 1.5 },

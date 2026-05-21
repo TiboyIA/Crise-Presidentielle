@@ -97,6 +97,12 @@ import {
 } from "@/logic/contradictionMemoryEngine";
 import type { ContradictionRecord } from "@/types/strategy";
 import {
+  INITIAL_RESILIENCE_FUND,
+  applyFundContribution,
+  applyFundToMoneyCost,
+} from "@/logic/resilienceFundEngine";
+import type { ContributionTier } from "@/logic/resilienceFundEngine";
+import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
   computePathologyThresholdEffects,
@@ -278,6 +284,7 @@ interface StrategyContextValue {
   loadFromSlot: (slot: SlotNumber) => Promise<boolean>;
   deleteSlot: (slot: SlotNumber) => Promise<void>;
   claimDailyReward: () => void;
+  contributeFund: (tier: ContributionTier) => { success: boolean; reason?: string };
 }
 
 const StrategyContext = createContext<StrategyContextValue | null>(null);
@@ -474,6 +481,25 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       };
     });
   }, [update]);
+
+  const contributeFund = useCallback(
+    (tier: ContributionTier): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      let result: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const { fund, resources, success, reason } = applyFundContribution(
+          prev.resilienceFund ?? { ...INITIAL_RESILIENCE_FUND },
+          tier,
+          prev.resources,
+        );
+        result = { success, reason };
+        if (!success) return prev;
+        return { ...prev, resources, resilienceFund: fund };
+      });
+      return result;
+    },
+    [state, update],
+  );
 
   // ── Anti-triche classé : collecte d'événements côté client ──────────────────
   // Aucune validation ici — les données sont envoyées au serveur à la soumission.
@@ -778,6 +804,24 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Fonds National de Résilience — absorbe une partie du coût en argent
+        // pour les crises forte/critique avec drain significatif.
+        let resilienceFund = prev.resilienceFund ?? { ...INITIAL_RESILIENCE_FUND };
+        let resiliencePayout = 0;
+        const moneyCostFromChoice = choice?.effects?.money ?? 0;
+        if (
+          (event.urgency === "critique" || event.urgency === "forte") &&
+          moneyCostFromChoice < 0 &&
+          resilienceFund.balance > 0
+        ) {
+          const fundResult = applyFundToMoneyCost(resilienceFund, moneyCostFromChoice, prev.news.actionCount);
+          resilienceFund = fundResult.fund;
+          resiliencePayout = fundResult.savings;
+          if (fundResult.savings > 0) {
+            resources = { ...resources, money: resources.money + fundResult.savings };
+          }
+        }
+
         // Indicateurs et politique cachée : version amplifiée remplace l'originale.
         let nationalIndicators = Object.keys(chaos.indicatorEffects).length > 0
           ? applyIndicatorEffects(prev.nationalIndicators, chaos.indicatorEffects)
@@ -1001,7 +1045,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, contradictionAlert: contradictionAlertForLog } : e) };
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory }, 0);
+        // Patch log entry pour enregistrer le payout du fonds si activé
+        if (resiliencePayout > 0 && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, resiliencePayout } : e) };
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -1309,14 +1359,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
-      claimDailyReward,
+      claimDailyReward, contributeFund,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
-      saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward],
+      saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;

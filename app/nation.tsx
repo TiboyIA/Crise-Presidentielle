@@ -30,6 +30,12 @@ import { isRankedIntended } from "@/services/RankedService";
 import { computeFrustration, BAND_LABELS, BAND_COLORS } from "@/logic/frustrationEngine";
 import { computePlayerStyle } from "@/logic/playerSegmentation";
 import { generateRecommendations } from "@/logic/recommendationEngine";
+import {
+  CONTRIBUTION_TIERS,
+  computeProtectionPct,
+  getProtectionLabel,
+} from "@/logic/resilienceFundEngine";
+import type { ContributionTier } from "@/logic/resilienceFundEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -68,7 +74,7 @@ const INDICATOR_COLORS: Record<string, string> = {
 export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, claimDailyReward } = useStrategy();
+  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, claimDailyReward, contributeFund } = useStrategy();
   const { selectedPortrait } = usePortrait();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
@@ -351,6 +357,59 @@ export default function NationScreen() {
             })}
           </View>
         </Panel>
+
+        {/* FONDS NATIONAL DE RÉSILIENCE */}
+        {(() => {
+          const fund = state.resilienceFund ?? { balance: 0, monthlyContribution: 0, protectionLevel: 0 };
+          const protPct = computeProtectionPct(fund.balance);
+          const { label: protLabel, color: protColor } = getProtectionLabel(protPct);
+          const tiers: ContributionTier[] = ["faible", "moyenne", "forte"];
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="shield-check-outline" size={14} color="#3fbe7a" />
+                <Text style={[styles.sectionTitle, { color: "#3fbe7a" }]}>RÉSERVE DE RÉSILIENCE</Text>
+                <View style={[styles.protChip, { borderColor: protColor + "55", backgroundColor: protColor + "14" }]}>
+                  <Text style={[styles.protChipText, { color: protColor }]}>{protLabel}</Text>
+                </View>
+              </View>
+              <View style={styles.fundRow}>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={styles.fundBalance}>{fund.balance.toLocaleString("fr-FR")} M€</Text>
+                  <Text style={styles.fundSub}>
+                    {protPct > 0
+                      ? `Absorbe jusqu'à ${protPct}% du coût des crises critiques`
+                      : "Aucune protection — constituez une réserve"}
+                  </Text>
+                </View>
+                {fund.balance > 0 && (
+                  <View style={styles.protBar}>
+                    <View style={[styles.protBarFill, { width: `${protPct * 2}%`, backgroundColor: protColor }]} />
+                  </View>
+                )}
+              </View>
+              <View style={styles.tierRow}>
+                {tiers.map((tier) => {
+                  const def = CONTRIBUTION_TIERS[tier];
+                  return (
+                    <Pressable
+                      key={tier}
+                      onPress={() => {
+                        const r = contributeFund(tier);
+                        if (!r.success) Alert.alert("Impossible", r.reason ?? "Fonds insuffisants");
+                      }}
+                      style={({ pressed }) => [styles.tierBtn, { opacity: pressed ? 0.75 : 1 }]}
+                    >
+                      <Text style={styles.tierLabel}>{def.label}</Text>
+                      <Text style={styles.tierCost}>−{def.moneyCost} M€</Text>
+                      <Text style={styles.tierGain}>+{def.balanceGain} réserve</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Panel>
+          );
+        })()}
 
         {/* DOCTRINE DE GOUVERNANCE */}
         {(() => {
@@ -957,4 +1016,17 @@ const styles = StyleSheet.create({
   recDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   recTitle: { fontSize: 12, fontFamily: FONT.semi, color: PALETTE.textHigh },
   recReason: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14 },
+
+  protChip: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2, marginLeft: "auto" },
+  protChipText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1 },
+  fundRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  fundBalance: { fontSize: 18, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  fundSub: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14 },
+  protBar: { width: 48, height: 5, borderRadius: 3, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  protBarFill: { height: "100%", borderRadius: 3 },
+  tierRow: { flexDirection: "row", gap: 8 },
+  tierBtn: { flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PALETTE.panelEdge, backgroundColor: PALETTE.panelHi, padding: 8, alignItems: "center", gap: 2 },
+  tierLabel: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  tierCost: { fontSize: 9, fontFamily: FONT.semi, color: PALETTE.danger },
+  tierGain: { fontSize: 8, fontFamily: FONT.reg, color: "#3fbe7a" },
 });

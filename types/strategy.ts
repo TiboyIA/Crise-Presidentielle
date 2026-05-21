@@ -412,6 +412,15 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Fonds National de Résilience ──────────────────────────────────────────────
+
+export interface ResilienceFund {
+  balance:              number;   // montant disponible dans la réserve
+  monthlyContribution:  number;   // coût du dernier palier choisi (cosmétique)
+  protectionLevel:      number;   // % de réduction (0-50) calculé depuis balance
+  lastPayoutAt?:        number;   // mandateDay du dernier déblocage automatique
+}
+
 // ── Contamination sémantique ──────────────────────────────────────────────────
 
 export interface ToxicKeyword {
@@ -538,6 +547,8 @@ export interface NewsLogEntry {
   diplomaticWording?: DiplomaticWordingId;
   /** Alerte contradiction — déclaration passée contredite par ce choix. */
   contradictionAlert?: { theme: ContradictionTheme; pastStatement: string };
+  /** Montant prélevé sur le Fonds de Résilience pour absorber le coût de cette crise. */
+  resiliencePayout?: number;
 }
 
 export interface NewsState {
@@ -616,4 +627,6 @@ export interface StrategyGameState {
   // Mémoire des contradictions — optional for backward compat
   pendingDeclarations?: PendingDeclaration[];
   contradictionHistory?: ContradictionRecord[];
+  // Fonds National de Résilience — optional for backward compat
+  resilienceFund?: ResilienceFund;
 }
