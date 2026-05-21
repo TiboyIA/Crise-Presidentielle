@@ -113,6 +113,16 @@ import {
 } from "@/logic/insuranceEngine";
 import type { InsuranceProductId } from "@/types/strategy";
 import {
+  CAT_BOND_DEFS,
+  INITIAL_CAT_BOND_MARKET,
+  computeBondAbsorption,
+  computeEffectiveCapital,
+  computeEffectiveCoupon,
+  isBondCovering,
+  processCatBondExpiry,
+} from "@/logic/catBondEngine";
+import type { CatBondTypeId } from "@/types/strategy";
+import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
   computePathologyThresholdEffects,
@@ -297,6 +307,7 @@ interface StrategyContextValue {
   contributeFund: (tier: ContributionTier) => { success: boolean; reason?: string };
   buyInsurance: (productId: InsuranceProductId) => { success: boolean; reason?: string };
   cancelInsurance: (productId: InsuranceProductId) => void;
+  emitCatBond: (typeId: CatBondTypeId) => { success: boolean; reason?: string };
 }
 
 const StrategyContext = createContext<StrategyContextValue | null>(null);
@@ -548,6 +559,53 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       });
     },
     [update],
+  );
+
+  const emitCatBondFn = useCallback(
+    (typeId: CatBondTypeId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      let result: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const bonds = prev.activeCatBonds ?? [];
+        const market = prev.catBondMarket ?? { ...INITIAL_CAT_BOND_MARKET };
+        const def = CAT_BOND_DEFS[typeId];
+
+        if (!def.available) {
+          result = { success: false, reason: "Disponible en version 2" };
+          return prev;
+        }
+        if (bonds.some((b) => !b.triggered && b.typeId === typeId)) {
+          result = { success: false, reason: "Une obligation de ce type est déjà active" };
+          return prev;
+        }
+
+        const effectiveCapital = computeEffectiveCapital(def, market.marketSkepticism);
+        const effectiveCoupon = computeEffectiveCoupon(def, market.marketSkepticism);
+
+        const newBond = {
+          typeId,
+          emittedAtAction: prev.news.actionCount,
+          expiresAtAction: prev.news.actionCount + def.durationActions,
+          capitalRaised: effectiveCapital,
+          couponDue: effectiveCoupon,
+          triggered: false,
+        };
+
+        const activeCatBonds = [...bonds, newBond];
+        const catBondMarket = {
+          totalIssuances: market.totalIssuances + 1,
+          marketSkepticism: Math.min(100, market.marketSkepticism + 8),
+        };
+        const resources = { ...prev.resources, money: prev.resources.money + effectiveCapital };
+        const nationalDebt = (prev.nationalDebt ?? 0) + Math.round(effectiveCapital * 0.08);
+        const hiddenPolitics = applyHiddenPoliticsEffects(prev.hiddenPolitics, { eliteTrust: def.investorConfidenceImpact });
+
+        result = { success: true };
+        return { ...prev, resources, nationalDebt, activeCatBonds, catBondMarket, hiddenPolitics };
+      });
+      return result;
+    },
+    [state, update],
   );
 
   // ── Anti-triche classé : collecte d'événements côté client ──────────────────
@@ -893,6 +951,41 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Obligations Catastrophe — phase 1 : absorption financière + expiry.
+        // La pénalité de réputation (eliteTrust) est appliquée après la déclaration de hiddenPolitics.
+        let activeCatBonds = prev.activeCatBonds ?? [];
+        let catBondMarket = prev.catBondMarket ?? { ...INITIAL_CAT_BOND_MARKET };
+        let catBondAbsorbed = 0;
+        let catBondTriggeredId: CatBondTypeId | undefined;
+        let catBondReputationPenalty = 0;
+        const moneyCostForBond = choice?.effects?.money ?? 0;
+        if (moneyCostForBond < 0) {
+          for (const bond of activeCatBonds) {
+            if (bond.triggered) continue;
+            const def = CAT_BOND_DEFS[bond.typeId];
+            if (isBondCovering(def, event)) {
+              const absorbed = computeBondAbsorption(bond.capitalRaised, moneyCostForBond);
+              if (absorbed > 0) {
+                catBondAbsorbed = absorbed;
+                catBondTriggeredId = bond.typeId;
+                catBondReputationPenalty = def.reputationPenalty;
+                resources = { ...resources, money: resources.money + absorbed };
+                catBondMarket = { ...catBondMarket, marketSkepticism: Math.min(100, catBondMarket.marketSkepticism + 12) };
+                activeCatBonds = activeCatBonds.map((b) =>
+                  b.typeId === bond.typeId ? { ...b, triggered: true } : b,
+                );
+                break;
+              }
+            }
+          }
+        }
+        const bondExpiry = processCatBondExpiry(activeCatBonds, news.actionCount);
+        activeCatBonds = bondExpiry.bonds;
+        if (bondExpiry.couponPaid > 0) {
+          resources = { ...resources, money: Math.max(0, resources.money - bondExpiry.couponPaid) };
+        }
+        catBondMarket = { ...catBondMarket, marketSkepticism: Math.max(0, catBondMarket.marketSkepticism + bondExpiry.skepticismDelta) };
+
         // Indicateurs et politique cachée : version amplifiée remplace l'originale.
         let nationalIndicators = Object.keys(chaos.indicatorEffects).length > 0
           ? applyIndicatorEffects(prev.nationalIndicators, chaos.indicatorEffects)
@@ -910,6 +1003,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         }
         if (Object.keys(cross.hiddenEffects).length > 0) {
           hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, cross.hiddenEffects);
+        }
+
+        // Obligations Catastrophe — phase 2 : pénalité de réputation (après déclaration de hiddenPolitics).
+        if (catBondReputationPenalty !== 0) {
+          hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, { eliteTrust: catBondReputationPenalty });
         }
 
         // Indice de Clarté Présidentielle — effets additifs sur hiddenPolitics uniquement si clarityProfile défini.
@@ -1128,7 +1226,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, insurancePayout: { productId: insurancePayoutProductId!, amount: insurancePayoutAmount } } : e) };
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies }, 0);
+        // Patch log entry pour enregistrer l'absorption par cat bond
+        if (catBondAbsorbed > 0 && catBondTriggeredId && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, catBondPayout: { typeId: catBondTriggeredId!, amount: catBondAbsorbed } } : e) };
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -1438,6 +1542,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
       buyInsurance: buyInsuranceFn, cancelInsurance: cancelInsuranceFn,
+      emitCatBond: emitCatBondFn,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
@@ -1445,7 +1550,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
-      buyInsuranceFn, cancelInsuranceFn],
+      buyInsuranceFn, cancelInsuranceFn, emitCatBondFn],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;

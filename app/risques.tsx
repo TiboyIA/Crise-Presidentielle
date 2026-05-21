@@ -7,12 +7,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { INSURANCE_PRODUCT_LIST } from "@/data/insuranceProducts";
 import { computeDynamicPremium, getRiskLabel } from "@/logic/insuranceEngine";
+import { CAT_BOND_DEF_LIST, computeEffectiveCapital, computeEffectiveCoupon, getMarketLabel } from "@/logic/catBondEngine";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
 export default function RisquesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, buyInsurance, cancelInsurance } = useStrategy();
+  const { state, buyInsurance, cancelInsurance, emitCatBond } = useStrategy();
 
   if (!state) return null;
 
@@ -145,6 +146,137 @@ export default function RisquesScreen() {
           );
         })}
 
+        {/* ─── OBLIGATIONS CATASTROPHE ─── */}
+        {(() => {
+          const bonds = state.activeCatBonds ?? [];
+          const market = state.catBondMarket ?? { totalIssuances: 0, marketSkepticism: 0 };
+          const marketStatus = getMarketLabel(market.marketSkepticism);
+          return (
+            <>
+              {/* En-tête section */}
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleRow}>
+                  <MaterialCommunityIcons name="chart-line" size={14} color={PALETTE.gold} />
+                  <Text style={styles.sectionTitle}>OBLIGATIONS CATASTROPHE</Text>
+                </View>
+                <View style={[styles.marketChip, { borderColor: marketStatus.color + "55", backgroundColor: marketStatus.color + "12" }]}>
+                  <Text style={[styles.marketChipText, { color: marketStatus.color }]}>{marketStatus.label}</Text>
+                </View>
+              </View>
+              <Text style={styles.sectionDesc}>
+                Émettez une obligation pour lever des capitaux auprès des marchés. En cas de crise couverte, le capital absorbe 75% des pertes. Sans crise, vous remboursez le coupon à l'expiration.
+              </Text>
+
+              {CAT_BOND_DEF_LIST.map((def) => {
+                const activeBond = bonds.find((b) => !b.triggered && b.typeId === def.id);
+                const isActive = !!activeBond;
+                const effectiveCapital = computeEffectiveCapital(def, market.marketSkepticism);
+                const effectiveCoupon = computeEffectiveCoupon(def, market.marketSkepticism);
+                const actionsLeft = isActive ? Math.max(0, activeBond.expiresAtAction - state.news.actionCount) : null;
+
+                return (
+                  <View
+                    key={def.id}
+                    style={[
+                      styles.bondCard,
+                      {
+                        borderColor: !def.available
+                          ? PALETTE.panelEdge
+                          : isActive
+                          ? def.color + "55"
+                          : PALETTE.panelEdge,
+                        backgroundColor: isActive ? def.color + "08" : PALETTE.panelHi,
+                        opacity: def.available ? 1 : 0.5,
+                      },
+                    ]}
+                  >
+                    <View style={styles.bondHeader}>
+                      <Text style={styles.bondIcon}>{def.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.bondTitleRow}>
+                          <Text style={[styles.bondName, { color: isActive ? def.color : PALETTE.textHigh }]}>
+                            {def.name}
+                          </Text>
+                          {!def.available && (
+                            <View style={styles.lockedChip}>
+                              <Text style={styles.lockedText}>V2</Text>
+                            </View>
+                          )}
+                          {isActive && (
+                            <View style={[styles.activeBondBadge, { borderColor: def.color + "55", backgroundColor: def.color + "1a" }]}>
+                              <Text style={[styles.activeBondText, { color: def.color }]}>
+                                ACTIF · {actionsLeft} actions restantes
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.bondRiskLabel}>{def.riskLabel}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.bondStats}>
+                      <View style={styles.bondStat}>
+                        <Text style={styles.bondStatLabel}>CAPITAL LEVÉ</Text>
+                        <Text style={[styles.bondStatVal, { color: "#3fbe7a" }]}>+{effectiveCapital} M€</Text>
+                      </View>
+                      <View style={styles.bondStatDiv} />
+                      <View style={styles.bondStat}>
+                        <Text style={styles.bondStatLabel}>COUPON DÛ</Text>
+                        <Text style={[styles.bondStatVal, { color: PALETTE.danger }]}>−{effectiveCoupon} M€</Text>
+                      </View>
+                      <View style={styles.bondStatDiv} />
+                      <View style={styles.bondStat}>
+                        <Text style={styles.bondStatLabel}>DURÉE</Text>
+                        <Text style={styles.bondStatVal}>{def.durationActions} actions</Text>
+                      </View>
+                    </View>
+
+                    {def.available && !isActive && (
+                      <Pressable
+                        onPress={() => {
+                          Alert.alert(
+                            `Émettre ${def.name}`,
+                            `Vous collectez ${effectiveCapital} M€ immédiatement. En l'absence de crise couverte, vous remboursez ${effectiveCoupon} M€ à l'expiration. La dette nationale augmentera légèrement.`,
+                            [
+                              { text: "Annuler", style: "cancel" },
+                              {
+                                text: "Émettre",
+                                onPress: () => {
+                                  const r = emitCatBond(def.id);
+                                  if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur");
+                                },
+                              },
+                            ],
+                          );
+                        }}
+                        style={({ pressed }) => [
+                          styles.emitBtn,
+                          { borderColor: def.color + "88", backgroundColor: def.color + "18", opacity: pressed ? 0.8 : 1 },
+                        ]}
+                      >
+                        <MaterialCommunityIcons name="bank-outline" size={13} color={def.color} />
+                        <Text style={[styles.emitBtnText, { color: def.color }]}>
+                          ÉMETTRE — +{effectiveCapital} M€
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+
+              {market.totalIssuances > 0 && (
+                <View style={styles.marketInfoRow}>
+                  <MaterialCommunityIcons name="trending-up" size={11} color={PALETTE.textLow} />
+                  <Text style={styles.marketInfoText}>
+                    {market.totalIssuances} émission{market.totalIssuances > 1 ? "s" : ""} · Méfiance marchés : {market.marketSkepticism}%
+                    {market.marketSkepticism >= 40 ? " — Capital réduit, coupon majoré" : ""}
+                  </Text>
+                </View>
+              )}
+            </>
+          );
+        })()}
+
         {/* Légende */}
         <View style={styles.legend}>
           <MaterialCommunityIcons name="information-outline" size={12} color={PALETTE.textLow} />
@@ -233,4 +365,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   legendText: { flex: 1, fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 14 },
+
+  // ── Cat bonds ──
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sectionTitle: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2 },
+  marketChip: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2 },
+  marketChipText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.8 },
+  sectionDesc: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 15 },
+
+  bondCard: {
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  bondHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  bondIcon: { fontSize: 18, lineHeight: 24 },
+  bondTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  bondName: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  bondRiskLabel: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid, marginTop: 2 },
+  lockedChip: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, backgroundColor: PALETTE.panelEdge },
+  lockedText: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 0.5 },
+  activeBondBadge: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  activeBondText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.8 },
+
+  bondStats: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: PALETTE.panelEdge, paddingTop: 8 },
+  bondStat: { flex: 1, alignItems: "center", gap: 3 },
+  bondStatLabel: { fontSize: 7, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1 },
+  bondStatVal: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  bondStatDiv: { width: 1, height: 26, backgroundColor: PALETTE.panelEdge },
+
+  emitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    paddingVertical: 10,
+  },
+  emitBtnText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1.5 },
+
+  marketInfoRow: { flexDirection: "row", alignItems: "flex-start", gap: 5, paddingHorizontal: 4 },
+  marketInfoText: { flex: 1, fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13 },
 });

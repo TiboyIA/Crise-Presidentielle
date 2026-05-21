@@ -11,6 +11,7 @@ import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
 import { WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
 import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
 import { INSURANCE_PRODUCTS } from "@/data/insuranceProducts";
+import { CAT_BOND_DEFS } from "@/logic/catBondEngine";
 
 interface Props {
   entry: NewsLogEntry;
@@ -111,6 +112,14 @@ export function NewsCard({ entry, onPress }: Props) {
               <Text style={styles.gaffeKicker}>{GAFFE_LABELS[entry.ministerGaffe.gaffeType].toUpperCase()}</Text>
               <Text style={styles.gaffeQuote}>« {entry.ministerGaffe.quote} »</Text>
               <Text style={styles.gaffeSpeaker}>— {entry.ministerGaffe.ministerName}</Text>
+            </View>
+          )}
+
+          {entry.catBondPayout != null && entry.catBondPayout.amount > 0 && (
+            <View style={styles.catBondChip}>
+              <Text style={styles.catBondChipText}>
+                {CAT_BOND_DEFS[entry.catBondPayout.typeId]?.icon ?? "📈"} Cat Bond déclenché : {entry.catBondPayout.amount} M€ absorbés
+              </Text>
             </View>
           )}
 
@@ -216,6 +225,9 @@ const styles = StyleSheet.create({
   gaffeKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1.5 },
   gaffeQuote: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 16, fontStyle: "italic" },
   gaffeSpeaker: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid },
+
+  catBondChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#e8a93a44", backgroundColor: "#e8a93a0d" },
+  catBondChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#e8a93a" },
 
   insuranceChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#4a9fff44", backgroundColor: "#4a9fff0d" },
   insuranceChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#4a9fff" },

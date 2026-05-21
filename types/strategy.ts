@@ -412,6 +412,29 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Obligations Catastrophe ───────────────────────────────────────────────────
+
+export type CatBondTypeId =
+  | "cat_cyber"
+  | "cat_climat"
+  | "cat_energie"
+  | "cat_infrastructure"
+  | "cat_guerre_hybride";
+
+export interface ActiveCatBond {
+  typeId: CatBondTypeId;
+  emittedAtAction: number;
+  expiresAtAction: number;
+  capitalRaised: number;   // capital effectif collecté (réduit si marchés méfiants)
+  couponDue: number;       // coupon à payer si aucune crise ne survient
+  triggered: boolean;      // true = le bond a été déclenché par une crise
+}
+
+export interface CatBondMarketState {
+  totalIssuances: number;   // total d'émissions depuis le début du mandat
+  marketSkepticism: number; // 0-100 — monte avec les émissions, baisse si bonds expirés sans crise
+}
+
 // ── Assurance Souveraine ──────────────────────────────────────────────────────
 
 export type InsuranceProductId =
@@ -568,6 +591,8 @@ export interface NewsLogEntry {
   resiliencePayout?: number;
   /** Indemnisation versée par une assurance souveraine lors de cette crise. */
   insurancePayout?: { productId: InsuranceProductId; amount: number };
+  /** Absorption par un cat bond déclenché lors de cette crise. */
+  catBondPayout?: { typeId: CatBondTypeId; amount: number };
 }
 
 export interface NewsState {
@@ -650,4 +675,7 @@ export interface StrategyGameState {
   resilienceFund?: ResilienceFund;
   // Assurance Souveraine — optional for backward compat
   insurancePolicies?: InsurancePolicy[];
+  // Obligations Catastrophe — optional for backward compat
+  activeCatBonds?: ActiveCatBond[];
+  catBondMarket?: CatBondMarketState;
 }
