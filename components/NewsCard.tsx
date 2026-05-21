@@ -10,6 +10,7 @@ import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/s
 import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
 import { WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
 import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
+import { INSURANCE_PRODUCTS } from "@/data/insuranceProducts";
 
 interface Props {
   entry: NewsLogEntry;
@@ -113,6 +114,14 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.insurancePayout != null && entry.insurancePayout.amount > 0 && (
+            <View style={styles.insuranceChip}>
+              <Text style={styles.insuranceChipText}>
+                {INSURANCE_PRODUCTS[entry.insurancePayout.productId]?.icon ?? "🏥"} Assurance remboursée : {entry.insurancePayout.amount} M€
+              </Text>
+            </View>
+          )}
+
           {entry.resiliencePayout != null && entry.resiliencePayout > 0 && (
             <View style={styles.resilienceChip}>
               <Text style={styles.resilienceChipText}>🛡 Réserve absorbée : {entry.resiliencePayout} M€</Text>
@@ -207,6 +216,9 @@ const styles = StyleSheet.create({
   gaffeKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1.5 },
   gaffeQuote: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 16, fontStyle: "italic" },
   gaffeSpeaker: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid },
+
+  insuranceChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#4a9fff44", backgroundColor: "#4a9fff0d" },
+  insuranceChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#4a9fff" },
 
   resilienceChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#3fbe7a44", backgroundColor: "#3fbe7a0d" },
   resilienceChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#3fbe7a" },

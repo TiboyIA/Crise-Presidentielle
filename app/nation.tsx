@@ -49,6 +49,7 @@ const NAV_ITEMS: { mcIcon: McIconName; label: string; route: string; tint?: stri
   { mcIcon: "clipboard-list-outline",      label: "Missions",         route: "/missions",             tint: PALETTE.info },
   { mcIcon: "newspaper-variant-outline",   label: "Journal de Crise", route: "/journal-crise",        tint: PALETTE.crimson },
   { mcIcon: "orbit",                       label: "Forces Cosmiques", route: "/entities",             tint: "#9b59b6" },
+  { mcIcon: "shield-half-full",            label: "Risques",          route: "/risques",              tint: "#4a9fff" },
 ];
 
 const RESOURCE_ORDER: ResourceKey[] = ["money", "influence", "energy", "intelligence", "technology", "military", "cyberDefense"];

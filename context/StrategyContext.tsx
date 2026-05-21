@@ -102,6 +102,16 @@ import {
   applyFundToMoneyCost,
 } from "@/logic/resilienceFundEngine";
 import type { ContributionTier } from "@/logic/resilienceFundEngine";
+import { INSURANCE_PRODUCTS } from "@/data/insuranceProducts";
+import {
+  applyInsuranceClaim,
+  buyInsurance as engineBuyInsurance,
+  cancelInsurance as engineCancelInsurance,
+  computeDynamicPremium,
+  computeInsurancePayout,
+  isEventCovered,
+} from "@/logic/insuranceEngine";
+import type { InsuranceProductId } from "@/types/strategy";
 import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
@@ -285,6 +295,8 @@ interface StrategyContextValue {
   deleteSlot: (slot: SlotNumber) => Promise<void>;
   claimDailyReward: () => void;
   contributeFund: (tier: ContributionTier) => { success: boolean; reason?: string };
+  buyInsurance: (productId: InsuranceProductId) => { success: boolean; reason?: string };
+  cancelInsurance: (productId: InsuranceProductId) => void;
 }
 
 const StrategyContext = createContext<StrategyContextValue | null>(null);
@@ -499,6 +511,43 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       return result;
     },
     [state, update],
+  );
+
+  const buyInsuranceFn = useCallback(
+    (productId: InsuranceProductId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé" };
+      let result: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const policies = prev.insurancePolicies ?? [];
+        const existingPolicy = policies.find((p) => p.productId === productId);
+        if (existingPolicy?.active) {
+          result = { success: false, reason: "Assurance déjà active" };
+          return prev;
+        }
+        const premium = computeDynamicPremium(productId, prev, existingPolicy);
+        if (prev.resources.money < premium) {
+          result = { success: false, reason: "Fonds insuffisants" };
+          return prev;
+        }
+        const resources = { ...prev.resources, money: prev.resources.money - premium };
+        const insurancePolicies = engineBuyInsurance(policies, productId, prev.mandateDay);
+        result = { success: true };
+        return { ...prev, resources, insurancePolicies };
+      });
+      return result;
+    },
+    [state, update],
+  );
+
+  const cancelInsuranceFn = useCallback(
+    (productId: InsuranceProductId): void => {
+      update((prev) => {
+        const policies = prev.insurancePolicies ?? [];
+        const insurancePolicies = engineCancelInsurance(policies, productId);
+        return { ...prev, insurancePolicies };
+      });
+    },
+    [update],
   );
 
   // ── Anti-triche classé : collecte d'événements côté client ──────────────────
@@ -822,6 +871,28 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Assurance Souveraine — indemnisation si l'événement est couvert par une police active.
+        let insurancePolicies = prev.insurancePolicies ?? [];
+        let insurancePayoutAmount = 0;
+        let insurancePayoutProductId: InsuranceProductId | undefined;
+        const moneyCostForInsurance = choice?.effects?.money ?? 0;
+        if (moneyCostForInsurance < 0) {
+          for (const policy of insurancePolicies) {
+            if (!policy.active) continue;
+            const def = INSURANCE_PRODUCTS[policy.productId];
+            if (isEventCovered(def, event)) {
+              const payout = computeInsurancePayout(def, moneyCostForInsurance);
+              if (payout > 0) {
+                insurancePayoutAmount = payout;
+                insurancePayoutProductId = policy.productId;
+                resources = { ...resources, money: resources.money + payout };
+                insurancePolicies = applyInsuranceClaim(insurancePolicies, policy.productId);
+                break;
+              }
+            }
+          }
+        }
+
         // Indicateurs et politique cachée : version amplifiée remplace l'originale.
         let nationalIndicators = Object.keys(chaos.indicatorEffects).length > 0
           ? applyIndicatorEffects(prev.nationalIndicators, chaos.indicatorEffects)
@@ -1051,7 +1122,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, resiliencePayout } : e) };
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund }, 0);
+        // Patch log entry pour enregistrer le remboursement d'assurance
+        if (insurancePayoutAmount > 0 && insurancePayoutProductId && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, insurancePayout: { productId: insurancePayoutProductId!, amount: insurancePayoutAmount } } : e) };
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -1360,13 +1437,15 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
+      buyInsurance: buyInsuranceFn, cancelInsurance: cancelInsuranceFn,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
-      saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund],
+      saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
+      buyInsuranceFn, cancelInsuranceFn],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;

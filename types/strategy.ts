@@ -412,6 +412,23 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Assurance Souveraine ──────────────────────────────────────────────────────
+
+export type InsuranceProductId =
+  | "cyber"
+  | "climat"
+  | "energie"
+  | "dette"
+  | "industrie"
+  | "troubles_sociaux";
+
+export interface InsurancePolicy {
+  productId: InsuranceProductId;
+  active: boolean;
+  claimCount: number;
+  activatedAtDay: number;
+}
+
 // ── Fonds National de Résilience ──────────────────────────────────────────────
 
 export interface ResilienceFund {
@@ -549,6 +566,8 @@ export interface NewsLogEntry {
   contradictionAlert?: { theme: ContradictionTheme; pastStatement: string };
   /** Montant prélevé sur le Fonds de Résilience pour absorber le coût de cette crise. */
   resiliencePayout?: number;
+  /** Indemnisation versée par une assurance souveraine lors de cette crise. */
+  insurancePayout?: { productId: InsuranceProductId; amount: number };
 }
 
 export interface NewsState {
@@ -629,4 +648,6 @@ export interface StrategyGameState {
   contradictionHistory?: ContradictionRecord[];
   // Fonds National de Résilience — optional for backward compat
   resilienceFund?: ResilienceFund;
+  // Assurance Souveraine — optional for backward compat
+  insurancePolicies?: InsurancePolicy[];
 }
