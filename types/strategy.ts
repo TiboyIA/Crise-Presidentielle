@@ -412,6 +412,47 @@ export interface NationalIndicators {
   publicBudget: number;  // -150 to +100
 }
 
+// ── Fuite d'Indemnisation ─────────────────────────────────────────────────────
+
+export type LeakageBand = "negligible" | "moderate" | "significant" | "critical";
+
+// ── Passifs Longue Traîne ─────────────────────────────────────────────────────
+
+export type LiabilityCategory =
+  | "dette_cachee" | "infrastructure" | "sante" | "cyber" | "energie" | "social" | "diplomatie";
+
+export type LiabilityDefId =
+  | "fiscal_opacity"
+  | "infrastructure_neglect"
+  | "social_fracture"
+  | "cyber_dependency"
+  | "energy_vulnerability";
+
+export interface LongTailLiability {
+  id:                   string;
+  defId:                LiabilityDefId;
+  sourceDecision:       string;   // "eventId/choiceId"
+  category:             LiabilityCategory;
+  annualCost:           number;   // M€ par période (croît avec riskGrowth)
+  initialCost:          number;   // référence pour le plafonnement
+  riskGrowth:           number;   // % par période non traitée
+  triggerAfterActions:  number;   // actionCount absolu de démarrage des coûts
+  createdAtDay:         number;
+  description:          string;
+}
+
+// ── Pool de Réassurance Alliée ────────────────────────────────────────────────
+
+export interface ReinsurancePool {
+  poolStress: number;
+  lastClaimAt?: number;
+}
+
+// ── Franchise Politique des Crises ───────────────────────────────────────────
+
+export type CostSharingStrategyId =
+  | "etat" | "assurance" | "regions" | "entreprises" | "emprunt";
+
 // ── Obligations Catastrophe ───────────────────────────────────────────────────
 
 export type CatBondTypeId =
@@ -593,6 +634,20 @@ export interface NewsLogEntry {
   insurancePayout?: { productId: InsuranceProductId; amount: number };
   /** Absorption par un cat bond déclenché lors de cette crise. */
   catBondPayout?: { typeId: CatBondTypeId; amount: number };
+  /** Absorption par le pool de réassurance alliée lors de cette crise. */
+  reinsurancePayout?: { absorbed: number; membersCount: number };
+  /** Passif longue traîne créé par ce choix — signalé discrètement dans le journal. */
+  createdLiabilityId?: LiabilityDefId;
+  /** Fuite d'indemnisation détectée lors du déploiement d'un plan d'urgence. */
+  leakagePayout?: { rate: number; leaked: number; band: LeakageBand; controlApplied: boolean };
+  /** Stratégie de partage du coût appliquée automatiquement pour les crises majeures éligibles. */
+  costSharingPayout?: {
+    strategyId: CostSharingStrategyId;
+    label: string;
+    description: string;
+    moneyRecovered: number;
+    debtAdded: number;
+  };
 }
 
 export interface NewsState {
@@ -678,4 +733,8 @@ export interface StrategyGameState {
   // Obligations Catastrophe — optional for backward compat
   activeCatBonds?: ActiveCatBond[];
   catBondMarket?: CatBondMarketState;
+  // Pool de Réassurance Alliée — optional for backward compat
+  reinsurancePool?: ReinsurancePool;
+  // Passifs Longue Traîne — optional for backward compat
+  longTailLiabilities?: LongTailLiability[];
 }

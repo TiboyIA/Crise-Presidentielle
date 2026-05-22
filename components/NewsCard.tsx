@@ -10,8 +10,11 @@ import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/s
 import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
 import { WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
 import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
+import { LIABILITY_DEFS } from "@/logic/longTailLiabilityEngine";
+import { LEAKAGE_BAND_LABELS, LEAKAGE_BAND_COLORS } from "@/logic/claimsLeakageEngine";
 import { INSURANCE_PRODUCTS } from "@/data/insuranceProducts";
 import { CAT_BOND_DEFS } from "@/logic/catBondEngine";
+import { COST_SHARING_ICONS, COST_SHARING_LABELS } from "@/logic/crisisCostSharingEngine";
 
 interface Props {
   entry: NewsLogEntry;
@@ -137,6 +140,50 @@ export function NewsCard({ entry, onPress }: Props) {
             </View>
           )}
 
+          {entry.createdLiabilityId && (
+            <View style={[styles.liabilityChip, { borderColor: LIABILITY_DEFS[entry.createdLiabilityId].color + "55", backgroundColor: LIABILITY_DEFS[entry.createdLiabilityId].color + "0d" }]}>
+              <Text style={[styles.liabilityChipText, { color: LIABILITY_DEFS[entry.createdLiabilityId].color }]}>
+                ⚠ Passif créé : {LIABILITY_DEFS[entry.createdLiabilityId].label}
+              </Text>
+            </View>
+          )}
+
+          {entry.reinsurancePayout != null && entry.reinsurancePayout.absorbed > 0 && (
+            <View style={styles.reinsuranceChip}>
+              <Text style={styles.reinsuranceChipText}>
+                🤝 Réassurance alliée : {entry.reinsurancePayout.absorbed} M€
+                {entry.reinsurancePayout.membersCount > 0
+                  ? ` (${entry.reinsurancePayout.membersCount} allié${entry.reinsurancePayout.membersCount > 1 ? "s" : ""})`
+                  : ""}
+              </Text>
+            </View>
+          )}
+
+          {entry.costSharingPayout != null && (
+            <View style={styles.costSharingChip}>
+              <Text style={styles.costSharingChipText}>
+                {COST_SHARING_ICONS[entry.costSharingPayout.strategyId]}{" "}
+                {COST_SHARING_LABELS[entry.costSharingPayout.strategyId]}
+                {entry.costSharingPayout.moneyRecovered > 0
+                  ? ` — +${entry.costSharingPayout.moneyRecovered} M€`
+                  : ""}
+                {entry.costSharingPayout.debtAdded > 0
+                  ? ` · dette +${entry.costSharingPayout.debtAdded} M€`
+                  : ""}
+              </Text>
+            </View>
+          )}
+
+          {entry.leakagePayout != null && (
+            <View style={[styles.leakageChip, { borderColor: LEAKAGE_BAND_COLORS[entry.leakagePayout.band] + "55", backgroundColor: LEAKAGE_BAND_COLORS[entry.leakagePayout.band] + "0d" }]}>
+              <Text style={[styles.leakageChipText, { color: LEAKAGE_BAND_COLORS[entry.leakagePayout.band] }]}>
+                ⚠ {LEAKAGE_BAND_LABELS[entry.leakagePayout.band]} : {entry.leakagePayout.leaked} M€
+                {" "}({Math.round(entry.leakagePayout.rate * 100)}%)
+                {entry.leakagePayout.controlApplied ? " · contrôle actif" : ""}
+              </Text>
+            </View>
+          )}
+
           {entry.contradictionAlert && (
             <View style={styles.contradictionBox}>
               <Text style={styles.contradictionKicker}>CONTRADICTION · {THEME_LABELS[entry.contradictionAlert.theme].toUpperCase()}</Text>
@@ -235,7 +282,19 @@ const styles = StyleSheet.create({
   resilienceChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#3fbe7a44", backgroundColor: "#3fbe7a0d" },
   resilienceChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#3fbe7a" },
 
+  reinsuranceChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#4a9fff44", backgroundColor: "#4a9fff0d" },
+  reinsuranceChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#4a9fff" },
+
+  liabilityChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },
+  liabilityChipText: { fontSize: 10, fontFamily: FONT.semi },
+
+  leakageChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },
+  leakageChipText: { fontSize: 10, fontFamily: FONT.semi },
+
   contradictionBox: { borderRadius: 4, padding: 8, gap: 3, borderWidth: 1, borderColor: "#c44b4b55", backgroundColor: "#c44b4b0d" },
   contradictionKicker: { fontSize: 7, fontFamily: FONT.bold, color: "#c44b4b", letterSpacing: 1.5 },
   contradictionPast: { fontSize: 11, fontFamily: FONT.semi, color: "#c44b4b99", lineHeight: 15, fontStyle: "italic" },
+
+  costSharingChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth, borderColor: "#c9a84c44", backgroundColor: "#c9a84c0d" },
+  costSharingChipText: { fontSize: 10, fontFamily: FONT.semi, color: "#c9a84c" },
 });

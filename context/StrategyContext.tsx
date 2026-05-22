@@ -122,6 +122,15 @@ import {
   processCatBondExpiry,
 } from "@/logic/catBondEngine";
 import type { CatBondTypeId } from "@/types/strategy";
+import { computeCostSharing, COST_SHARING_ELIGIBLE_EVENTS } from "@/logic/crisisCostSharingEngine";
+import type { CostSharingStrategyId } from "@/types/strategy";
+import { claimReinsurance, decayPoolStress } from "@/logic/reinsurancePoolEngine";
+import type { ReinsurancePool } from "@/types/strategy";
+import { checkLiabilityTrigger, applyLiabilityPeriod, reduceLiabilitiesByReform } from "@/logic/longTailLiabilityEngine";
+import type { LongTailLiability } from "@/types/strategy";
+import { computeLeakage, LEAKAGE_ELIGIBLE_CHOICES, LEAKAGE_BAND_LABELS, LEAKAGE_NEWS_TITLE, LEAKAGE_NEWS_SOURCE } from "@/logic/claimsLeakageEngine";
+import type { LeakageBand } from "@/types/strategy";
+import { getRiskAppetiteDef } from "@/logic/riskAppetiteEngine";
 import {
   DEFAULT_PATHOLOGY,
   applyPathologyDelta,
@@ -319,6 +328,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
   const auth = useAuth();
   const allianceBonusRef = useRef(0);
+  const allianceCountRef = useRef(0);
   // Refs pour détection de complétion côté classé (comparaison inter-render)
   const stateRef            = useRef<StrategyGameState | null>(null);
   const prevBuildingsRef    = useRef<StrategyGameState["buildings"]>([]);
@@ -329,6 +339,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     const run = async () => {
       const list = await fetchAlliances(auth.accessToken!);
       allianceBonusRef.current = computeAllianceBonuses(list).rate;
+      allianceCountRef.current = list.filter((a) => a.status === "active").length;
     };
     void run();
     const id = setInterval(() => void run(), 5 * 60 * 1000);
@@ -986,6 +997,61 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         }
         catBondMarket = { ...catBondMarket, marketSkepticism: Math.max(0, catBondMarket.marketSkepticism + bondExpiry.skepticismDelta) };
 
+        // Pool de Réassurance Alliée — absorption partielle par les alliés actifs.
+        let reinsurancePool: ReinsurancePool = prev.reinsurancePool ?? { poolStress: 0 };
+        let reinsuranceAbsorbed = 0;
+        const allyCount = allianceCountRef.current;
+
+        if (allyCount > 0) {
+          const rawCostForRein = Math.abs(Math.min(0, moneyCostFromChoice));
+          const coveredSoFar = resiliencePayout + insurancePayoutAmount + catBondAbsorbed;
+          const residualForRein = Math.max(0, rawCostForRein - coveredSoFar);
+          const reinResult = claimReinsurance(reinsurancePool, allyCount, residualForRein, prev.news.actionCount);
+          if (reinResult) {
+            reinsuranceAbsorbed = reinResult.absorbed;
+            reinsurancePool = reinResult.newPool;
+            resources = {
+              ...resources,
+              money: resources.money + reinResult.absorbed,
+              influence: Math.max(0, resources.influence - reinResult.influenceCost),
+            };
+          }
+        }
+
+        // Franchise Politique — phase 1 : partage du coût résiduel non couvert.
+        let nationalDebt = prev.nationalDebt ?? 0;
+        let costSharingPayoutResult: {
+          strategyId: CostSharingStrategyId;
+          label: string;
+          description: string;
+          moneyRecovered: number;
+          debtAdded: number;
+        } | null = null;
+        let costSharingHiddenFx: Partial<import("@/types/strategy").HiddenPolitics> = {};
+        let costSharingIndicatorFx: Partial<import("@/types/strategy").NationalIndicators> = {};
+
+        if (COST_SHARING_ELIGIBLE_EVENTS.has(event.id)) {
+          const rawCost = Math.abs(Math.min(0, moneyCostFromChoice));
+          const alreadyCovered = resiliencePayout + insurancePayoutAmount + catBondAbsorbed + reinsuranceAbsorbed;
+          const uncoveredCost = Math.max(0, rawCost - alreadyCovered);
+          const outcome = computeCostSharing(prev, event.id, uncoveredCost);
+          if (outcome) {
+            if (outcome.moneyRecovered > 0) {
+              resources = { ...resources, money: resources.money + outcome.moneyRecovered };
+            }
+            nationalDebt += outcome.debtAdded;
+            costSharingHiddenFx = outcome.hiddenPoliticsEffects;
+            costSharingIndicatorFx = outcome.indicatorEffects;
+            costSharingPayoutResult = {
+              strategyId: outcome.strategyId,
+              label: outcome.label,
+              description: outcome.description,
+              moneyRecovered: outcome.moneyRecovered,
+              debtAdded: outcome.debtAdded,
+            };
+          }
+        }
+
         // Indicateurs et politique cachée : version amplifiée remplace l'originale.
         let nationalIndicators = Object.keys(chaos.indicatorEffects).length > 0
           ? applyIndicatorEffects(prev.nationalIndicators, chaos.indicatorEffects)
@@ -1008,6 +1074,37 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         // Obligations Catastrophe — phase 2 : pénalité de réputation (après déclaration de hiddenPolitics).
         if (catBondReputationPenalty !== 0) {
           hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, { eliteTrust: catBondReputationPenalty });
+        }
+
+        // Franchise Politique — phase 2 : effets politiques/indicateurs du partage de coût.
+        if (Object.keys(costSharingHiddenFx).length > 0) {
+          hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, costSharingHiddenFx);
+        }
+        if (Object.keys(costSharingIndicatorFx).length > 0) {
+          nationalIndicators = applyIndicatorEffects(nationalIndicators, costSharingIndicatorFx);
+        }
+
+        // Fuite d'Indemnisation — prélèvement additionnel sur les plans d'urgence éligibles.
+        let leakagePayoutResult: { rate: number; leaked: number; band: LeakageBand; controlApplied: boolean } | null = null;
+        if (choice && LEAKAGE_ELIGIBLE_CHOICES.has(choice.id) && moneyCostFromChoice < 0) {
+          const aidAmount = Math.abs(moneyCostFromChoice);
+          const leakage = computeLeakage(prev, event.urgency, aidAmount);
+          if (leakage.leaked > 0) {
+            resources = { ...resources, money: Math.max(0, resources.money - leakage.leaked) };
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, { scandalRisk: leakage.scandalBoost });
+            leakagePayoutResult = { rate: leakage.rate, leaked: leakage.leaked, band: leakage.band, controlApplied: leakage.controlApplied };
+          }
+        }
+
+        // Appétence au Risque Présidentielle — ajustement du coût résiduel selon le profil dérivé de la doctrine.
+        // crisisCostFactor < 1 → remboursement partiel ; > 1 → surcoût supplémentaire.
+        if (moneyCostFromChoice < 0) {
+          const appetiteDef = getRiskAppetiteDef(prev.governanceDoctrine);
+          if (appetiteDef.crisisCostFactor !== 1.0) {
+            const rawCost   = Math.abs(moneyCostFromChoice);
+            const adjustment = Math.round(rawCost * (1 - appetiteDef.crisisCostFactor));
+            resources = { ...resources, money: Math.max(0, resources.money + adjustment) };
+          }
         }
 
         // Indice de Clarté Présidentielle — effets additifs sur hiddenPolitics uniquement si clarityProfile défini.
@@ -1232,7 +1329,54 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, catBondPayout: { typeId: catBondTriggeredId!, amount: catBondAbsorbed } } : e) };
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket }, 0);
+        // Patch log entry pour enregistrer l'absorption par le pool de réassurance alliée
+        if (reinsuranceAbsorbed > 0 && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, reinsurancePayout: { absorbed: reinsuranceAbsorbed, membersCount: allyCount } } : e) };
+        }
+
+        // Patch log entry pour enregistrer la stratégie de partage du coût
+        if (costSharingPayoutResult && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, costSharingPayout: costSharingPayoutResult! } : e) };
+        }
+
+        // Patch log entry pour enregistrer la fuite d'indemnisation
+        if (leakagePayoutResult && news.log.length > 0) {
+          const lastIdx = news.log.length - 1;
+          news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, leakagePayout: leakagePayoutResult! } : e) };
+        }
+
+        // Actualité de presse générée pour les fuites significatives et critiques
+        if (leakagePayoutResult && (leakagePayoutResult.band === "significant" || leakagePayoutResult.band === "critical")) {
+          const pressTitle  = LEAKAGE_NEWS_TITLE[leakagePayoutResult.band];
+          const pressSource = LEAKAGE_NEWS_SOURCE[leakagePayoutResult.band];
+          const pressUrgency = leakagePayoutResult.band === "critical" ? "forte" as const : "moyenne" as const;
+          const syntheticEntry: import("@/types/strategy").NewsLogEntry = {
+            eventId:   `aid_leak_${leakagePayoutResult.band}_${prev.news.actionCount}`,
+            title:     pressTitle,
+            source:    pressSource,
+            type:      "national",
+            urgency:   pressUrgency,
+            timestamp: Date.now() + 1,
+            effects:   {},
+          };
+          news = { ...news, log: [...news.log, syntheticEntry], unreadCount: news.unreadCount + 1 };
+        }
+
+        // Passifs Longue Traîne — détection de déclencheur sur ce couple événement/choix.
+        const prevLiabilities = prev.longTailLiabilities ?? [];
+        let longTailLiabilities: LongTailLiability[] = prevLiabilities;
+        const newLiability = checkLiabilityTrigger(event.id, choice?.id ?? "", prevLiabilities, prev.mandateDay, prev.news.actionCount);
+        if (newLiability) {
+          longTailLiabilities = [...prevLiabilities, newLiability];
+          if (news.log.length > 0) {
+            const lastIdx = news.log.length - 1;
+            news = { ...news, log: news.log.map((e, i) => i === lastIdx ? { ...e, createdLiabilityId: newLiability.defId } : e) };
+          }
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -1583,15 +1727,24 @@ function processReformCompletions(state: StrategyGameState): StrategyGameState {
   let ind = state.nationalIndicators;
   let hp = state.hiddenPolitics;
   let res = state.resources;
+  const completedReformIds: import("@/types/strategy").ReformId[] = [];
   const reforms = state.reforms.map((r) => {
     if (r.applied || state.mandateDay < r.completesAtDay) return r;
     const def = REFORMS[r.id];
     ind = applyIndicatorEffects(ind, def.indicatorBoost);
     hp = applyHiddenPoliticsEffects(hp, def.hiddenEffect);
     res = applyRewards(res, def.resourceBoost);
+    completedReformIds.push(r.id);
     return { ...r, applied: true };
   });
-  return { ...state, reforms, nationalIndicators: ind, hiddenPolitics: hp, resources: res };
+
+  // Liquider les passifs longue traîne couverts par les réformes complétées
+  let liabilities = state.longTailLiabilities ?? [];
+  for (const reformId of completedReformIds) {
+    liabilities = reduceLiabilitiesByReform(liabilities, reformId);
+  }
+
+  return { ...state, reforms, nationalIndicators: ind, hiddenPolitics: hp, resources: res, longTailLiabilities: liabilities };
 }
 
 function applyMinisterBonuses(state: StrategyGameState): StrategyGameState {
@@ -1662,6 +1815,30 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
     // Décroissance naturelle des pathologies discursives (-2 par palier de 10 jours)
     if (s.discoursePathology) {
       s = { ...s, discoursePathology: decayPathologies(s.discoursePathology, 2) };
+    }
+
+    // Récupération naturelle du pool de réassurance alliée (-8 stress tous les 10 jours)
+    if (s.reinsurancePool) {
+      s = { ...s, reinsurancePool: decayPoolStress(s.reinsurancePool) };
+    }
+
+    // Appétence au Risque — bonus de récupération du pool et dérive de la méfiance des marchés.
+    const riskDef = getRiskAppetiteDef(s.governanceDoctrine);
+    if (riskDef.poolStressDecayBonus > 0 && s.reinsurancePool) {
+      s = { ...s, reinsurancePool: { ...s.reinsurancePool, poolStress: Math.max(0, s.reinsurancePool.poolStress - riskDef.poolStressDecayBonus) } };
+    }
+    if (riskDef.marketSkepticismDrift !== 0 && s.catBondMarket) {
+      s = { ...s, catBondMarket: { ...s.catBondMarket, marketSkepticism: Math.min(100, Math.max(0, s.catBondMarket.marketSkepticism + riskDef.marketSkepticismDrift)) } };
+    }
+
+    // Passifs Longue Traîne — prélèvement périodique et croissance
+    if (s.longTailLiabilities && s.longTailLiabilities.length > 0) {
+      const periodResult = applyLiabilityPeriod(s.longTailLiabilities, s.resources.money, s.news.actionCount);
+      s = {
+        ...s,
+        resources: { ...s.resources, money: periodResult.money },
+        longTailLiabilities: periodResult.liabilities,
+      };
     }
 
     const doctrineDef = DOCTRINES[s.governanceDoctrine];

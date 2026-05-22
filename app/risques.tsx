@@ -8,6 +8,7 @@ import { useStrategy } from "@/context/StrategyContext";
 import { INSURANCE_PRODUCT_LIST } from "@/data/insuranceProducts";
 import { computeDynamicPremium, getRiskLabel } from "@/logic/insuranceEngine";
 import { CAT_BOND_DEF_LIST, computeEffectiveCapital, computeEffectiveCoupon, getMarketLabel } from "@/logic/catBondEngine";
+import { computeSolvencyScore, getSolvencyHint } from "@/logic/solvencyEngine";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
 export default function RisquesScreen() {
@@ -18,6 +19,7 @@ export default function RisquesScreen() {
   if (!state) return null;
 
   const policies = state.insurancePolicies ?? [];
+  const solvency = computeSolvencyScore(state);
 
   return (
     <View style={styles.root}>
@@ -39,6 +41,32 @@ export default function RisquesScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ─── SOLVABILITÉ NATIONALE ─── */}
+        <View style={[styles.solvencyBanner, { borderColor: solvency.color + "44", backgroundColor: solvency.color + "0d" }]}>
+          <View style={styles.solvencyTop}>
+            <View style={styles.solvencyLeft}>
+              <Text style={styles.solvencyKicker}>SOLVABILITÉ NATIONALE</Text>
+              <Text style={[styles.solvencyLabel, { color: solvency.color }]}>{solvency.label}</Text>
+            </View>
+            <View style={[styles.solvencyScoreBadge, { borderColor: solvency.color + "66", backgroundColor: solvency.color + "18" }]}>
+              <Text style={[styles.solvencyScoreNum, { color: solvency.color }]}>{solvency.score}</Text>
+              <Text style={[styles.solvencyScoreMax, { color: solvency.color + "99" }]}>/100</Text>
+            </View>
+          </View>
+          <View style={[styles.solvencyTrack, { backgroundColor: solvency.color + "20" }]}>
+            <View style={[styles.solvencyFill, { width: `${solvency.score}%`, backgroundColor: solvency.color }]} />
+          </View>
+          <Text style={styles.solvencyHint}>{getSolvencyHint(solvency.band)}</Text>
+          {solvency.premiumMultiplier > 1.0 && (
+            <View style={styles.solvencySurcharge}>
+              <MaterialCommunityIcons name="alert-outline" size={10} color={solvency.color} />
+              <Text style={[styles.solvencySurchargeText, { color: solvency.color }]}>
+                Surcoût assurance : +{Math.round((solvency.premiumMultiplier - 1) * 100)}% — solvabilité insuffisante
+              </Text>
+            </View>
+          )}
+        </View>
+
         {INSURANCE_PRODUCT_LIST.map((def) => {
           const policy = policies.find((p) => p.productId === def.id);
           const isActive = policy?.active ?? false;
@@ -300,6 +328,20 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 },
 
   content: { padding: 16, gap: 12 },
+
+  solvencyBanner: { borderRadius: RADIUS.md, borderWidth: 1, padding: 12, gap: 8 },
+  solvencyTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  solvencyLeft: { gap: 2 },
+  solvencyKicker: { fontSize: 7, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2 },
+  solvencyLabel: { fontSize: 13, fontFamily: FONT.bold },
+  solvencyScoreBadge: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "baseline", gap: 2 },
+  solvencyScoreNum: { fontSize: 22, fontFamily: FONT.bold },
+  solvencyScoreMax: { fontSize: 10, fontFamily: FONT.med },
+  solvencyTrack: { height: 4, borderRadius: 2, overflow: "hidden" },
+  solvencyFill: { height: 4, borderRadius: 2 },
+  solvencyHint: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14 },
+  solvencySurcharge: { flexDirection: "row", alignItems: "center", gap: 4 },
+  solvencySurchargeText: { fontSize: 9, fontFamily: FONT.semi },
 
   card: {
     borderRadius: RADIUS.md,

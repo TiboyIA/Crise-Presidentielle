@@ -1,5 +1,6 @@
 import type { InsurancePolicy, InsuranceProductId, NewsEvent, StrategyGameState } from "@/types/strategy";
 import { INSURANCE_PRODUCTS, type InsuranceProductDef } from "@/data/insuranceProducts";
+import { computeSolvencyScore } from "@/logic/solvencyEngine";
 
 // ── Risk multiplier ───────────────────────────────────────────────────────────
 // Returns 0.0 (no extra cost) → 0.8 (premium nearly doubled) based on neglected domain.
@@ -49,7 +50,8 @@ export function computeDynamicPremium(
   const def = INSURANCE_PRODUCTS[productId];
   const riskMultiplier = computeRiskMultiplier(productId, state);
   const claimMalus = (existingPolicy?.claimCount ?? 0) * CLAIM_MALUS;
-  return Math.round(def.basePremiumCost * (1 + riskMultiplier + claimMalus));
+  const solvencyMultiplier = computeSolvencyScore(state).premiumMultiplier;
+  return Math.round(def.basePremiumCost * (1 + riskMultiplier + claimMalus) * solvencyMultiplier);
 }
 
 // ── Event coverage ────────────────────────────────────────────────────────────

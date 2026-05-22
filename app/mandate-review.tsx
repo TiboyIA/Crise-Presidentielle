@@ -22,6 +22,9 @@ import { computeNationalTension, getTensionLevel, getTensionColor } from "@/logi
 import { computeReputationProfile, getTopDimensions } from "@/logic/reputationVectorEngine";
 import { getTopDecisions, getWeightLabel, getDecisionTier, DECISION_TIER_COLOR } from "@/logic/decisionWeightEngine";
 import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
+import { computeSolvencyScore } from "@/logic/solvencyEngine";
+import { LIABILITY_DEFS, LIABILITY_CATEGORY_LABELS, computeTotalExposure, getLiabilityColor } from "@/logic/longTailLiabilityEngine";
+import { getRiskAppetiteDef } from "@/logic/riskAppetiteEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -93,6 +96,7 @@ export default function MandateReviewScreen() {
   const mandateTension = computeNationalTension(state);
   const mandateTensionLevel = getTensionLevel(mandateTension);
   const mandateTensionColor = getTensionColor(mandateTensionLevel);
+  const solvency      = computeSolvencyScore(state);
   const reputation    = computeReputationProfile(state);
   const topDims       = getTopDimensions(reputation.vector, 3);
   const topDecisions  = getTopDecisions(
@@ -267,6 +271,45 @@ export default function MandateReviewScreen() {
           </View>
         </Panel>
 
+        {/* SOLVABILITÉ NATIONALE */}
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="bank-outline" size={14} color={solvency.color} />
+            <Text style={[styles.sectionTitle, { color: solvency.color }]}>SOLVABILITÉ NATIONALE</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={[styles.solvencyScore, { color: solvency.color }]}>{solvency.score}<Text style={styles.solvencyScoreMax}>/100</Text></Text>
+          </View>
+          <View style={styles.solvencyTrack}>
+            <View style={[styles.solvencyFill, { width: `${solvency.score}%`, backgroundColor: solvency.color }]} />
+          </View>
+          <Text style={[styles.solvencyLabel, { color: solvency.color }]}>{solvency.label}</Text>
+          <View style={styles.solvencyGrid}>
+            {([
+              { label: "Budget",   val: solvency.breakdown.budget,      max: 20 },
+              { label: "Dette",    val: solvency.breakdown.debt,         max: 20 },
+              { label: "Réserves",  val: solvency.breakdown.reserves,    max: 10 },
+              { label: "Sécurité", val: solvency.breakdown.stability,    max: 12 },
+              { label: "Cohésion", val: solvency.breakdown.cohesion,     max: 8  },
+              { label: "Cyber",    val: solvency.breakdown.cyberDefense, max: 10 },
+              { label: "Énergie",  val: solvency.breakdown.energy,       max: 5  },
+              { label: "Assurance",val: solvency.breakdown.insurance,    max: 8  },
+              { label: "Marchés",  val: solvency.breakdown.marketRisk,   max: 7  },
+            ] as { label: string; val: number; max: number }[]).map(({ label, val, max }) => {
+              const pct = val / max;
+              const barColor = pct >= 0.7 ? "#3fbe7a" : pct >= 0.4 ? "#e8a93a" : "#e54848";
+              return (
+                <View key={label} style={styles.solvencyItem}>
+                  <Text style={styles.solvencyItemLabel}>{label}</Text>
+                  <View style={styles.solvencyItemTrack}>
+                    <View style={[styles.solvencyItemFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: barColor }]} />
+                  </View>
+                  <Text style={[styles.solvencyItemVal, { color: barColor }]}>{val}/{max}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </Panel>
+
         {/* DOCTRINE & RÉFORMES DU MANDAT */}
         {(() => {
           const doctrine = DOCTRINES[state.governanceDoctrine];
@@ -285,6 +328,18 @@ export default function MandateReviewScreen() {
                   <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 2 }}>{doctrine.slogan}</Text>
                 </View>
               </View>
+              {(() => {
+                const appetite = getRiskAppetiteDef(state.governanceDoctrine);
+                return (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5, paddingHorizontal: 8, borderRadius: RADIUS.xs, backgroundColor: appetite.color + "14", borderWidth: 1, borderColor: appetite.color + "40", marginTop: 2 }}>
+                    <MaterialCommunityIcons name={appetite.icon as any} size={14} color={appetite.color} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: appetite.color }}>Appétence : {appetite.label}</Text>
+                      <Text style={{ fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1 }}>{appetite.description}</Text>
+                    </View>
+                  </View>
+                );
+              })()}
               {completedReforms.length > 0 && (
                 <View style={{ gap: 4 }}>
                   <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 2, marginTop: 4 }}>RÉFORMES ACCOMPLIES</Text>
@@ -484,6 +539,66 @@ export default function MandateReviewScreen() {
           </Panel>
         )}
 
+        {/* PASSIFS LONGUE TRAÎNE — uniquement si au moins un passif actif */}
+        {(state.longTailLiabilities ?? []).length > 0 && (() => {
+          const liabilities = state.longTailLiabilities!;
+          const totalExposure = computeTotalExposure(liabilities, state.news.actionCount);
+          return (
+            <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="clock-alert-outline" size={14} color="#e54848" />
+                <Text style={[styles.sectionTitle, { color: "#e54848" }]}>PASSIFS LONGUE TRAÎNE</Text>
+                <View style={{ flex: 1 }} />
+                {totalExposure > 0 && (
+                  <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: "#e54848", letterSpacing: 1 }}>
+                    {totalExposure} M€/période
+                  </Text>
+                )}
+              </View>
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {liabilities.map((l) => {
+                  const def = LIABILITY_DEFS[l.defId];
+                  const color = getLiabilityColor(l.defId);
+                  const active = state.news.actionCount >= l.triggerAfterActions;
+                  const growthPct = Math.round(((l.annualCost - l.initialCost) / l.initialCost) * 100);
+                  return (
+                    <View key={l.id} style={{ gap: 3 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: color }} />
+                        <Text style={{ fontSize: 10, fontFamily: FONT.bold, color, flex: 1 }}>{def.label}</Text>
+                        <Text style={{ fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1 }}>
+                          {LIABILITY_CATEGORY_LABELS[l.category].toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14 }} numberOfLines={2}>
+                        {l.description}
+                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: active ? "#e54848" : PALETTE.textLow }}>
+                          {active ? `${l.annualCost} M€/période` : "Dormant"}
+                        </Text>
+                        {growthPct > 0 && (
+                          <Text style={{ fontSize: 8, fontFamily: FONT.reg, color: "#e54848" }}>
+                            +{growthPct}% vs. initial
+                          </Text>
+                        )}
+                        <Text style={{ fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow }}>
+                          · Réforme : {def.reducedByReform}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#e5484833" }}>
+                <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 14 }}>
+                  Ces passifs grèvent le budget tous les 10 jours. Une réforme ciblée les liquide définitivement.
+                </Text>
+              </View>
+            </Panel>
+          );
+        })()}
+
         {/* ACHIEVEMENTS */}
         {state.achievements.length > 0 && (
           <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
@@ -672,4 +787,17 @@ const styles = StyleSheet.create({
   contradictionTheme: { fontSize: 8, fontFamily: FONT.bold, color: "#c44b4b", letterSpacing: 1.5 },
   contradictionStmt: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 13, fontStyle: "italic" },
   contradictionRisk: { fontSize: 11, fontFamily: FONT.bold, minWidth: 32, textAlign: "right" },
+
+  // Solvabilité
+  solvencyScore:     { fontSize: 16, fontFamily: FONT.bold },
+  solvencyScoreMax:  { fontSize: 10, fontFamily: FONT.med, color: PALETTE.textLow },
+  solvencyTrack:     { height: 5, borderRadius: 3, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  solvencyFill:      { height: "100%", borderRadius: 3 },
+  solvencyLabel:     { fontSize: 11, fontFamily: FONT.semi },
+  solvencyGrid:      { gap: 5 },
+  solvencyItem:      { flexDirection: "row", alignItems: "center", gap: 6 },
+  solvencyItemLabel: { fontSize: 9, fontFamily: FONT.med, color: PALETTE.textMid, width: 60 },
+  solvencyItemTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  solvencyItemFill:  { height: "100%", borderRadius: 2 },
+  solvencyItemVal:   { fontSize: 9, fontFamily: FONT.bold, width: 30, textAlign: "right" },
 });

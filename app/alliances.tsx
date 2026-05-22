@@ -12,6 +12,8 @@ import { useAuth } from "@/context/AuthContext";
 import { fetchAlliances, respondToAlliance, computeAllianceBonuses, ALLIANCE_BONUS_PER_ACTIVE, type Alliance } from "@/services/AllianceService";
 import { FEATURES } from "@/config/features";
 import { FeatureUnavailable } from "@/components/FeatureUnavailable";
+import { useStrategy } from "@/context/StrategyContext";
+import { computeCoverageRate, getPoolStressLabel, getPoolStressColor } from "@/logic/reinsurancePoolEngine";
 
 const STATUS_ICONS: Record<string, React.ComponentProps<typeof MaterialCommunityIcons>["name"]> = {
   pending:  "clock-outline",
@@ -53,6 +55,7 @@ export default function AlliancesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const auth = useAuth();
+  const { state } = useStrategy();
 
   const [alliances, setAlliances] = useState<Alliance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,6 +176,10 @@ export default function AlliancesScreen() {
           {active.length > 0 && (() => {
             const { rate } = computeAllianceBonuses(active);
             const bonusPct = Math.round(rate * 100);
+            const pool = state?.reinsurancePool ?? { poolStress: 0 };
+            const coveragePct = Math.round(computeCoverageRate(pool, active.length) * 100);
+            const stressLabel = getPoolStressLabel(pool.poolStress);
+            const stressColor = getPoolStressColor(pool.poolStress);
             return (
               <>
                 <Text style={styles.sectionLabel}>ALLIANCES ACTIVES</Text>
@@ -182,6 +189,16 @@ export default function AlliancesScreen() {
                     <Text style={styles.bonusTitle}>BONUS DIPLOMATIQUE ACTIF</Text>
                     <Text style={styles.bonusDesc}>
                       {`+${Math.round(ALLIANCE_BONUS_PER_ACTIVE * 100)}% par alliance — Bonus total : +${bonusPct}% production`}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.reinsuranceEncart}>
+                  <MaterialCommunityIcons name="shield-link-variant-outline" size={13} color="#4a9fff" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reinsuranceTitle}>POOL DE RÉASSURANCE ALLIÉE</Text>
+                    <Text style={styles.reinsuranceDesc}>
+                      {`Couverture : ${coveragePct}% des crises majeures · `}
+                      <Text style={{ color: stressColor }}>{`Pool : ${stressLabel}`}</Text>
                     </Text>
                   </View>
                 </View>
@@ -294,6 +311,16 @@ const styles = StyleSheet.create({
   },
   bonusTitle: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.success, letterSpacing: 2, marginBottom: 2 },
   bonusDesc:  { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 },
+
+  reinsuranceEncart: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    backgroundColor: "#4a9fff12",
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: "#4a9fff44",
+    padding: 12, marginBottom: 4,
+  },
+  reinsuranceTitle: { fontSize: 8, fontFamily: FONT.bold, color: "#4a9fff", letterSpacing: 2, marginBottom: 2 },
+  reinsuranceDesc:  { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 },
 
   row: {
     flexDirection: "row", alignItems: "center", gap: 12,
