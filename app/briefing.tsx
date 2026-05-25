@@ -435,6 +435,13 @@ export default function BriefingScreen() {
               <Text style={styles.ctaText}>VOIR LE JOURNAL DE CRISE</Text>
             </LinearGradient>
           </Pressable>
+          <Pressable
+            onPress={() => router.push("/weather-room")}
+            style={({ pressed }) => [styles.weatherBtn, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <MaterialCommunityIcons name="weather-cloudy" size={14} color="#4a9fff" />
+            <Text style={styles.weatherBtnText}>SALLE MÉTÉO NATIONALE</Text>
+          </Pressable>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.dismissBtn, { opacity: pressed ? 0.6 : 1 }]}>
             <Text style={styles.dismissText}>Fermer le briefing</Text>
           </Pressable>
@@ -509,6 +516,13 @@ const styles = StyleSheet.create({
   ctaText: { fontSize: 12, fontFamily: FONT.bold, color: "#fff", letterSpacing: 2 },
   dismissBtn: { alignItems: "center", paddingVertical: 10 },
   dismissText: { fontSize: 12, fontFamily: FONT.med, color: PALETTE.textLow, letterSpacing: 0.5 },
+  weatherBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingVertical: 12, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: "#4a9fff44",
+    backgroundColor: "#4a9fff0d",
+  },
+  weatherBtnText: { fontSize: 11, fontFamily: FONT.bold, color: "#4a9fff", letterSpacing: 2 },
 
   mediaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   mediaName: { flex: 1, fontSize: 11, fontFamily: FONT.med, color: PALETTE.textMid },
