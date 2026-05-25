@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useComfort, PROFILE_LIST } from "@/context/ComfortContext";
+import { isDevSandboxEnabled } from "@/config/devSandbox";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
 export default function SettingsScreen() {
@@ -260,6 +261,30 @@ export default function SettingsScreen() {
           <Row icon="earth" label="Mode" value="Stratégie mondiale" />
           <Row icon="shield-lock-outline" label="Données" value="Stockage local uniquement" />
         </View>
+
+        {/* Accès bac à sable — invisible en production */}
+        {isDevSandboxEnabled() && (
+          <>
+            <Text style={styles.sectionLabel}>DÉVELOPPEUR</Text>
+            <View style={styles.card}>
+              <Pressable
+                onPress={() => router.push("/dev-sandbox" as any)}
+                style={({ pressed }) => [styles.resetBtn, { borderLeftColor: "#ff6b3588", opacity: pressed ? 0.75 : 1 }]}
+              >
+                <MaterialCommunityIcons name="flask-outline" size={16} color="#ff6b35" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.resetBtnTitle, { color: "#ff6b35" }]}>
+                    Bac à sable développeur
+                  </Text>
+                  <Text style={styles.resetBtnSub}>
+                    Tests et mutations d'état — partie normale non affectée.
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={16} color="#ff6b3588" />
+              </Pressable>
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );

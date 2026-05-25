@@ -19,6 +19,7 @@ import {
   CABINET_HEADER,
   MINISTER_BADGE_IMAGES,
 } from "@/data/cabinetImages";
+import { computeHumanCapital } from "@/logic/humanCapitalEngine";
 
 export default function CabinetScreen() {
   const colors = useColors();
@@ -62,6 +63,7 @@ export default function CabinetScreen() {
     (m) => m.scandalRisk >= 60 && m.scandals === 0,
   );
   const hasInternalAlerts = rivals.length > 0 || atRisk.length > 0;
+  const hc = computeHumanCapital(state.ministers);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -112,6 +114,23 @@ export default function CabinetScreen() {
               {state.ministers.length}
             </Text>
           </View>
+        </View>
+
+        {/* Capital humain — indicateur RH global, valeur dérivée non stockée */}
+        <View style={[styles.hcCard, { backgroundColor: colors.card, borderColor: hc.color + "55" }]}>
+          <View style={styles.hcRow}>
+            <Text style={[styles.hcLabel, { color: colors.mutedForeground }]}>
+              CAPITAL HUMAIN DU GOUVERNEMENT
+            </Text>
+            <Text style={[styles.hcScore, { color: hc.color }]}>{hc.score}</Text>
+          </View>
+          <View style={styles.hcBarTrack}>
+            <View style={[styles.hcBarFill, { width: `${hc.score}%`, backgroundColor: hc.color }]} />
+          </View>
+          <Text style={[styles.hcTierLabel, { color: hc.color }]}>{hc.label}</Text>
+          {hc.effects.map((e, i) => (
+            <Text key={i} style={[styles.hcEffect, { color: colors.mutedForeground }]}>· {e}</Text>
+          ))}
         </View>
 
         {hasInternalAlerts ? (
@@ -206,6 +225,47 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     height: 32,
+  },
+  hcCard: {
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginBottom: 6,
+    gap: 5,
+  },
+  hcRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  hcLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+    flex: 1,
+  },
+  hcScore: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
+  hcBarTrack: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  hcBarFill: {
+    height: 3,
+    borderRadius: 2,
+  },
+  hcTierLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+  },
+  hcEffect: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 16,
   },
   internalCard: {
     padding: 12,
