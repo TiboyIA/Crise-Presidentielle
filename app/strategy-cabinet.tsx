@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
@@ -20,6 +20,10 @@ import {
   CONFLICT_DEFS,
   type ConflictResolution,
 } from "@/logic/cabinetConflictEngine";
+import {
+  evaluateCabinetPerformance, summarizeCabinetHealth,
+  RATING_INFO, type MinisterPerformanceReport,
+} from "@/logic/ministerPerformanceReview";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
@@ -372,6 +376,23 @@ function MinisterFullCard({
   );
 }
 
+// ── Ligne de bilan ministériel ────────────────────────────────────────────────
+
+function PerformanceRow({ report }: { report: MinisterPerformanceReport }) {
+  const def = STRATEGY_MINISTERS[report.ministerId as StrategyMinisterId];
+  if (!def) return null;
+  const displayName = def.name.split(" ")[0]; // prénom uniquement
+  return (
+    <View style={styles.perfRow}>
+      <Text style={styles.perfName} numberOfLines={1}>{displayName}</Text>
+      <View style={[styles.perfBadge, { backgroundColor: report.color + "22", borderColor: report.color + "55" }]}>
+        <Text style={[styles.perfBadgeText, { color: report.color }]}>{report.label}</Text>
+      </View>
+      <Text style={styles.perfSummary} numberOfLines={1}>{report.summary}</Text>
+    </View>
+  );
+}
+
 // ── Écran principal ───────────────────────────────────────────────────────────
 
 export default function StrategyCabinetScreen() {
@@ -379,10 +400,22 @@ export default function StrategyCabinetScreen() {
   const insets  = useSafeAreaInsets();
   const { state, appointMinister, restMinister, delegateMinister, fireMinister, arbitrateConflict } = useStrategy();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [bilanExpanded, setBilanExpanded] = useState(false);
 
   if (!state) return null;
 
   const fatigueMap = state.ministerFatigue ?? {};
+
+  const performanceReports = useMemo(
+    () => evaluateCabinetPerformance(state),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.strategyMinisters, state.ministerFatigue, state.cabinetConflicts, state.nationalIndicators],
+  );
+  const cabinetHealth = useMemo(
+    () => summarizeCabinetHealth(performanceReports),
+    [performanceReports],
+  );
+  const warningCount = cabinetHealth.countByRating.fragile + cabinetHealth.replacementCount;
 
   const toggle = (id: string) => setExpandedId((prev) => (prev === id ? null : id));
 
@@ -454,6 +487,32 @@ export default function StrategyCabinetScreen() {
           </>
         )}
 
+        {/* Bilan périodique — toujours visible, contenu collapsible */}
+        <Pressable
+          onPress={() => setBilanExpanded((v) => !v)}
+          style={({ pressed }) => [styles.bilanHeader, { opacity: pressed ? 0.8 : 1 }]}
+        >
+          <MaterialCommunityIcons name="clipboard-text-outline" size={13} color={PALETTE.gold} />
+          <Text style={styles.bilanHeaderTitle}>BILAN PÉRIODIQUE</Text>
+          <Text style={styles.bilanHeaderSub}>
+            {warningCount > 0
+              ? `${warningCount} ministres à surveiller`
+              : `Cabinet en bonne santé · moy. ${cabinetHealth.avgScore}`}
+          </Text>
+          <MaterialCommunityIcons
+            name={bilanExpanded ? "chevron-up" : "chevron-down"}
+            size={13}
+            color={warningCount > 0 ? PALETTE.warning : PALETTE.textLow}
+          />
+        </Pressable>
+        {bilanExpanded && (
+          <View style={styles.bilanPanel}>
+            {performanceReports.map((r) => (
+              <PerformanceRow key={r.ministerId} report={r} />
+            ))}
+          </View>
+        )}
+
         <Text style={styles.sectionLabel}>CABINET PRINCIPAL</Text>
         {CABINET_PRIMARY.map((id) => (
           <MinisterFullCard
@@ -509,6 +568,49 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2.5,
     color: PALETTE.gold, marginTop: 8, marginBottom: 4, marginLeft: 2,
+  },
+
+  // ── Bilan périodique ────────────────────────────────────────────────────────
+  bilanHeader: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.gold + "33",
+    marginBottom: 0,
+  },
+  bilanHeaderTitle: {
+    fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2, color: PALETTE.gold,
+  },
+  bilanHeaderSub: {
+    flex: 1, fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow,
+  },
+  bilanPanel: {
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    overflow: "hidden",
+    marginTop: 1, marginBottom: 4,
+  },
+  perfRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.panelEdge,
+  },
+  perfName: {
+    fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, width: 66,
+  },
+  perfBadge: {
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    minWidth: 70, alignItems: "center",
+  },
+  perfBadgeText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  perfSummary: {
+    flex: 1, fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid,
   },
 
   // ── Carte ministre ──────────────────────────────────────────────────────────
