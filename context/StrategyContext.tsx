@@ -102,6 +102,7 @@ import {
   canStartTraining,
 } from "@/logic/trainingEngine";
 import type { TrainingId } from "@/data/trainingPrograms";
+import { applyGovernmentCulture } from "@/logic/governmentCultureEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -172,6 +173,7 @@ import type {
   DecisionTrace,
   DelayedConsequence,
   GovernanceDoctrine,
+  GovernmentCultureId,
   HiddenPolitics,
   NationalIndicators,
   OperationType,
@@ -335,6 +337,7 @@ interface StrategyContextValue {
   appointMinister: (ministerId: string, candidate: MinisterCandidate) => void;
   arbitrateConflict: (conflictId: string, resolution: ConflictResolution) => void;
   startMinisterTraining: (ministerId: string, programId: TrainingId) => { success: boolean; reason?: string };
+  setGovernmentCulture: (id: GovernmentCultureId | null) => void;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1712,6 +1715,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update, state],
   );
 
+  const setGovernmentCulture = useCallback(
+    (id: GovernmentCultureId | null) => {
+      update((prev) => ({ ...prev, governmentCulture: id ?? undefined }));
+    },
+    [update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1829,7 +1839,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform,
       fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
-      startMinisterTraining,
+      startMinisterTraining, setGovernmentCulture,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1845,7 +1855,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
-      startMinisterTraining,
+      startMinisterTraining, setGovernmentCulture,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
@@ -2021,6 +2031,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = { ...s, news: queueNews(s.news, "opposition_rise") };
     }
     s = { ...s, oppositionPower: newOpposition };
+
+    // Culture de gouvernement — effets périodiques
+    s = applyGovernmentCulture(s);
 
     // Détection des conflits internes (tous les 10 jours)
     s = { ...s, cabinetConflicts: detectCabinetConflicts(s) };

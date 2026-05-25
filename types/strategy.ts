@@ -260,6 +260,14 @@ export type GovernanceDoctrine =
   | "democratique" | "technocratique" | "securitaire" | "populiste" | "autoritaire"
   | "souverainiste" | "ecologiste" | "liberal";
 
+export type GovernmentCultureId =
+  | "discipline"
+  | "innovation"
+  | "transparence"
+  | "loyaute"
+  | "technocratie"
+  | "urgence_permanente";
+
 export type ReformId =
   | "fiscal" | "securite" | "energie" | "industrie"
   | "cyber" | "diplomatique" | "sociale" | "education";
@@ -769,4 +777,6 @@ export interface StrategyGameState {
   cabinetConflicts?: CabinetConflict[];
   // Formations ministérielles en cours — optional for backward compat
   activeTrainings?: Record<string, ActiveTraining>; // keyed by ministerId
+  // Culture de gouvernement — optional for backward compat (null = aucune)
+  governmentCulture?: GovernmentCultureId;
 }

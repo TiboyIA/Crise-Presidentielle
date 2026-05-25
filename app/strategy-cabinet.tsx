@@ -29,6 +29,11 @@ import {
   type TrainingId,
 } from "@/data/trainingPrograms";
 import { getMinisterTraining } from "@/logic/trainingEngine";
+import {
+  GOVERNMENT_CULTURES, CULTURE_LIST,
+  type GovernmentCultureDef,
+} from "@/logic/governmentCultureEngine";
+import type { GovernmentCultureId } from "@/types/strategy";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
@@ -513,9 +518,10 @@ function PerformanceRow({ report }: { report: MinisterPerformanceReport }) {
 export default function StrategyCabinetScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
-  const { state, appointMinister, restMinister, delegateMinister, fireMinister, arbitrateConflict } = useStrategy();
+  const { state, appointMinister, restMinister, delegateMinister, fireMinister, arbitrateConflict, setGovernmentCulture } = useStrategy();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bilanExpanded, setBilanExpanded] = useState(false);
+  const [cultureExpanded, setCultureExpanded] = useState(false);
 
   if (!state) return null;
 
@@ -602,6 +608,83 @@ export default function StrategyCabinetScreen() {
           </>
         )}
 
+        {/* Culture de gouvernement — sélecteur compact collapsible */}
+        {(() => {
+          const currentCulture = state.governmentCulture
+            ? GOVERNMENT_CULTURES[state.governmentCulture]
+            : null;
+          return (
+            <>
+              <Pressable
+                onPress={() => setCultureExpanded((v) => !v)}
+                style={({ pressed }) => [styles.cultureHeader, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <MaterialCommunityIcons
+                  name={currentCulture ? (currentCulture.icon as any) : "office-building-cog-outline"}
+                  size={13}
+                  color={currentCulture?.color ?? PALETTE.textLow}
+                />
+                <Text style={styles.cultureHeaderTitle}>CULTURE</Text>
+                <Text style={[styles.cultureHeaderCurrent, { color: currentCulture?.color ?? PALETTE.textLow }]}>
+                  {currentCulture?.name ?? "Aucune"}
+                </Text>
+                <MaterialCommunityIcons
+                  name={cultureExpanded ? "chevron-up" : "chevron-down"}
+                  size={13}
+                  color={PALETTE.textLow}
+                />
+              </Pressable>
+              {cultureExpanded && (
+                <View style={styles.culturePanel}>
+                  {CULTURE_LIST.map((def) => {
+                    const isActive = state.governmentCulture === def.id;
+                    return (
+                      <Pressable
+                        key={def.id}
+                        onPress={() => {
+                          if (!isActive) {
+                            Alert.alert(
+                              `Adopter : ${def.name}`,
+                              `${def.tagline}\n\n✅ ${def.benefits[0]}\n✅ ${def.benefits[1]}\n⚠️ ${def.drawbacks[0]}\n⚠️ ${def.drawbacks[1]}`,
+                              [
+                                { text: "Annuler", style: "cancel" },
+                                { text: "Confirmer", onPress: () => { setGovernmentCulture(def.id); setCultureExpanded(false); } },
+                              ],
+                            );
+                          } else {
+                            Alert.alert(
+                              `Retirer la culture ${def.name}`,
+                              "Le gouvernement fonctionnera sans culture définie.",
+                              [
+                                { text: "Annuler", style: "cancel" },
+                                { text: "Retirer", style: "destructive", onPress: () => setGovernmentCulture(null) },
+                              ],
+                            );
+                          }
+                        }}
+                        style={({ pressed }) => [
+                          styles.cultureOption,
+                          isActive && { borderColor: def.color + "66", backgroundColor: def.color + "0d" },
+                          { opacity: pressed ? 0.8 : 1 },
+                        ]}
+                      >
+                        <View style={[styles.cultureDot, { backgroundColor: def.color }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.cultureOptionName, isActive && { color: def.color }]}>{def.name}</Text>
+                          <Text style={styles.cultureOptionTagline} numberOfLines={1}>{def.tagline}</Text>
+                        </View>
+                        {isActive && (
+                          <MaterialCommunityIcons name="check-circle" size={14} color={def.color} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </>
+          );
+        })()}
+
         {/* Bilan périodique — toujours visible, contenu collapsible */}
         <Pressable
           onPress={() => setBilanExpanded((v) => !v)}
@@ -683,6 +766,47 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2.5,
     color: PALETTE.gold, marginTop: 8, marginBottom: 4, marginLeft: 2,
+  },
+
+  // ── Culture de gouvernement ─────────────────────────────────────────────────
+  cultureHeader: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+  },
+  cultureHeaderTitle: {
+    fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2, color: PALETTE.textLow,
+  },
+  cultureHeaderCurrent: {
+    flex: 1, fontSize: 11, fontFamily: FONT.bold,
+  },
+  culturePanel: {
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    overflow: "hidden",
+    marginTop: 1,
+  },
+  cultureOption: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 12, paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.panelEdge,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "transparent",
+  },
+  cultureDot: {
+    width: 8, height: 8, borderRadius: 4,
+  },
+  cultureOptionName: {
+    fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh,
+  },
+  cultureOptionTagline: {
+    fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1,
   },
 
   // ── Bilan périodique ────────────────────────────────────────────────────────
