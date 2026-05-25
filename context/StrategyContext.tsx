@@ -89,6 +89,7 @@ import {
   applyRestAction,
   applyDelegateAction,
 } from "@/logic/ministerBurnoutEngine";
+import { tickAdministrationMorale } from "@/logic/administrationMoraleEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -1988,10 +1989,13 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
     s = { ...s, oppositionPower: newOpposition };
   }
 
-  // Tick fatigue RH ministres (une fois par avancée, cap à 7j pour éviter les rattrapages excessifs)
+  // Tick fatigue RH + moral administratif (cap à 7j pour éviter les rattrapages excessifs)
   if (days > 0) {
     const clampedDays = Math.min(days, 7);
-    for (let d = 0; d < clampedDays; d++) s = tickMinisterFatigue(s);
+    for (let d = 0; d < clampedDays; d++) {
+      s = tickMinisterFatigue(s);
+      s = tickAdministrationMorale(s);
+    }
   }
 
   // Check achievements

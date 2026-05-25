@@ -28,6 +28,7 @@ import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
 import { useComfort } from "@/context/ComfortContext";
 import { getFatigueTier } from "@/logic/ministerBurnoutEngine";
+import { getMoraleTier } from "@/logic/administrationMoraleEngine";
 import { LowLoadBanner } from "@/components/LowLoadBanner";
 import { isRankedIntended } from "@/services/RankedService";
 import { computeFrustration, BAND_LABELS, BAND_COLORS } from "@/logic/frustrationEngine";
@@ -611,6 +612,22 @@ export default function NationScreen() {
               </View>
             );
           })()}
+          {/* Moral administratif — discret, visible uniquement si dégradé */}
+          {(state.administrationMorale ?? 60) < 80 && (() => {
+            const morale = state.administrationMorale ?? 60;
+            const mt = getMoraleTier(morale);
+            return (
+              <View style={styles.moraleRow}>
+                <MaterialCommunityIcons name="account-group-outline" size={11} color={mt.color} />
+                <Text style={[styles.moraleLabel, { color: mt.color }]}>ADMINISTRATION</Text>
+                <View style={styles.moraleTrack}>
+                  <View style={[styles.moraleFill, { width: `${morale}%`, backgroundColor: mt.color }]} />
+                </View>
+                <Text style={[styles.moraleVal, { color: mt.color }]}>{mt.label}</Text>
+              </View>
+            );
+          })()}
+
           {/* Primary ministers */}
           <View style={styles.cabinetGrid}>
             {state.strategyMinisters
@@ -1107,6 +1124,12 @@ const styles = StyleSheet.create({
 
   cabinetNavBtn: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.xs, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.gold + "55", backgroundColor: PALETTE.gold + "0d" },
   cabinetNavBtnText: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
+
+  moraleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  moraleLabel: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1.5, width: 90 },
+  moraleTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
+  moraleFill: { height: "100%", borderRadius: 2 },
+  moraleVal: { fontSize: 8, fontFamily: FONT.semi, letterSpacing: 0.3, flexShrink: 0 },
 
   // Daily reward card
   rewardCard: {

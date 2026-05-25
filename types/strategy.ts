@@ -739,4 +739,6 @@ export interface StrategyGameState {
   longTailLiabilities?: LongTailLiability[];
   // Fatigue RH des ministres — optional for backward compat
   ministerFatigue?: Record<string, number>;
+  // Moral de l'administration — optional for backward compat (default 60)
+  administrationMorale?: number;
 }
