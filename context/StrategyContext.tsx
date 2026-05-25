@@ -103,6 +103,12 @@ import {
 } from "@/logic/trainingEngine";
 import type { TrainingId } from "@/data/trainingPrograms";
 import { applyGovernmentCulture } from "@/logic/governmentCultureEngine";
+import {
+  tickTalentDrain,
+  applyPlanModernisationRH,
+  applyReconnaissancePublique,
+  applyStabilisationCabinet,
+} from "@/logic/publicTalentDrainEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -338,6 +344,9 @@ interface StrategyContextValue {
   arbitrateConflict: (conflictId: string, resolution: ConflictResolution) => void;
   startMinisterTraining: (ministerId: string, programId: TrainingId) => { success: boolean; reason?: string };
   setGovernmentCulture: (id: GovernmentCultureId | null) => void;
+  planModernisationRH: () => { success: boolean; reason?: string };
+  reconnaissancePublique: () => { success: boolean; reason?: string };
+  stabilisationCabinet: () => void;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1722,6 +1731,47 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const planModernisationRH = useCallback(
+    (): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let result: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = applyPlanModernisationRH(prev);
+        result = { success: r.success, reason: r.reason };
+        if (!r.success || !r.newState) return prev;
+        return withNews(r.newState);
+      });
+      return result;
+    },
+    [state, update],
+  );
+
+  const reconnaissancePublique = useCallback(
+    (): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let result: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = applyReconnaissancePublique(prev);
+        result = { success: r.success, reason: r.reason };
+        if (!r.success || !r.newState) return prev;
+        return withNews(r.newState);
+      });
+      return result;
+    },
+    [state, update],
+  );
+
+  const stabilisationCabinet = useCallback(
+    (): void => {
+      update((prev) => {
+        const r = applyStabilisationCabinet(prev);
+        if (!r.newState) return prev;
+        return withNews(r.newState);
+      });
+    },
+    [update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1840,6 +1890,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform,
       fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
+      planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1856,6 +1907,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
+      planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
@@ -2034,6 +2086,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Culture de gouvernement — effets périodiques
     s = applyGovernmentCulture(s);
+
+    // Fuite des talents publics — recalcul + effets
+    s = tickTalentDrain(s);
 
     // Détection des conflits internes (tous les 10 jours)
     s = { ...s, cabinetConflicts: detectCabinetConflicts(s) };

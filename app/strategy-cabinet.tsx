@@ -33,6 +33,9 @@ import {
   GOVERNMENT_CULTURES, CULTURE_LIST,
   type GovernmentCultureDef,
 } from "@/logic/governmentCultureEngine";
+import {
+  getTalentDrainTier,
+} from "@/logic/publicTalentDrainEngine";
 import type { GovernmentCultureId } from "@/types/strategy";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
@@ -518,7 +521,12 @@ function PerformanceRow({ report }: { report: MinisterPerformanceReport }) {
 export default function StrategyCabinetScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
-  const { state, appointMinister, restMinister, delegateMinister, fireMinister, arbitrateConflict, setGovernmentCulture } = useStrategy();
+  const {
+    state,
+    appointMinister, restMinister, delegateMinister, fireMinister,
+    arbitrateConflict, setGovernmentCulture,
+    planModernisationRH, reconnaissancePublique, stabilisationCabinet,
+  } = useStrategy();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bilanExpanded, setBilanExpanded] = useState(false);
   const [cultureExpanded, setCultureExpanded] = useState(false);
@@ -682,6 +690,87 @@ export default function StrategyCabinetScreen() {
                 </View>
               )}
             </>
+          );
+        })()}
+
+        {/* Fuite des talents — indicateur discret + 3 leviers */}
+        {(() => {
+          const score = state.talentDrainScore ?? 15;
+          const tier  = getTalentDrainTier(score);
+          return (
+            <View style={styles.drainBlock}>
+              <View style={styles.drainRow}>
+                <MaterialCommunityIcons name="account-arrow-right-outline" size={13} color={tier.color} />
+                <Text style={styles.drainLabel}>FUITE DES TALENTS</Text>
+                <View style={[styles.drainBadge, { backgroundColor: tier.color + "22", borderColor: tier.color + "55" }]}>
+                  <Text style={[styles.drainBadgeText, { color: tier.color }]}>{tier.label} · {score}</Text>
+                </View>
+              </View>
+              <View style={styles.drainActions}>
+                <Pressable
+                  style={({ pressed }) => [styles.drainBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => {
+                    Alert.alert(
+                      "Plan de modernisation RH",
+                      "Restructuration des conditions de travail et des parcours de carrière.\n\nCoût : 200M€ + 30 influence\nEffet : Fuite −25 · Moral admin. +8",
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        {
+                          text: "Lancer le plan",
+                          onPress: () => {
+                            const r = planModernisationRH();
+                            if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur");
+                          },
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <Text style={styles.drainBtnText}>Plan RH</Text>
+                  <Text style={styles.drainBtnCost}>200M€ + 30🎭</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.drainBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => {
+                    Alert.alert(
+                      "Reconnaissance publique",
+                      "Discours de valorisation du service public. Signal fort, effet immédiat.\n\nCoût : 40 influence\nEffet : Fuite −12 · Moral admin. +6",
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        {
+                          text: "Prononcer le discours",
+                          onPress: () => {
+                            const r = reconnaissancePublique();
+                            if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur");
+                          },
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <Text style={styles.drainBtnText}>Reconnaissance</Text>
+                  <Text style={styles.drainBtnCost}>40🎭</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.drainBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => {
+                    const adminMorale = state.administrationMorale ?? 60;
+                    const reduction   = adminMorale >= 50 ? 15 : 8;
+                    Alert.alert(
+                      "Stabilisation du cabinet",
+                      `Mesures internes de cohésion et de soutien aux équipes.\n\nSans coût direct.\nEffet : Fuite −${reduction}`,
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        { text: "Confirmer", onPress: () => stabilisationCabinet() },
+                      ],
+                    );
+                  }}
+                >
+                  <Text style={styles.drainBtnText}>Stabilisation</Text>
+                  <Text style={styles.drainBtnCost}>Gratuit</Text>
+                </Pressable>
+              </View>
+            </View>
           );
         })()}
 
@@ -850,6 +939,46 @@ const styles = StyleSheet.create({
   perfBadgeText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
   perfSummary: {
     flex: 1, fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid,
+  },
+
+  // ── Fuite des talents ────────────────────────────────────────────────────────
+  drainBlock: {
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 4, gap: 8,
+  },
+  drainRow: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+  },
+  drainLabel: {
+    fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2, color: PALETTE.textLow,
+    flex: 1,
+  },
+  drainBadge: {
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+  },
+  drainBadgeText: {
+    fontSize: 9, fontFamily: FONT.bold,
+  },
+  drainActions: {
+    flexDirection: "row", gap: 6,
+  },
+  drainBtn: {
+    flex: 1, backgroundColor: PALETTE.panelHi,
+    borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    paddingVertical: 7, paddingHorizontal: 6,
+    alignItems: "center", gap: 2,
+  },
+  drainBtnText: {
+    fontSize: 9, fontFamily: FONT.semi, color: PALETTE.textHigh,
+  },
+  drainBtnCost: {
+    fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow,
   },
 
   // ── Carte ministre ──────────────────────────────────────────────────────────

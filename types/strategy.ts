@@ -779,4 +779,6 @@ export interface StrategyGameState {
   activeTrainings?: Record<string, ActiveTraining>; // keyed by ministerId
   // Culture de gouvernement — optional for backward compat (null = aucune)
   governmentCulture?: GovernmentCultureId;
+  // Fuite des talents publics — optional for backward compat (default 15)
+  talentDrainScore?: number;
 }
