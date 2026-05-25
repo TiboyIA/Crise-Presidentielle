@@ -19,6 +19,7 @@ import {
 } from "@/logic/operationWeatherModifier";
 import type { WeatherTypeId } from "@/data/weatherEvents";
 import { OPERATION_IMG } from "@/constants/assets";
+import { getOperationNarrative, getBlockedNarrative } from "@/data/operationNarratives";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { RESOURCE_LABELS } from "@/types/strategy";
 import type { CountryId, OperationType, ResourceKey } from "@/types/strategy";
@@ -32,7 +33,7 @@ export default function OperationsScreen() {
   const { state, launchOperation } = useStrategy();
   const { hPad } = useResponsive();
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId | null>(params.countryId ?? null);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ success: boolean; message: string; narrativeTitle?: string; narrativeBody?: string } | null>(null);
   const { run, isPending } = useCommand();
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (resultTimerRef.current) clearTimeout(resultTimerRef.current); }, []);
@@ -65,9 +66,10 @@ export default function OperationsScreen() {
       resultTimerRef.current = setTimeout(() => setResult(null), 1500);
       return;
     }
-    setResult(res);
+    const narrative = getOperationNarrative(type, res.success);
+    setResult({ ...res, narrativeTitle: narrative.title, narrativeBody: narrative.body });
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
-    resultTimerRef.current = setTimeout(() => setResult(null), 4000);
+    resultTimerRef.current = setTimeout(() => setResult(null), 7000);
   };
 
   const handleLaunch = (type: OperationType) => {
@@ -99,9 +101,28 @@ export default function OperationsScreen() {
       <ScreenHeader title="Centre d'opérations" kicker="ACTIONS COVERTES" />
 
       {result && (
-        <View style={[styles.resultBanner, { marginHorizontal: hPad, borderColor: result.success ? PALETTE.success : PALETTE.danger, backgroundColor: result.success ? PALETTE.success + "1c" : PALETTE.danger + "1c" }]}>
-          <MaterialCommunityIcons name={result.success ? "check-circle-outline" : "alert-octagon-outline"} size={16} color={result.success ? PALETTE.success : PALETTE.danger} />
-          <Text style={[styles.resultText, { color: result.success ? PALETTE.success : PALETTE.danger }]}>{result.message}</Text>
+        <View style={[
+          styles.resultBanner,
+          { marginHorizontal: hPad, borderColor: result.success ? PALETTE.success + "55" : PALETTE.danger + "55", backgroundColor: result.success ? PALETTE.success + "12" : PALETTE.danger + "12" },
+        ]}>
+          <MaterialCommunityIcons
+            name={result.success ? "check-circle-outline" : "alert-octagon-outline"}
+            size={18}
+            color={result.success ? PALETTE.success : PALETTE.danger}
+            style={{ marginTop: 2 }}
+          />
+          <View style={{ flex: 1, gap: 3 }}>
+            {result.narrativeTitle ? (
+              <>
+                <Text style={[styles.resultTitle, { color: result.success ? PALETTE.success : PALETTE.danger }]}>
+                  {result.narrativeTitle}
+                </Text>
+                <Text style={styles.resultNarrative}>{result.narrativeBody}</Text>
+              </>
+            ) : (
+              <Text style={[styles.resultText, { color: result.success ? PALETTE.success : PALETTE.danger }]}>{result.message}</Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -229,18 +250,34 @@ export default function OperationsScreen() {
                       </View>
 
                       {/* Status messages */}
-                      {!check.allowed && (
-                        <View style={styles.statusRow}>
-                          <MaterialCommunityIcons name="lock-outline" size={12} color={PALETTE.danger} />
-                          <Text style={[styles.statusText, { color: PALETTE.danger }]}>{check.reason}</Text>
-                        </View>
-                      )}
-                      {onCooldown && check.allowed && (
-                        <View style={styles.statusRow}>
-                          <MaterialCommunityIcons name="timer-sand" size={12} color={PALETTE.warning} />
-                          <Text style={[styles.statusText, { color: PALETTE.warning }]}>Rechargement en cours</Text>
-                        </View>
-                      )}
+                      {!check.allowed && (() => {
+                        const bn = getBlockedNarrative(check.reason ?? "");
+                        return (
+                          <View style={{ gap: 4 }}>
+                            <View style={styles.statusRow}>
+                              <MaterialCommunityIcons name="lock-outline" size={12} color={PALETTE.danger} />
+                              <Text style={[styles.statusText, { color: PALETTE.danger }]}>{bn.title}</Text>
+                            </View>
+                            {!reducedInfo && (
+                              <Text style={styles.blockedNarrative}>{bn.body}</Text>
+                            )}
+                          </View>
+                        );
+                      })()}
+                      {onCooldown && check.allowed && (() => {
+                        const bn = getBlockedNarrative("cooldown");
+                        return (
+                          <View style={{ gap: 4 }}>
+                            <View style={styles.statusRow}>
+                              <MaterialCommunityIcons name="timer-sand" size={12} color={PALETTE.warning} />
+                              <Text style={[styles.statusText, { color: PALETTE.warning }]}>{bn.title}</Text>
+                            </View>
+                            {!reducedInfo && (
+                              <Text style={styles.blockedNarrative}>{bn.body}</Text>
+                            )}
+                          </View>
+                        );
+                      })()}
 
                       {hasResearchBonus && !reducedInfo && (
                         <View style={styles.statusRow}>
@@ -285,8 +322,11 @@ export default function OperationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PALETTE.ink },
-  resultBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, padding: 12, borderRadius: RADIUS.sm, borderWidth: 1 },
+  resultBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 8, padding: 12, borderRadius: RADIUS.sm, borderWidth: 1 },
+  resultTitle: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  resultNarrative: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 17 },
   resultText: { fontSize: 12, fontFamily: FONT.bold, flex: 1 },
+  blockedNarrative: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, fontStyle: "italic", lineHeight: 15, paddingLeft: 18 },
   content: { paddingTop: 12, gap: 10 },
   // note: gap is overridden inline when comfort enabled
   changeLink: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold },
