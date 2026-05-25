@@ -784,4 +784,7 @@ export interface StrategyGameState {
   // Cellule de crise interministérielle — optional for backward compat
   lastStaffingAt?: number;    // news.actionCount de la dernière activation
   staffingUseCount?: number;  // total d'activations (dégrade les outcomes sur usage répété)
+  // Prévisions météo incertaines — optional for backward compat
+  lastForecastPreparedPeriod?: number;  // période (floor(mandateDay/4)) de la dernière préparation
+  lastForecastAlertPeriod?: number;     // période de la dernière alerte publique émise
 }

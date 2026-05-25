@@ -10,7 +10,16 @@ import { Badge, Panel, ScreenHeader, SectionHeader } from "@/components/ui";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { typeIcon, urgencyColor } from "@/logic/newsEngine";
 import { computeNationalTension } from "@/logic/tensionEngine";
-import { FONT, PALETTE } from "@/constants/uiTokens";
+import {
+  generateForecast,
+  canPrepareForecast,
+  canIssueAlert,
+  CONFIDENCE_DEFS,
+  SEVERITY_DEFS,
+  PREPARE_COST_MONEY,
+  ALERT_COST_INFLUENCE,
+} from "@/logic/forecastUncertaintyEngine";
+import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { NewsType } from "@/types/strategy";
 import { useComfort } from "@/context/ComfortContext";
 import { LowLoadBanner } from "@/components/LowLoadBanner";
@@ -38,6 +47,7 @@ export default function JournalDeCriseScreen() {
   const { state, resolveInteractiveNews, dismissNews, markNewsRead } = useStrategy();
   const { hPad, width } = useResponsive();
 
+  const { prepareForecast, issuePublicAlert } = useStrategy();
   const { enabled: comfort, fs, pad, lowLoad, reducedInfo, extraConfirm } = useComfort();
   const [filter, setFilter] = useState<NewsType | "all">("all");
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -47,6 +57,11 @@ export default function JournalDeCriseScreen() {
   useEffect(() => {
     if (state) markNewsRead();
   }, []);
+
+  const forecast = useMemo(
+    () => (state ? generateForecast(state.mandateDay) : null),
+    [state?.mandateDay],
+  );
 
   const pendingInteractive = useMemo(() => {
     if (!state) return [];
@@ -136,6 +151,110 @@ export default function JournalDeCriseScreen() {
             })}
           </ScrollView>
         </Panel>
+      )}
+
+      {/* ── Prévisions météo incertaines ──────────────────────────────── */}
+      {forecast && !lowLoad && (
+        <View style={[styles.forecastBlock, { marginHorizontal: hPad }]}>
+          <View style={styles.forecastHeader}>
+            <MaterialCommunityIcons name="weather-partly-cloudy" size={12} color={PALETTE.textLow} />
+            <Text style={styles.forecastTitle}>PRÉVISIONS INCERTAINES</Text>
+            <View style={[styles.forecastSevBadge, { backgroundColor: SEVERITY_DEFS[forecast.expectedSeverity].color + "22" }]}>
+              <Text style={[styles.forecastSevText, { color: SEVERITY_DEFS[forecast.expectedSeverity].color }]}>
+                {SEVERITY_DEFS[forecast.expectedSeverity].label.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.forecastRow}>
+            <MaterialCommunityIcons
+              name={forecast.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+              size={20}
+              color={CONFIDENCE_DEFS[forecast.confidence].color}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.forecastPhenomenon, { color: CONFIDENCE_DEFS[forecast.confidence].color }]}>
+                {forecast.phenomenon}
+              </Text>
+              <Text style={styles.forecastMeta}>
+                {forecast.probability} % de probabilité · Confiance{" "}
+                <Text style={{ color: CONFIDENCE_DEFS[forecast.confidence].color }}>
+                  {CONFIDENCE_DEFS[forecast.confidence].label}
+                </Text>
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.forecastHint}>{CONFIDENCE_DEFS[forecast.confidence].description}</Text>
+
+          <View style={styles.forecastSystemsRow}>
+            {forecast.affectedSystems.map((s) => (
+              <View key={s} style={styles.forecastChip}>
+                <Text style={styles.forecastChipText}>{s}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.forecastActions}>
+            {(() => {
+              const canPrep = state ? canPrepareForecast(state) : { ok: false };
+              return (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.forecastBtn,
+                    !canPrep.ok && styles.forecastBtnDim,
+                    { opacity: pressed ? 0.75 : 1 },
+                  ]}
+                  disabled={!canPrep.ok}
+                  onPress={() => {
+                    const r = prepareForecast();
+                    if (r.outcome) {
+                      Alert.alert(
+                        r.wasRealEvent ? "Anticipation réussie" : "Fausse alerte",
+                        r.outcome,
+                        [{ text: "OK" }],
+                      );
+                    }
+                  }}
+                >
+                  <MaterialCommunityIcons name="shield-check-outline" size={11} color={canPrep.ok ? "#3fbe7a" : PALETTE.textLow} />
+                  <Text style={[styles.forecastBtnText, { color: canPrep.ok ? "#3fbe7a" : PALETTE.textLow }]}>
+                    {canPrep.ok ? `Préparer — ${PREPARE_COST_MONEY} M€` : "Préparé ce cycle"}
+                  </Text>
+                </Pressable>
+              );
+            })()}
+
+            {(() => {
+              const canAlert = state ? canIssueAlert(state) : { ok: false };
+              return (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.forecastBtn,
+                    !canAlert.ok && styles.forecastBtnDim,
+                    { opacity: pressed ? 0.75 : 1 },
+                  ]}
+                  disabled={!canAlert.ok}
+                  onPress={() => {
+                    const r = issuePublicAlert();
+                    if (r.outcome) {
+                      Alert.alert(
+                        r.wasRealEvent ? "Alerte confirmée" : "Fausse alerte publique",
+                        r.outcome,
+                        [{ text: "OK" }],
+                      );
+                    }
+                  }}
+                >
+                  <MaterialCommunityIcons name="bullhorn-outline" size={11} color={canAlert.ok ? "#4a9fff" : PALETTE.textLow} />
+                  <Text style={[styles.forecastBtnText, { color: canAlert.ok ? "#4a9fff" : PALETTE.textLow }]}>
+                    {canAlert.ok ? `Émettre alerte — ${ALERT_COST_INFLUENCE} INF` : "Alerte émise ce cycle"}
+                  </Text>
+                </Pressable>
+              );
+            })()}
+          </View>
+        </View>
       )}
 
       {/* Filters */}
@@ -267,4 +386,35 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, textAlign: "center", lineHeight: 16, maxWidth: 240 },
   logMoreBtn: { alignItems: "center", paddingVertical: 10 },
   logMoreText: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 0.5 },
+
+  // Prévisions météo incertaines
+  forecastBlock: {
+    backgroundColor: PALETTE.panel, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: PALETTE.panelEdge,
+    padding: 12, gap: 8, marginTop: 6,
+  },
+  forecastHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  forecastTitle: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2, color: PALETTE.textLow, flex: 1 },
+  forecastSevBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.pill },
+  forecastSevText: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  forecastRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  forecastPhenomenon: { fontSize: 13, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  forecastMeta: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1 },
+  forecastHint: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, fontStyle: "italic" },
+  forecastSystemsRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  forecastChip: {
+    paddingHorizontal: 7, paddingVertical: 3,
+    backgroundColor: PALETTE.panelHi, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: PALETTE.panelEdge,
+  },
+  forecastChipText: { fontSize: 8, fontFamily: FONT.semi, color: PALETTE.textMid },
+  forecastActions: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  forecastBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 10, paddingVertical: 6,
+    backgroundColor: PALETTE.panelHi, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: PALETTE.panelEdge,
+  },
+  forecastBtnDim: { opacity: 0.5 },
+  forecastBtnText: { fontSize: 10, fontFamily: FONT.semi },
 });

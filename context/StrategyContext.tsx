@@ -114,6 +114,13 @@ import {
   canActivateStaffing,
   type StaffingActivationResult,
 } from "@/logic/crisisStaffingEngine";
+import {
+  applyPrepareForecast,
+  applyIssuePublicAlert,
+  canPrepareForecast,
+  canIssueAlert,
+  type ForecastActionResult,
+} from "@/logic/forecastUncertaintyEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -353,6 +360,8 @@ interface StrategyContextValue {
   reconnaissancePublique: () => { success: boolean; reason?: string };
   stabilisationCabinet: () => void;
   activateCrisisStaffing: () => { result: StaffingActivationResult | null; failReason?: string };
+  prepareForecast: () => ForecastActionResult;
+  issuePublicAlert: () => ForecastActionResult;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1795,6 +1804,40 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const prepareForecast = useCallback(
+    (): ForecastActionResult => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      const check = canPrepareForecast(state);
+      if (!check.ok) return { success: false, reason: check.reason };
+      let out: ForecastActionResult = { success: false };
+      update((prev) => {
+        const r = applyPrepareForecast(prev);
+        out = r.result;
+        if (!r.result.success) return prev;
+        return withNews(r.newState);
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const issuePublicAlert = useCallback(
+    (): ForecastActionResult => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      const check = canIssueAlert(state);
+      if (!check.ok) return { success: false, reason: check.reason };
+      let out: ForecastActionResult = { success: false };
+      update((prev) => {
+        const r = applyIssuePublicAlert(prev);
+        out = r.result;
+        if (!r.result.success) return prev;
+        return withNews(r.newState);
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1914,7 +1957,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
-      activateCrisisStaffing,
+      activateCrisisStaffing, prepareForecast, issuePublicAlert,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1932,7 +1975,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
-      activateCrisisStaffing,
+      activateCrisisStaffing, prepareForecast, issuePublicAlert,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
