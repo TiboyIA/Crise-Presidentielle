@@ -36,6 +36,10 @@ import {
 import {
   getTalentDrainTier,
 } from "@/logic/publicTalentDrainEngine";
+import {
+  canActivateStaffing, STAFFING_COST_INFLUENCE, STAFFING_OUTCOMES, STAFFING_COOLDOWN_ACTIONS,
+} from "@/logic/crisisStaffingEngine";
+import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import type { GovernmentCultureId } from "@/types/strategy";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
@@ -526,6 +530,7 @@ export default function StrategyCabinetScreen() {
     appointMinister, restMinister, delegateMinister, fireMinister,
     arbitrateConflict, setGovernmentCulture,
     planModernisationRH, reconnaissancePublique, stabilisationCabinet,
+    activateCrisisStaffing,
   } = useStrategy();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bilanExpanded, setBilanExpanded] = useState(false);
@@ -615,6 +620,90 @@ export default function StrategyCabinetScreen() {
             ))}
           </>
         )}
+
+        {/* Cellule de crise interministérielle — visible uniquement si crise critique active */}
+        {(() => {
+          const criticalPending = state.news.pendingIds.filter(
+            (id) => NEWS_EVENT_MAP[id]?.urgency === "critique",
+          );
+          if (criticalPending.length === 0) return null;
+
+          const check        = canActivateStaffing(state);
+          const lastAt       = state.lastStaffingAt ?? -99;
+          const cooldownLeft = STAFFING_COOLDOWN_ACTIONS - (state.news.actionCount - lastAt);
+          const onCooldown   = cooldownLeft > 0;
+          const useCount     = state.staffingUseCount ?? 0;
+
+          const handleActivate = () => {
+            if (!check.ok) {
+              Alert.alert("Cellule indisponible", check.reason ?? "Conditions non remplies.");
+              return;
+            }
+            Alert.alert(
+              "Activer la cellule de crise",
+              `${criticalPending.length} crise${criticalPending.length > 1 ? "s" : ""} critique${criticalPending.length > 1 ? "s" : ""} en cours.\n\nLes ministres les plus compétents disponibles seront mobilisés immédiatement.\n\nCoût : ${STAFFING_COST_INFLUENCE} influence\n${useCount >= 2 ? "⚠️ Usages répétés — risque de saturation accru." : ""}`,
+              [
+                { text: "Annuler", style: "cancel" },
+                {
+                  text: "Activer",
+                  onPress: () => {
+                    const { result, failReason } = activateCrisisStaffing();
+                    if (!result) {
+                      Alert.alert("Échec", failReason ?? "Activation impossible.");
+                      return;
+                    }
+                    const def = STAFFING_OUTCOMES[result.outcome];
+                    Alert.alert(
+                      def.label,
+                      `${def.description}\n\nMobilisés : ${result.mobilizedIds.length} ministre${result.mobilizedIds.length > 1 ? "s" : ""}`,
+                    );
+                  },
+                },
+              ],
+            );
+          };
+
+          return (
+            <View style={[styles.staffingBlock, onCooldown && styles.staffingBlockDim]}>
+              <View style={styles.staffingHeader}>
+                <MaterialCommunityIcons
+                  name="shield-alert-outline"
+                  size={13}
+                  color={check.ok ? "#e54848" : PALETTE.textLow}
+                />
+                <Text style={[styles.staffingTitle, !check.ok && { color: PALETTE.textLow }]}>
+                  CELLULE DE CRISE
+                </Text>
+                <View style={styles.staffingBadge}>
+                  <Text style={styles.staffingBadgeText}>
+                    {criticalPending.length} critique{criticalPending.length > 1 ? "s" : ""}
+                  </Text>
+                </View>
+                {useCount > 0 && (
+                  <Text style={styles.staffingUse}>×{useCount}</Text>
+                )}
+              </View>
+              <Text style={styles.staffingDesc} numberOfLines={2}>
+                {check.ok
+                  ? `Mobiliser les ministres disponibles pour absorber partiellement l'impact. Coût : ${STAFFING_COST_INFLUENCE}🎭`
+                  : check.reason}
+              </Text>
+              <Pressable
+                onPress={handleActivate}
+                disabled={!check.ok}
+                style={({ pressed }) => [
+                  styles.staffingBtn,
+                  check.ok && { borderColor: "#e5484899", backgroundColor: "#e548481a" },
+                  { opacity: pressed ? 0.7 : check.ok ? 1 : 0.45 },
+                ]}
+              >
+                <Text style={[styles.staffingBtnText, check.ok && { color: "#e54848" }]}>
+                  {onCooldown ? `Disponible dans ${cooldownLeft} action${cooldownLeft > 1 ? "s" : ""}` : "Activer la cellule"}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        })()}
 
         {/* Culture de gouvernement — sélecteur compact collapsible */}
         {(() => {
@@ -939,6 +1028,48 @@ const styles = StyleSheet.create({
   perfBadgeText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
   perfSummary: {
     flex: 1, fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid,
+  },
+
+  // ── Cellule de crise ─────────────────────────────────────────────────────────
+  staffingBlock: {
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#e5484844",
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 4, gap: 7,
+  },
+  staffingBlockDim: {
+    borderColor: PALETTE.panelEdge,
+  },
+  staffingHeader: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+  },
+  staffingTitle: {
+    fontSize: 8, fontFamily: FONT.bold, letterSpacing: 2, color: "#e54848",
+    flex: 1,
+  },
+  staffingBadge: {
+    backgroundColor: "#e548481a", borderRadius: RADIUS.pill,
+    paddingHorizontal: 7, paddingVertical: 2,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: "#e5484844",
+  },
+  staffingBadgeText: {
+    fontSize: 8, fontFamily: FONT.bold, color: "#e54848",
+  },
+  staffingUse: {
+    fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow,
+  },
+  staffingDesc: {
+    fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid,
+  },
+  staffingBtn: {
+    borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    paddingVertical: 8, alignItems: "center",
+  },
+  staffingBtnText: {
+    fontSize: 10, fontFamily: FONT.semi, color: PALETTE.textLow,
   },
 
   // ── Fuite des talents ────────────────────────────────────────────────────────

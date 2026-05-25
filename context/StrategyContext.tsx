@@ -109,6 +109,11 @@ import {
   applyReconnaissancePublique,
   applyStabilisationCabinet,
 } from "@/logic/publicTalentDrainEngine";
+import {
+  activateStaffingCell,
+  canActivateStaffing,
+  type StaffingActivationResult,
+} from "@/logic/crisisStaffingEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -347,6 +352,7 @@ interface StrategyContextValue {
   planModernisationRH: () => { success: boolean; reason?: string };
   reconnaissancePublique: () => { success: boolean; reason?: string };
   stabilisationCabinet: () => void;
+  activateCrisisStaffing: () => { result: StaffingActivationResult | null; failReason?: string };
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1772,6 +1778,23 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const activateCrisisStaffing = useCallback(
+    (): { result: StaffingActivationResult | null; failReason?: string } => {
+      if (!state) return { result: null, failReason: "Jeu non initialisé." };
+      const check = canActivateStaffing(state);
+      if (!check.ok) return { result: null, failReason: check.reason };
+      let out: { result: StaffingActivationResult | null; failReason?: string } = { result: null };
+      update((prev) => {
+        const activation = activateStaffingCell(prev);
+        out = { result: activation.result, failReason: activation.failReason };
+        if (!activation.result) return prev;
+        return withNews(activation.newState);
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1891,6 +1914,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
+      activateCrisisStaffing,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1908,6 +1932,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
+      activateCrisisStaffing,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,

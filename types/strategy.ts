@@ -781,4 +781,7 @@ export interface StrategyGameState {
   governmentCulture?: GovernmentCultureId;
   // Fuite des talents publics — optional for backward compat (default 15)
   talentDrainScore?: number;
+  // Cellule de crise interministérielle — optional for backward compat
+  lastStaffingAt?: number;    // news.actionCount de la dernière activation
+  staffingUseCount?: number;  // total d'activations (dégrade les outcomes sur usage répété)
 }
