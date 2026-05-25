@@ -10,6 +10,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useAuth } from "@/context/AuthContext";
 import { fetchSpyOps, type SpyOp, type SpyResult } from "@/services/SpyService";
+import { buildOperationReport } from "@/logic/operationNarrativeEngine";
+import { OperationReportCard } from "@/components/OperationReportCard";
 
 const DOCTRINE_LABELS: Record<string, string> = {
   democratique:   "Réformateur",
@@ -192,6 +194,7 @@ export default function SpyOpsScreen() {
   const [ops, setOps] = useState<SpyOp[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [archivedIds, setArchivedIds] = useState<ReadonlySet<string>>(new Set());
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -212,6 +215,10 @@ export default function SpyOpsScreen() {
   useEffect(() => { load(); }, [load]);
 
   const onRefresh = () => { setRefreshing(true); load(); };
+
+  const archiveOp = useCallback((id: string) => {
+    setArchivedIds((prev) => new Set([...prev, id]));
+  }, []);
 
   if (!auth.isEnabled) return null;
 
@@ -268,14 +275,34 @@ export default function SpyOpsScreen() {
           {resolved.length > 0 && (
             <>
               <Text style={styles.sectionLabel}>RÉSULTATS</Text>
-              {resolved.map((op) => <OpRow key={op.id} op={op} />)}
+              {resolved.map((op) =>
+                archivedIds.has(op.id) ? (
+                  <OpRow key={op.id} op={op} />
+                ) : (
+                  <OperationReportCard
+                    key={op.id}
+                    report={buildOperationReport(op)}
+                    onArchive={() => archiveOp(op.id)}
+                  />
+                )
+              )}
             </>
           )}
 
           {blocked.length > 0 && (
             <>
               <Text style={styles.sectionLabel}>BLOQUÉES</Text>
-              {blocked.map((op) => <OpRow key={op.id} op={op} />)}
+              {blocked.map((op) =>
+                archivedIds.has(op.id) ? (
+                  <OpRow key={op.id} op={op} />
+                ) : (
+                  <OperationReportCard
+                    key={op.id}
+                    report={buildOperationReport(op)}
+                    onArchive={() => archiveOp(op.id)}
+                  />
+                )
+              )}
             </>
           )}
 
