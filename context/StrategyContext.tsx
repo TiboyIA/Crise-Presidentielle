@@ -121,6 +121,7 @@ import {
   canIssueAlert,
   type ForecastActionResult,
 } from "@/logic/forecastUncertaintyEngine";
+import { tickWeatherEnergyPressure } from "@/logic/weatherEnergyPressureEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -2157,6 +2158,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Fuite des talents publics — recalcul + effets
     s = tickTalentDrain(s);
+
+    // Pression météo sur l'énergie — delta + journal si notable
+    s = tickWeatherEnergyPressure(s);
 
     // Détection des conflits internes (tous les 10 jours)
     s = { ...s, cabinetConflicts: detectCabinetConflicts(s) };
