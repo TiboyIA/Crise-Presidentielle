@@ -344,6 +344,13 @@ export interface CabinetConflict {
   expiresAfterActions: number;    // actionCount absolu d'expiration
 }
 
+export interface ActiveTraining {
+  ministerId: string;
+  programId: string;              // TrainingId
+  startedAtAction: number;        // news.actionCount au lancement
+  completesAtAction: number;      // news.actionCount à la complétion
+}
+
 export interface HiddenPolitics {
   eliteTrust: number;              // 0-100 — confiance des élites / hauts fonctionnaires
   scandalRisk: number;             // 0-100 — probabilité qu'un scandale éclate
@@ -760,4 +767,6 @@ export interface StrategyGameState {
   administrationMorale?: number;
   // Conflits internes du cabinet — optional for backward compat
   cabinetConflicts?: CabinetConflict[];
+  // Formations ministérielles en cours — optional for backward compat
+  activeTrainings?: Record<string, ActiveTraining>; // keyed by ministerId
 }

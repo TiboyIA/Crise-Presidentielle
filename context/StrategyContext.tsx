@@ -96,6 +96,12 @@ import {
   resolveConflict as engineResolveConflict,
   type ConflictResolution,
 } from "@/logic/cabinetConflictEngine";
+import {
+  startTraining as engineStartTraining,
+  tickTrainings,
+  canStartTraining,
+} from "@/logic/trainingEngine";
+import type { TrainingId } from "@/data/trainingPrograms";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -328,6 +334,7 @@ interface StrategyContextValue {
   delegateMinister: (id: string) => void;
   appointMinister: (ministerId: string, candidate: MinisterCandidate) => void;
   arbitrateConflict: (conflictId: string, resolution: ConflictResolution) => void;
+  startMinisterTraining: (ministerId: string, programId: TrainingId) => { success: boolean; reason?: string };
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1694,6 +1701,17 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const startMinisterTraining = useCallback(
+    (ministerId: string, programId: TrainingId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      const check = canStartTraining(state, ministerId, programId);
+      if (!check.ok) return { success: false, reason: check.reason };
+      update((prev) => withNews(engineStartTraining(prev, ministerId, programId)));
+      return { success: true };
+    },
+    [update, state],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1811,6 +1829,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform,
       fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
+      startMinisterTraining,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1826,6 +1845,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
+      startMinisterTraining,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
@@ -2059,7 +2079,10 @@ function withAchievements(state: StrategyGameState): StrategyGameState {
 function withNews(state: StrategyGameState): StrategyGameState {
   const newCount = state.news.actionCount + 1;
   const newsState = { ...state.news, actionCount: newCount };
-  const stateWithCount = { ...state, news: newsState };
+  let stateWithCount = { ...state, news: newsState };
+
+  // Vérifier complétion des formations (action-based)
+  stateWithCount = tickTrainings(stateWithCount);
 
   if (shouldTriggerInteractiveNews(newsState, newCount)) {
     const event = selectNextNews(stateWithCount, true);

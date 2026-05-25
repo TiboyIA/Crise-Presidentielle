@@ -24,6 +24,11 @@ import {
   evaluateCabinetPerformance, summarizeCabinetHealth,
   RATING_INFO, type MinisterPerformanceReport,
 } from "@/logic/ministerPerformanceReview";
+import {
+  TRAINING_PROGRAMS, TRAINING_LIST,
+  type TrainingId,
+} from "@/data/trainingPrograms";
+import { getMinisterTraining } from "@/logic/trainingEngine";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
@@ -266,17 +271,57 @@ function MinisterFullCard({
   onFire: () => void;
   fatigueMap: Record<string, number>;
 }) {
-  const { state } = useStrategy();
+  const { state, startMinisterTraining } = useStrategy();
+  const [trainingExpanded, setTrainingExpanded] = useState(false);
   if (!state) return null;
   const def = STRATEGY_MINISTERS[ministerId];
   const m   = state.strategyMinisters.find((x) => x.id === ministerId);
   if (!def || !m) return null;
 
-  const displayName  = m.name ?? def.name;
-  const fatigue      = fatigueMap[ministerId] ?? 0;
-  const ft           = getFatigueTier(fatigue);
-  const loyaltyColor = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
-  const candidates   = getCandidatesForPosition(ministerId);
+  const displayName   = m.name ?? def.name;
+  const fatigue       = fatigueMap[ministerId] ?? 0;
+  const ft            = getFatigueTier(fatigue);
+  const loyaltyColor  = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
+  const candidates    = getCandidatesForPosition(ministerId);
+  const activeTraining = getMinisterTraining(state, ministerId);
+  const trainingProgress = activeTraining
+    ? Math.min(1, (state.news.actionCount - activeTraining.startedAtAction) /
+        (activeTraining.completesAtAction - activeTraining.startedAtAction))
+    : null;
+  const remainingActions = activeTraining
+    ? Math.max(0, activeTraining.completesAtAction - state.news.actionCount)
+    : null;
+  const trainingProgram = activeTraining ? TRAINING_PROGRAMS[activeTraining.programId as TrainingId] : null;
+
+  const confirmStartTraining = (programId: TrainingId) => {
+    const prog = TRAINING_PROGRAMS[programId];
+    if (!prog) return;
+    const costLabel = prog.costMoney
+      ? `${prog.costMoney}💰`
+      : prog.costInfluence
+      ? `${prog.costInfluence} influence`
+      : "Gratuit";
+    const effectLines = [
+      prog.effect.competenceDelta ? `Compétence +${prog.effect.competenceDelta}` : null,
+      prog.effect.loyaltyDelta    ? `Loyauté +${prog.effect.loyaltyDelta}`    : null,
+      prog.effect.scandalRiskDelta ? `Risque scandale ${prog.effect.scandalRiskDelta}` : null,
+    ].filter(Boolean).join(" · ");
+    Alert.alert(
+      `Former : ${prog.name}`,
+      `${prog.description}\n\nCoût : ${costLabel}  ·  Durée : ${prog.durationActions} actions\nEffet : ${effectLines}\nFatigue immédiate : +${prog.fatigueCost}`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Lancer la formation",
+          onPress: () => {
+            const result = startMinisterTraining!(ministerId, programId);
+            if (!result.success) Alert.alert("Impossible", result.reason ?? "Erreur.");
+            else setTrainingExpanded(false);
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={[styles.ministerCard, { borderTopColor: def.specialtyColor }]}>
@@ -323,6 +368,15 @@ function MinisterFullCard({
             <Text style={[styles.statLineVal, { color: ft.color }]}>{ft.label}</Text>
           </View>
         )}
+        {activeTraining && trainingProgram && trainingProgress !== null && (
+          <View style={styles.statLine}>
+            <Text style={[styles.statLineKey, { color: PALETTE.info }]}>FORMATION</Text>
+            <StatBar value={Math.round(trainingProgress * 100)} color={PALETTE.info} />
+            <Text style={[styles.statLineVal, { color: PALETTE.info, fontSize: 9 }]}>
+              -{remainingActions}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Actions rapides */}
@@ -345,6 +399,25 @@ function MinisterFullCard({
             <Text style={[styles.actionChipText, { color: PALETTE.danger }]}>Limoger</Text>
           </Pressable>
         )}
+        {!activeTraining && (
+          <Pressable
+            onPress={() => setTrainingExpanded((v) => !v)}
+            style={({ pressed }) => [styles.actionChip, styles.actionChipTraining, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <MaterialCommunityIcons name="school-outline" size={11} color={PALETTE.info} />
+            <Text style={[styles.actionChipText, { color: PALETTE.info }]}>
+              {trainingExpanded ? "Masquer" : "Former"}
+            </Text>
+          </Pressable>
+        )}
+        {activeTraining && trainingProgram && (
+          <View style={[styles.actionChip, styles.actionChipTrainingActive]}>
+            <MaterialCommunityIcons name="school-outline" size={11} color={PALETTE.info} />
+            <Text style={[styles.actionChipText, { color: PALETTE.info }]} numberOfLines={1}>
+              {trainingProgram.name}
+            </Text>
+          </View>
+        )}
         <Pressable onPress={onToggle} style={({ pressed }) => [styles.actionChip, styles.actionChipToggle, { opacity: pressed ? 0.7 : 1 }]}>
           <MaterialCommunityIcons
             name={isExpanded ? "chevron-up" : "account-switch-outline"}
@@ -356,6 +429,48 @@ function MinisterFullCard({
           </Text>
         </Pressable>
       </View>
+
+      {/* Panel de formation */}
+      {trainingExpanded && !activeTraining && (
+        <View style={styles.trainingPanel}>
+          <Text style={styles.trainingPanelTitle}>PROGRAMMES DE FORMATION</Text>
+          {TRAINING_LIST.map((prog) => {
+            const costLabel = prog.costMoney
+              ? `💰 ${prog.costMoney}`
+              : prog.costInfluence
+              ? `🎭 ${prog.costInfluence}`
+              : "Gratuit";
+            const effectBits = [
+              prog.effect.competenceDelta  ? `Compétence +${prog.effect.competenceDelta}` : null,
+              prog.effect.loyaltyDelta     ? `Loyauté +${prog.effect.loyaltyDelta}`       : null,
+              prog.effect.scandalRiskDelta ? `Risque ${prog.effect.scandalRiskDelta}`     : null,
+            ].filter(Boolean);
+            return (
+              <View key={prog.id} style={styles.trainingCard}>
+                <View style={styles.trainingCardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.trainingCardName}>{prog.name}</Text>
+                    <Text style={styles.trainingCardDesc} numberOfLines={1}>{prog.description}</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => confirmStartTraining(prog.id)}
+                    style={({ pressed }) => [styles.trainingLaunchBtn, { opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={styles.trainingLaunchText}>Lancer</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.trainingCardMeta}>
+                  <Text style={styles.trainingMetaChip}>{costLabel}</Text>
+                  <Text style={styles.trainingMetaChip}>{prog.durationActions} actions</Text>
+                  {effectBits.map((e, i) => (
+                    <Text key={i} style={[styles.trainingMetaChip, { color: PALETTE.success }]}>{e}</Text>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Panel de succession */}
       {isExpanded && (
@@ -669,7 +784,43 @@ const styles = StyleSheet.create({
   },
   actionChipDanger: { borderColor: PALETTE.danger + "44" },
   actionChipToggle: { marginLeft: "auto" },
+  actionChipTraining: { borderColor: PALETTE.info + "44" },
+  actionChipTrainingActive: { borderColor: PALETTE.info + "44", backgroundColor: PALETTE.info + "11", maxWidth: 160 },
   actionChipText: { fontSize: 9, fontFamily: FONT.bold },
+
+  // ── Panel de formation ──────────────────────────────────────────────────────
+  trainingPanel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: PALETTE.panelEdge,
+    paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+    backgroundColor: "rgba(74,159,255,0.04)",
+  },
+  trainingPanelTitle: {
+    fontSize: 7, fontFamily: FONT.bold, color: PALETTE.info,
+    letterSpacing: 2, marginBottom: 2,
+  },
+  trainingCard: {
+    backgroundColor: PALETTE.panelHi,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.info + "33",
+    padding: 10, gap: 6,
+  },
+  trainingCardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  trainingCardName: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh },
+  trainingCardDesc: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, marginTop: 1 },
+  trainingLaunchBtn: {
+    paddingHorizontal: 9, paddingVertical: 5,
+    borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PALETTE.info + "66",
+  },
+  trainingLaunchText: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.info },
+  trainingCardMeta: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  trainingMetaChip: {
+    fontSize: 8, fontFamily: FONT.med, color: PALETTE.textLow,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: RADIUS.pill,
+  },
 
   // ── Panel de succession ─────────────────────────────────────────────────────
   candidatesPanel: {
