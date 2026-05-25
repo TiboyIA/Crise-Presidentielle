@@ -1,4 +1,5 @@
 import type { GaffeType, HiddenPolitics, MinisterGaffeEntry, NationalIndicators, NewsUrgency, StrategyMinister } from "@/types/strategy";
+import { fatigueToProbabilityBonus } from "@/logic/ministerBurnoutEngine";
 
 export type { GaffeType, MinisterGaffeEntry } from "@/types/strategy";
 
@@ -96,6 +97,7 @@ export function computeGaffeProbability(
   minister: StrategyMinister,
   hiddenPolitics: HiddenPolitics,
   urgency: NewsUrgency,
+  fatigue?: number,
 ): number {
   let score = 0;
 
@@ -116,6 +118,9 @@ export function computeGaffeProbability(
   if (urgency === "critique") score += 10;
   else if (urgency === "forte") score += 5;
 
+  // Fatigue ministérielle
+  if (fatigue !== undefined) score += fatigueToProbabilityBonus(fatigue);
+
   return Math.min(20, Math.round(score / 4));
 }
 
@@ -134,11 +139,13 @@ export function generateMinisterGaffe(
   ministers: StrategyMinister[],
   hiddenPolitics: HiddenPolitics,
   urgency: NewsUrgency,
+  fatigueMap?: Record<string, number>,
 ): MinisterGaffeEntry | null {
   const minister = pickWeakestMinister(ministers);
   if (!minister) return null;
 
-  const probability = computeGaffeProbability(minister, hiddenPolitics, urgency);
+  const fatigue    = fatigueMap?.[minister.id];
+  const probability = computeGaffeProbability(minister, hiddenPolitics, urgency, fatigue);
   if (Math.random() * 100 >= probability) return null;
 
   const gaffeType = pickGaffeType(minister);

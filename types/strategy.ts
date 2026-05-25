@@ -737,4 +737,6 @@ export interface StrategyGameState {
   reinsurancePool?: ReinsurancePool;
   // Passifs Longue Traîne — optional for backward compat
   longTailLiabilities?: LongTailLiability[];
+  // Fatigue RH des ministres — optional for backward compat
+  ministerFatigue?: Record<string, number>;
 }

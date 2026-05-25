@@ -27,6 +27,7 @@ import type { ResourceKey } from "@/types/strategy";
 import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
 import { useComfort } from "@/context/ComfortContext";
+import { getFatigueTier } from "@/logic/ministerBurnoutEngine";
 import { LowLoadBanner } from "@/components/LowLoadBanner";
 import { isRankedIntended } from "@/services/RankedService";
 import { computeFrustration, BAND_LABELS, BAND_COLORS } from "@/logic/frustrationEngine";
@@ -78,7 +79,7 @@ const INDICATOR_COLORS: Record<string, string> = {
 export default function NationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, claimDailyReward, contributeFund } = useStrategy();
+  const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, restMinister, delegateMinister, claimDailyReward, contributeFund } = useStrategy();
   const { selectedPortrait } = usePortrait();
   const { lowLoad, reducedInfo, contrastBoost } = useComfort();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
@@ -608,7 +609,15 @@ export default function NationScreen() {
           <View style={styles.cabinetGrid}>
             {state.strategyMinisters
               .filter((m) => CABINET_PRIMARY.includes(m.id as any))
-              .map((m) => <MinisterRow key={m.id} m={m} onFire={fireMinister} />)}
+              .map((m) => (
+                <MinisterRow
+                  key={m.id} m={m}
+                  fatigue={state.ministerFatigue?.[m.id] ?? 0}
+                  onFire={fireMinister}
+                  onRest={restMinister}
+                  onDelegate={delegateMinister}
+                />
+              ))}
           </View>
 
           {/* Secondary ministers — collapsible */}
@@ -623,7 +632,15 @@ export default function NationScreen() {
             <View style={styles.cabinetGrid}>
               {state.strategyMinisters
                 .filter((m) => CABINET_SECONDARY.includes(m.id as any))
-                .map((m) => <MinisterRow key={m.id} m={m} onFire={fireMinister} />)}
+                .map((m) => (
+                  <MinisterRow
+                    key={m.id} m={m}
+                    fatigue={state.ministerFatigue?.[m.id] ?? 0}
+                    onFire={fireMinister}
+                    onRest={restMinister}
+                    onDelegate={delegateMinister}
+                  />
+                ))}
             </View>
           )}
         </Panel>
@@ -828,17 +845,31 @@ export default function NationScreen() {
   );
 }
 
-function MinisterRow({ m, onFire }: { m: { id: string; name?: string; loyalty: number; competence: number; scandalRisk: number }; onFire: (id: string) => void }) {
+function MinisterRow({
+  m, fatigue, onFire, onRest, onDelegate,
+}: {
+  m: { id: string; name?: string; loyalty: number; competence: number; scandalRisk: number };
+  fatigue: number;
+  onFire: (id: string) => void;
+  onRest: (id: string) => void;
+  onDelegate: (id: string) => void;
+}) {
   const def = STRATEGY_MINISTERS[m.id as StrategyMinisterId];
   if (!def) return null;
-  const displayName = m.name ?? def.name;
+  const displayName  = m.name ?? def.name;
   const loyaltyColor = m.loyalty < 40 ? PALETTE.danger : m.loyalty < 60 ? PALETTE.warning : def.specialtyColor;
-  const canFire = m.loyalty < 40;
+  const canFire      = m.loyalty < 40;
+  const ft           = getFatigueTier(fatigue);
+  const showFatigue  = fatigue > 30; // discret en-dessous
+  const needsAction  = fatigue > 60;
+
   return (
     <View style={styles.ministerChip}>
       <Text style={[styles.ministerSpec, { color: def.specialtyColor }]}>{def.specialty[0]}</Text>
       <View style={{ flex: 1, gap: 3 }}>
-        <Text style={styles.ministerName} numberOfLines={1}>{displayName.split(" ")[0]} {displayName.split(" ").slice(-1)}</Text>
+        <Text style={styles.ministerName} numberOfLines={1}>
+          {displayName.split(" ")[0]} {displayName.split(" ").slice(-1)}
+        </Text>
         <View style={styles.ministerLoyaltyRow}>
           <View style={styles.ministerLoyaltyTrack}>
             <View style={[styles.ministerLoyaltyFill, { width: `${m.loyalty}%`, backgroundColor: loyaltyColor }]} />
@@ -850,6 +881,48 @@ function MinisterRow({ m, onFire }: { m: { id: string; name?: string; loyalty: n
             ? <Text style={[styles.ministerLoyaltyStatus, { color: PALETTE.warning }]}>VIGILANCE</Text>
             : null}
         </View>
+        {/* Fatigue — discrète si tension, visible si risque/burnout */}
+        {showFatigue && (
+          <View style={styles.ministerFatigueRow}>
+            <View style={styles.ministerFatigueTrack}>
+              <View style={[styles.ministerFatigueFill, { width: `${fatigue}%`, backgroundColor: ft.color }]} />
+            </View>
+            <Text style={[styles.ministerFatigueTier, { color: ft.color }]}>{ft.label}</Text>
+          </View>
+        )}
+        {/* Boutons repos / déléguer */}
+        {needsAction && (
+          <View style={styles.ministerActionRow}>
+            <Pressable
+              onPress={() => Alert.alert(
+                "Repos politique",
+                `Accorder un temps de repos à ${displayName} ? Sa fatigue diminuera de 25 points.`,
+                [
+                  { text: "Annuler", style: "cancel" },
+                  { text: "Accorder", onPress: () => onRest(m.id) },
+                ],
+              )}
+              style={({ pressed }) => [styles.ministerActionBtn, { borderColor: ft.color + "66", opacity: pressed ? 0.7 : 1 }]}
+            >
+              <MaterialCommunityIcons name="sleep" size={11} color={ft.color} />
+              <Text style={[styles.ministerActionLabel, { color: ft.color }]}>Repos</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => Alert.alert(
+                "Déléguer",
+                `Alléger le portefeuille de ${displayName} ? Sa fatigue diminuera de 15 points.`,
+                [
+                  { text: "Annuler", style: "cancel" },
+                  { text: "Déléguer", onPress: () => onDelegate(m.id) },
+                ],
+              )}
+              style={({ pressed }) => [styles.ministerActionBtn, { borderColor: PALETTE.panelEdge, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <MaterialCommunityIcons name="account-arrow-right-outline" size={11} color={PALETTE.textMid} />
+              <Text style={[styles.ministerActionLabel, { color: PALETTE.textMid }]}>Déléguer</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
       {canFire && (
         <Pressable
@@ -1014,6 +1087,13 @@ const styles = StyleSheet.create({
   ministerLoyaltyFill: { height: "100%", borderRadius: 2 },
   ministerLoyaltyVal: { fontSize: 9, fontFamily: FONT.bold, width: 22, textAlign: "right" },
   ministerLoyaltyStatus: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 0.4, flexShrink: 0 },
+  ministerFatigueRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  ministerFatigueTrack: { flex: 1, height: 2, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 1, overflow: "hidden" },
+  ministerFatigueFill: { height: 2, borderRadius: 1 },
+  ministerFatigueTier: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 0.4, flexShrink: 0 },
+  ministerActionRow: { flexDirection: "row", gap: 5, marginTop: 2 },
+  ministerActionBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 3, borderRadius: RADIUS.xs, borderWidth: StyleSheet.hairlineWidth },
+  ministerActionLabel: { fontSize: 9, fontFamily: FONT.bold },
   fireBtn: { padding: 6, borderRadius: RADIUS.xs, backgroundColor: PALETTE.danger + "22", borderWidth: 1, borderColor: PALETTE.danger + "44" },
 
   secondaryCabinetToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, justifyContent: "center" },

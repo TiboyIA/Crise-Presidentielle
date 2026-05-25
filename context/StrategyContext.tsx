@@ -84,6 +84,11 @@ import {
   computeGaffeEffects,
   generateMinisterGaffe,
 } from "@/logic/ministerSpeechEngine";
+import {
+  tickMinisterFatigue,
+  applyRestAction,
+  applyDelegateAction,
+} from "@/logic/ministerBurnoutEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
   addContradictionToHistory,
@@ -311,6 +316,8 @@ interface StrategyContextValue {
   adoptDoctrine: (id: GovernanceDoctrine) => { success: boolean; reason?: string };
   launchReform: (id: ReformId) => { success: boolean; reason?: string };
   fireMinister: (id: string) => void;
+  restMinister: (id: string) => void;
+  delegateMinister: (id: string) => void;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1297,7 +1304,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           ...m,
           name: m.name ?? STRATEGY_MINISTERS[m.id as StrategyMinisterId]?.name,
         }));
-        const ministerGaffe = generateMinisterGaffe(resolvedMinisters, hiddenPolitics, event.urgency);
+        const ministerGaffe = generateMinisterGaffe(resolvedMinisters, hiddenPolitics, event.urgency, prev.ministerFatigue);
         let oppositionPower = prev.oppositionPower;
         if (ministerGaffe) {
           const gaffeFx = computeGaffeEffects(ministerGaffe);
@@ -1653,6 +1660,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const restMinister = useCallback(
+    (id: string) => { update((prev) => applyRestAction(prev, id)); },
+    [update],
+  );
+
+  const delegateMinister = useCallback(
+    (id: string) => { update((prev) => applyDelegateAction(prev, id)); },
+    [update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1768,7 +1785,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan,
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
-      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
+      acknowledgePoll, startNewMandate, adoptDoctrine, launchReform,
+      fireMinister, restMinister, delegateMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1783,6 +1801,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
+      restMinister, delegateMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
@@ -1958,6 +1977,12 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = { ...s, news: queueNews(s.news, "opposition_rise") };
     }
     s = { ...s, oppositionPower: newOpposition };
+  }
+
+  // Tick fatigue RH ministres (une fois par avancée, cap à 7j pour éviter les rattrapages excessifs)
+  if (days > 0) {
+    const clampedDays = Math.min(days, 7);
+    for (let d = 0; d < clampedDays; d++) s = tickMinisterFatigue(s);
   }
 
   // Check achievements
