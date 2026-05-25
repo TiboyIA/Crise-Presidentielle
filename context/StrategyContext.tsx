@@ -89,6 +89,7 @@ import {
   applyRestAction,
   applyDelegateAction,
 } from "@/logic/ministerBurnoutEngine";
+import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
   addContradictionToHistory,
@@ -318,6 +319,7 @@ interface StrategyContextValue {
   fireMinister: (id: string) => void;
   restMinister: (id: string) => void;
   delegateMinister: (id: string) => void;
+  appointMinister: (ministerId: string, candidate: MinisterCandidate) => void;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1670,6 +1672,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const appointMinister = useCallback(
+    (ministerId: string, candidate: MinisterCandidate) => {
+      update((prev) => applySuccession(prev, ministerId, candidate));
+    },
+    [update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1786,7 +1795,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform,
-      fireMinister, restMinister, delegateMinister,
+      fireMinister, restMinister, delegateMinister, appointMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1801,7 +1810,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
-      restMinister, delegateMinister,
+      restMinister, delegateMinister, appointMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,

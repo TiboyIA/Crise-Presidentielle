@@ -588,6 +588,12 @@ export default function NationScreen() {
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="account-tie-outline" size={14} color={PALETTE.gold} />
             <Text style={styles.sectionTitle}>CABINET STRATÉGIQUE</Text>
+            <Pressable
+              onPress={() => router.push("/strategy-cabinet" as any)}
+              style={({ pressed }) => [styles.cabinetNavBtn, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={styles.cabinetNavBtnText}>GÉRER →</Text>
+            </Pressable>
           </View>
           {/* Debt indicator */}
           {(() => {
@@ -1098,6 +1104,9 @@ const styles = StyleSheet.create({
 
   secondaryCabinetToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, justifyContent: "center" },
   secondaryCabinetLabel: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1.5, flex: 1, textAlign: "center" },
+
+  cabinetNavBtn: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.xs, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.gold + "55", backgroundColor: PALETTE.gold + "0d" },
+  cabinetNavBtnText: { fontSize: 8, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 1.5 },
 
   // Daily reward card
   rewardCard: {
