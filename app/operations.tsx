@@ -11,6 +11,13 @@ import { Badge, Panel, PrimaryButton, ScreenHeader, SectionHeader } from "@/comp
 import { COUNTRY_LIST } from "@/data/countries";
 import { STRATEGY_RESEARCH_LIST } from "@/data/strategyResearch";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
+import { generateWeatherState } from "@/logic/weatherEngine";
+import {
+  getOperationWeatherModifier,
+  getGlobalWeatherCondition,
+  type WeatherCondition,
+} from "@/logic/operationWeatherModifier";
+import type { WeatherTypeId } from "@/data/weatherEvents";
 import { OPERATION_IMG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { RESOURCE_LABELS } from "@/types/strategy";
@@ -33,6 +40,17 @@ export default function OperationsScreen() {
   const { enabled: comfort, fs, pad, reducedInfo, extraConfirm } = useComfort();
 
   if (!state) return null;
+
+  const weather = generateWeatherState(state.mandateDay);
+  const weatherTypeId = weather.typeDef.id as WeatherTypeId;
+  const globalCondition = getGlobalWeatherCondition(weatherTypeId);
+
+  const conditionColor = (c: WeatherCondition) =>
+    c === "favorable" ? PALETTE.success : c === "defavorable" ? PALETTE.warning : PALETTE.textLow;
+  const conditionLabel = (c: WeatherCondition) =>
+    c === "favorable" ? "Favorable" : c === "defavorable" ? "Défavorable" : "Neutre";
+  const conditionIcon = (c: WeatherCondition): React.ComponentProps<typeof MaterialCommunityIcons>["name"] =>
+    c === "favorable" ? "weather-sunny" : c === "defavorable" ? "weather-lightning-rainy" : "weather-cloudy";
 
   const relationMap = Object.fromEntries(state.relations.map((r) => [r.countryId, r]));
   const selectedRelation = selectedCountryId ? relationMap[selectedCountryId] : null;
@@ -111,6 +129,26 @@ export default function OperationsScreen() {
         {selectedCountryId && selectedRelation && (
           <>
             <SectionHeader label="Catalogue d'opérations" count={`${ops.length}`} />
+
+            {/* Bandeau météo opérationnel */}
+            {!reducedInfo && (
+              <View style={[styles.weatherBanner, { borderColor: conditionColor(globalCondition.condition) + "44", backgroundColor: conditionColor(globalCondition.condition) + "0e" }]}>
+                <MaterialCommunityIcons
+                  name={weather.typeDef.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+                  size={14}
+                  color={conditionColor(globalCondition.condition)}
+                />
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={[styles.weatherBannerTitle, { color: conditionColor(globalCondition.condition) }]}>
+                    {weather.typeDef.label} · Condition météo :{" "}
+                    <Text style={{ fontFamily: FONT.bold }}>{conditionLabel(globalCondition.condition)}</Text>
+                  </Text>
+                  <Text style={styles.weatherBannerSub}>{globalCondition.summary}</Text>
+                </View>
+                <MaterialCommunityIcons name={conditionIcon(globalCondition.condition)} size={18} color={conditionColor(globalCondition.condition) + "88"} />
+              </View>
+            )}
+
             <Panel style={styles.diploCard}>
               <Text style={styles.diploKicker}>SCORE DIPLOMATIQUE</Text>
               <View style={styles.diploRow}>
@@ -211,6 +249,22 @@ export default function OperationsScreen() {
                         </View>
                       )}
 
+                      {!reducedInfo && (() => {
+                        const wm = getOperationWeatherModifier(weatherTypeId, op.id);
+                        const col = conditionColor(wm.condition);
+                        const pct = wm.modifier !== 0
+                          ? ` · ${wm.modifier > 0 ? "+" : ""}${Math.round(wm.modifier * 100)} %`
+                          : "";
+                        return (
+                          <View style={styles.statusRow}>
+                            <MaterialCommunityIcons name={conditionIcon(wm.condition)} size={12} color={col} />
+                            <Text style={[styles.statusText, { color: col }]}>
+                              Météo : {conditionLabel(wm.condition)}{pct} · {wm.label}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+
                       <PrimaryButton
                         label={isLoading ? "En cours…" : op.isOffensive ? "Lancer l'opération" : "Engager"}
                         variant={op.isOffensive ? "danger" : "primary"}
@@ -264,4 +318,11 @@ const styles = StyleSheet.create({
 
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusText: { fontSize: 11, fontFamily: FONT.semi },
+
+  weatherBanner: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    padding: 10, borderRadius: RADIUS.sm, borderWidth: 1,
+  },
+  weatherBannerTitle: { fontSize: 10, fontFamily: FONT.semi },
+  weatherBannerSub: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow },
 });
