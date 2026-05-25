@@ -327,6 +327,23 @@ export interface StrategyMinister {
   scandalRisk: number; // 0-100, can increase
 }
 
+export type ConflictReason =
+  | "domain_rivalry"
+  | "ambition"
+  | "loyalty_gap"
+  | "doctrine_split"
+  | "crisis_blame";
+
+export interface CabinetConflict {
+  id: string;
+  ministerA: string;              // StrategyMinisterId
+  ministerB: string;              // StrategyMinisterId
+  intensity: number;              // 0-100
+  reason: ConflictReason;
+  createdAtAction: number;        // news.actionCount à la création
+  expiresAfterActions: number;    // actionCount absolu d'expiration
+}
+
 export interface HiddenPolitics {
   eliteTrust: number;              // 0-100 — confiance des élites / hauts fonctionnaires
   scandalRisk: number;             // 0-100 — probabilité qu'un scandale éclate
@@ -741,4 +758,6 @@ export interface StrategyGameState {
   ministerFatigue?: Record<string, number>;
   // Moral de l'administration — optional for backward compat (default 60)
   administrationMorale?: number;
+  // Conflits internes du cabinet — optional for backward compat
+  cabinetConflicts?: CabinetConflict[];
 }

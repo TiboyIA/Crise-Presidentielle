@@ -16,6 +16,11 @@ import {
   type MinisterCandidate,
 } from "@/logic/successionEngine";
 import { getFatigueTier } from "@/logic/ministerBurnoutEngine";
+import {
+  CONFLICT_DEFS,
+  type ConflictResolution,
+} from "@/logic/cabinetConflictEngine";
+import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -131,6 +136,113 @@ function CandidateCard({
         {preview.notes.map((n, i) => (
           <Text key={i} style={styles.previewNote}>· {n}</Text>
         ))}
+      </View>
+    </View>
+  );
+}
+
+// ── Carte conflit ─────────────────────────────────────────────────────────────
+
+function ConflictCard({
+  conflict,
+  onArbitrate,
+}: {
+  conflict: CabinetConflict;
+  onArbitrate: (resolution: ConflictResolution) => void;
+}) {
+  const { state } = useStrategy();
+  if (!state) return null;
+
+  const def  = CONFLICT_DEFS[conflict.reason];
+  const mA   = state.strategyMinisters.find((m) => m.id === conflict.ministerA);
+  const mB   = state.strategyMinisters.find((m) => m.id === conflict.ministerB);
+  const defA = STRATEGY_MINISTERS[conflict.ministerA as StrategyMinisterId];
+  const defB = STRATEGY_MINISTERS[conflict.ministerB as StrategyMinisterId];
+  if (!mA || !mB || !defA || !defB) return null;
+
+  const nameA = mA.name ?? defA.name;
+  const nameB = mB.name ?? defB.name;
+
+  const confirmArbitrate = (resolution: ConflictResolution) => {
+    const labels: Record<ConflictResolution, string> = {
+      support_a:  `Soutenir ${nameA.split(" ")[0]}`,
+      support_b:  `Soutenir ${nameB.split(" ")[0]}`,
+      compromise: "Imposer un compromis",
+    };
+    const consequences: Record<ConflictResolution, string> = {
+      support_a:  `${nameB.split(" ")[0]} perd 6 points de loyauté. ${nameA.split(" ")[0]} en gagne 4. Risque de scandale +5.`,
+      support_b:  `${nameA.split(" ")[0]} perd 6 points de loyauté. ${nameB.split(" ")[0]} en gagne 4. Risque de scandale +5.`,
+      compromise: `Les deux gagnent 2 points de loyauté. Stabilité institutionnelle +5.`,
+    };
+    Alert.alert(
+      labels[resolution],
+      consequences[resolution],
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Confirmer", onPress: () => onArbitrate(resolution) },
+      ],
+    );
+  };
+
+  const intensityColor =
+    conflict.intensity > 70 ? PALETTE.danger :
+    conflict.intensity > 50 ? PALETTE.warning : def.color;
+
+  return (
+    <View style={[styles.conflictCard, { borderLeftColor: def.color }]}>
+      {/* En-tête conflit */}
+      <View style={styles.conflictHeader}>
+        <MaterialCommunityIcons name={def.icon as any} size={13} color={def.color} />
+        <Text style={[styles.conflictReason, { color: def.color }]}>{def.label.toUpperCase()}</Text>
+        <View style={styles.conflictIntensityWrap}>
+          <View style={styles.conflictIntensityTrack}>
+            <View style={[styles.conflictIntensityFill, { width: `${conflict.intensity}%`, backgroundColor: intensityColor }]} />
+          </View>
+          <Text style={[styles.conflictIntensityVal, { color: intensityColor }]}>{conflict.intensity}</Text>
+        </View>
+      </View>
+
+      {/* Protagonistes */}
+      <View style={styles.conflictProtagonists}>
+        <View style={[styles.conflictMinister, { borderColor: defA.specialtyColor + "55" }]}>
+          <Text style={[styles.conflictMinisterSpec, { color: defA.specialtyColor }]}>{defA.specialty[0]}</Text>
+          <Text style={styles.conflictMinisterName} numberOfLines={1}>{nameA.split(" ")[0]}</Text>
+        </View>
+        <Text style={styles.conflictVs}>vs</Text>
+        <View style={[styles.conflictMinister, { borderColor: defB.specialtyColor + "55" }]}>
+          <Text style={[styles.conflictMinisterSpec, { color: defB.specialtyColor }]}>{defB.specialty[0]}</Text>
+          <Text style={styles.conflictMinisterName} numberOfLines={1}>{nameB.split(" ")[0]}</Text>
+        </View>
+      </View>
+
+      {/* Motif */}
+      <Text style={styles.conflictDescription}>{def.description}</Text>
+
+      {/* Actions d'arbitrage */}
+      <View style={styles.conflictActions}>
+        <Pressable
+          onPress={() => confirmArbitrate("support_a")}
+          style={({ pressed }) => [styles.conflictBtn, { borderColor: defA.specialtyColor + "66", opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Text style={[styles.conflictBtnText, { color: defA.specialtyColor }]} numberOfLines={1}>
+            {nameA.split(" ")[0]} ↑
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => confirmArbitrate("compromise")}
+          style={({ pressed }) => [styles.conflictBtn, styles.conflictBtnCenter, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="handshake-outline" size={11} color={PALETTE.gold} />
+          <Text style={[styles.conflictBtnText, { color: PALETTE.gold }]}>Compromis</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => confirmArbitrate("support_b")}
+          style={({ pressed }) => [styles.conflictBtn, { borderColor: defB.specialtyColor + "66", opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Text style={[styles.conflictBtnText, { color: defB.specialtyColor }]} numberOfLines={1}>
+            {nameB.split(" ")[0]} ↑
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -265,7 +377,7 @@ function MinisterFullCard({
 export default function StrategyCabinetScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
-  const { state, appointMinister, restMinister, delegateMinister, fireMinister } = useStrategy();
+  const { state, appointMinister, restMinister, delegateMinister, fireMinister, arbitrateConflict } = useStrategy();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (!state) return null;
@@ -326,6 +438,22 @@ export default function StrategyCabinetScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Section conflits — visible uniquement si des tensions existent */}
+        {(state.cabinetConflicts ?? []).length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>
+              TENSIONS INTERNES · {(state.cabinetConflicts ?? []).length}
+            </Text>
+            {(state.cabinetConflicts ?? []).map((c) => (
+              <ConflictCard
+                key={c.id}
+                conflict={c}
+                onArbitrate={(resolution) => arbitrateConflict(c.id, resolution)}
+              />
+            ))}
+          </>
+        )}
+
         <Text style={styles.sectionLabel}>CABINET PRINCIPAL</Text>
         {CABINET_PRIMARY.map((id) => (
           <MinisterFullCard
@@ -494,4 +622,44 @@ const styles = StyleSheet.create({
     fontSize: 10, fontFamily: FONT.reg,
     color: PALETTE.textMid, lineHeight: 15,
   },
+
+  // ── Carte conflit ───────────────────────────────────────────────────────────
+  conflictCard: {
+    backgroundColor: PALETTE.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    borderLeftWidth: 2,
+    padding: 12, gap: 10,
+  },
+  conflictHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  conflictReason: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1.5, flex: 1 },
+  conflictIntensityWrap: { flexDirection: "row", alignItems: "center", gap: 5 },
+  conflictIntensityTrack: { width: 48, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
+  conflictIntensityFill: { height: "100%", borderRadius: 2 },
+  conflictIntensityVal: { fontSize: 10, fontFamily: FONT.bold, width: 22, textAlign: "right" },
+
+  conflictProtagonists: { flexDirection: "row", alignItems: "center", gap: 8 },
+  conflictMinister: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  conflictMinisterSpec: { fontSize: 14, fontFamily: FONT.bold },
+  conflictMinisterName: { fontSize: 11, fontFamily: FONT.semi, color: PALETTE.textHigh, flex: 1 },
+  conflictVs: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1 },
+
+  conflictDescription: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 15 },
+
+  conflictActions: { flexDirection: "row", gap: 6 },
+  conflictBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  conflictBtnCenter: { borderColor: PALETTE.gold + "44", backgroundColor: PALETTE.gold + "0a" },
+  conflictBtnText: { fontSize: 9, fontFamily: FONT.bold },
 });

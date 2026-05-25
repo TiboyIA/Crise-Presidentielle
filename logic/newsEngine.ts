@@ -173,8 +173,9 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     has_infowar:                 (state.strategyResearch?.completed ?? []).includes("research_infowar"),
     cosmic_auroria_eligible:     indicators.cohesion >= 50 && hp.institutionalStability >= 55 && hp.scandalRisk < 50,
     cosmic_obscurium_active:     hp.scandalRisk > 40 || resources.cyberDefense < 40 || hp.popularFatigue > 55,
-    low_administration_morale:   (state.administrationMorale ?? 60) <= 40,
+    low_administration_morale:      (state.administrationMorale ?? 60) <= 40,
     very_low_administration_morale: (state.administrationMorale ?? 60) <= 20,
+    active_high_cabinet_conflict:   (state.cabinetConflicts ?? []).some((c) => c.intensity > 65),
   };
 }
 

@@ -2670,6 +2670,47 @@ export const NEWS_EVENTS: NewsEvent[] = [
       },
     ],
   },
+  // ── CONFLITS INTERNES DU CABINET ─────────────────────────────────────────────
+  {
+    id: "cabinet_conflict_leak",
+    title: "Guerre d'influence au sein du gouvernement",
+    source: "Correspondants Politiques",
+    type: "national",
+    urgency: "moyenne",
+    description: "Des sources proches de l'exécutif confirment des tensions persistantes entre plusieurs membres du cabinet. Des réunions interministérielles auraient tourné à l'affrontement ouvert. L'image de cohésion gouvernementale est fragilisée.",
+    isInteractive: true,
+    conditionKey: "active_high_cabinet_conflict",
+    choices: [
+      {
+        id: "deny_tensions",
+        label: "Démentir fermement les divisions internes",
+        consequence: "Le démenti passe mal auprès des correspondants politiques qui ont leurs sources. La presse creuse.",
+        effects: { influence: -5 },
+        hiddenPoliticsEffects: { mediaMood: -4 },
+        pathologyDelta: { doubleSpeak: 6 },
+        communicationRegister: "institutionnel",
+      },
+      {
+        id: "acknowledge_debate",
+        label: "Reconnaître un débat démocratique interne sain",
+        consequence: "La franchise est saluée. Elle révèle néanmoins les fissures de l'exécutif.",
+        effects: { influence: 6 },
+        hiddenPoliticsEffects: { mediaMood: 5, eliteTrust: -3 },
+        indicatorEffects: { popularity: -2 },
+        communicationRegister: "empathique",
+        clarityProfile: { coherence: 8, precision: 6, transparency: 8, jargon: 1, evasion: 2 },
+      },
+      {
+        id: "reshuffle_signal",
+        label: "Laisser entendre qu'un arbitrage présidentiel est imminent",
+        consequence: "Le signal calme temporairement les médias mais nourrit les rumeurs de remaniement.",
+        effects: {},
+        hiddenPoliticsEffects: { scandalRisk: 6, mediaMood: 4 },
+        indicatorEffects: { popularity: -4 },
+      },
+    ],
+  },
+
   // ── MORAL ADMINISTRATIF ──────────────────────────────────────────────────────
   {
     id: "admin_morale_fuite",

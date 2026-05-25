@@ -90,6 +90,12 @@ import {
   applyDelegateAction,
 } from "@/logic/ministerBurnoutEngine";
 import { tickAdministrationMorale } from "@/logic/administrationMoraleEngine";
+import {
+  detectCabinetConflicts,
+  tickCabinetConflicts,
+  resolveConflict as engineResolveConflict,
+  type ConflictResolution,
+} from "@/logic/cabinetConflictEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -321,6 +327,7 @@ interface StrategyContextValue {
   restMinister: (id: string) => void;
   delegateMinister: (id: string) => void;
   appointMinister: (ministerId: string, candidate: MinisterCandidate) => void;
+  arbitrateConflict: (conflictId: string, resolution: ConflictResolution) => void;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -1680,6 +1687,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const arbitrateConflict = useCallback(
+    (conflictId: string, resolution: ConflictResolution) => {
+      update((prev) => engineResolveConflict(prev, conflictId, resolution));
+    },
+    [update],
+  );
+
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
       if (!state) return { success: false, reason: "Jeu non initialisé" };
@@ -1796,7 +1810,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform,
-      fireMinister, restMinister, delegateMinister, appointMinister,
+      fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1811,7 +1825,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
       collectMissionReward, resolveInteractiveNews, dismissNews, markNewsRead,
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
-      restMinister, delegateMinister, appointMinister,
+      restMinister, delegateMinister, appointMinister, arbitrateConflict,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
@@ -1987,14 +2001,23 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = { ...s, news: queueNews(s.news, "opposition_rise") };
     }
     s = { ...s, oppositionPower: newOpposition };
+
+    // Détection des conflits internes (tous les 10 jours)
+    s = { ...s, cabinetConflicts: detectCabinetConflicts(s) };
+    // Fuite médiatique si un conflit est très intense et pas encore vu
+    const highConflict = (s.cabinetConflicts ?? []).some((c) => c.intensity > 65);
+    if (highConflict && !s.news.seenIds.includes("cabinet_conflict_leak")) {
+      s = { ...s, news: queueNews(s.news, "cabinet_conflict_leak") };
+    }
   }
 
-  // Tick fatigue RH + moral administratif (cap à 7j pour éviter les rattrapages excessifs)
+  // Tick fatigue RH + moral administratif + conflits (cap à 7j pour éviter les rattrapages excessifs)
   if (days > 0) {
     const clampedDays = Math.min(days, 7);
     for (let d = 0; d < clampedDays; d++) {
       s = tickMinisterFatigue(s);
       s = tickAdministrationMorale(s);
+      s = tickCabinetConflicts(s);
     }
   }
 
