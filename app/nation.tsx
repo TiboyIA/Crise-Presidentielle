@@ -26,6 +26,8 @@ import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { ResourceKey } from "@/types/strategy";
 import { isDailyRewardReady, getNextReward } from "@/data/dailyRewards";
 import { usePortrait } from "@/context/PortraitContext";
+import { useComfort } from "@/context/ComfortContext";
+import { LowLoadBanner } from "@/components/LowLoadBanner";
 import { isRankedIntended } from "@/services/RankedService";
 import { computeFrustration, BAND_LABELS, BAND_COLORS } from "@/logic/frustrationEngine";
 import { computePlayerStyle } from "@/logic/playerSegmentation";
@@ -78,11 +80,15 @@ export default function NationScreen() {
   const insets = useSafeAreaInsets();
   const { state, collectMissionReward, shouldShowBilan, adoptDoctrine, launchReform, fireMinister, claimDailyReward, contributeFund } = useStrategy();
   const { selectedPortrait } = usePortrait();
+  const { lowLoad, reducedInfo, contrastBoost } = useComfort();
   const [doctrineExpanded, setDoctrineExpanded] = useState(false);
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [reformsExpanded, setReformsExpanded] = useState(false);
   const [secondaryExpanded, setSecondaryExpanded] = useState(false);
   const [advisorDismissed, setAdvisorDismissed] = useState(false);
+  const [lowLoadExpanded, setLowLoadExpanded] = useState(false);
+  const [baromExpanded, setBaromExpanded] = useState(false);
+  const [secondairesExpanded, setSecondairesExpanded] = useState(false);
   const { hPad, navCols, maxContentWidth } = useResponsive();
 
   const frustration       = useMemo(() => (state ? computeFrustration(state) : null),        [state]);
@@ -251,6 +257,23 @@ export default function NationScreen() {
         {/* HORLOGE STRATÉGIQUE — drives mandate progression in real time */}
         <StrategicClock />
 
+        {/* PRIORITÉ — Mode Faible Charge Mentale */}
+        {lowLoad && (() => {
+          const topRec = recommendations[0];
+          if (!topRec) return null;
+          const color = topRec.priority === 1 ? PALETTE.danger : topRec.priority === 2 ? PALETTE.info : PALETTE.textMid;
+          const icon = topRec.priority === 1 ? "alert-circle-outline" : "compass-outline";
+          return (
+            <LowLoadBanner
+              text={topRec.title + " — " + topRec.reason}
+              icon={icon as any}
+              color={color}
+              actionLabel="Agir"
+              actionRoute={topRec.targetRoute}
+            />
+          );
+        })()}
+
         {/* MODE CLASSÉ ACTIF */}
         {isRankedIntended() && (
           <View style={styles.rankedBadge}>
@@ -334,7 +357,14 @@ export default function NationScreen() {
         </ScrollView>
 
         {/* BAROMÈTRE NATIONAL */}
-        <SectionHeader label="Baromètre national" />
+        <SectionHeader label="Baromètre national" trailing={
+          reducedInfo
+            ? <Pressable onPress={() => setBaromExpanded((v) => !v)}>
+                <Text style={styles.showMoreText}>{baromExpanded ? "Réduire ↑" : "Voir ↓"}</Text>
+              </Pressable>
+            : undefined
+        } />
+        {(!reducedInfo || baromExpanded) && (
         <Panel style={styles.barometre}>
           <View style={styles.barometreGrid}>
             {Object.entries(state.nationalIndicators).map(([key, val]) => {
@@ -346,10 +376,16 @@ export default function NationScreen() {
               return (
                 <View key={key} style={styles.barometreItem}>
                   <View style={styles.barometreLabelRow}>
-                    <Text style={styles.barometreLabel}>{INDICATOR_LABELS[key]}</Text>
-                    <Text style={[styles.barometreVal, isLow && { color: PALETTE.danger }]}>
-                      {key === "publicBudget" ? (val >= 0 ? `+${val}` : `${val}`) : `${val}%`}
-                    </Text>
+                    <View style={styles.barometreLabelWrap}>
+                      {isLow && <MaterialCommunityIcons name="alert" size={9} color={PALETTE.danger} />}
+                      <Text style={[styles.barometreLabel, contrastBoost && { color: PALETTE.textMid }]}>{INDICATOR_LABELS[key]}</Text>
+                    </View>
+                    <View style={styles.barometreValWrap}>
+                      {isLow && <Text style={styles.barometreAlertBadge}>CRITIQUE</Text>}
+                      <Text style={[styles.barometreVal, isLow && { color: PALETTE.danger }, contrastBoost && !isLow && { color: PALETTE.textHigh }]}>
+                        {key === "publicBudget" ? (val >= 0 ? `+${val}` : `${val}`) : `${val}%`}
+                      </Text>
+                    </View>
                   </View>
                   <View style={styles.barometreTrack}>
                     <View style={[styles.barometreFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: isLow ? PALETTE.danger : color }]} />
@@ -359,6 +395,30 @@ export default function NationScreen() {
             })}
           </View>
         </Panel>
+        )}
+
+        {/* SECTIONS SECONDAIRES — masquées en mode Faible Charge Mentale */}
+        {lowLoad && !lowLoadExpanded && (
+          <Pressable
+            onPress={() => setLowLoadExpanded(true)}
+            style={({ pressed }) => [styles.showMoreBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <MaterialCommunityIcons name="chevron-down" size={14} color={PALETTE.textLow} />
+            <Text style={styles.showMoreText}>Voir tout le tableau de bord</Text>
+          </Pressable>
+        )}
+        {lowLoad && lowLoadExpanded && (
+          <Pressable
+            onPress={() => setLowLoadExpanded(false)}
+            style={({ pressed }) => [styles.showMoreBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <MaterialCommunityIcons name="chevron-up" size={14} color={PALETTE.textLow} />
+            <Text style={styles.showMoreText}>Réduire</Text>
+          </Pressable>
+        )}
+
+        {(!lowLoad || lowLoadExpanded) && (
+          <>
 
         {/* FONDS NATIONAL DE RÉSILIENCE */}
         {(() => {
@@ -568,6 +628,9 @@ export default function NationScreen() {
           )}
         </Panel>
 
+          </>
+        )}
+
         {/* BILAN DISPONIBLE BANNER */}
         {shouldShowBilan && (
           <Pressable onPress={() => router.push("/mandate-review" as any)} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}>
@@ -599,33 +662,89 @@ export default function NationScreen() {
           </Panel>
         )}
 
-        {/* RECOMMANDATIONS — prochaine action pertinente */}
-        {recommendations.length > 0 && (
-          <View style={styles.recCard}>
-            <View style={styles.recHeader}>
-              <MaterialCommunityIcons name="compass-outline" size={13} color={PALETTE.info} />
-              <Text style={styles.recKicker}>PROCHAINE ACTION</Text>
-            </View>
-            {recommendations.map((rec, i) => (
-              <Pressable
-                key={rec.id}
-                onPress={() => router.push(rec.targetRoute as any)}
-                style={({ pressed }) => [
-                  styles.recRow,
-                  i < recommendations.length - 1 && styles.recRowBorder,
-                  { opacity: pressed ? 0.8 : 1 },
-                ]}
-              >
-                <View style={[styles.recDot, { backgroundColor: rec.priority === 1 ? "#FF8040" : rec.priority === 2 ? PALETTE.info : "#6b7280" }]} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.recTitle} numberOfLines={1}>{rec.title}</Text>
-                  <Text style={styles.recReason} numberOfLines={2}>{rec.reason}</Text>
+        {/* ACTIONS PRIORITAIRES — hiérarchie décisionnelle */}
+        {recommendations.length > 0 && (() => {
+          const critiques   = recommendations.filter((r) => r.priority === 1);
+          const importantes = recommendations.filter((r) => r.priority === 2).slice(0, 2);
+          const secondaires = recommendations.filter((r) => r.priority === 3);
+          return (
+            <View style={styles.actionSection}>
+              <SectionHeader label="Actions prioritaires" />
+
+              {/* ── CRITIQUE : À TRAITER MAINTENANT ── */}
+              {critiques[0] && (
+                <Pressable
+                  onPress={() => router.push(critiques[0].targetRoute as any)}
+                  style={({ pressed }) => [styles.actionCritiqueCard, { opacity: pressed ? 0.9 : 1 }]}
+                >
+                  <View style={styles.actionLabelRow}>
+                    <MaterialCommunityIcons name="alert-octagon" size={10} color={PALETTE.danger} />
+                    <Text style={[styles.actionLabel, { color: PALETTE.danger }]}>À TRAITER MAINTENANT</Text>
+                  </View>
+                  <Text style={styles.actionCritiqueTitle}>{critiques[0].title}</Text>
+                  <Text style={styles.actionReason} numberOfLines={2}>{critiques[0].reason}</Text>
+                  <View style={styles.actionCta}>
+                    <Text style={[styles.actionCtaText, { color: PALETTE.danger }]}>Agir →</Text>
+                  </View>
+                </Pressable>
+              )}
+
+              {/* ── IMPORTANTES : PEUT ATTENDRE ── */}
+              {importantes.length > 0 && (
+                <View style={styles.actionImportantGroup}>
+                  <View style={styles.actionLabelRow}>
+                    <MaterialCommunityIcons name="clock-outline" size={10} color={PALETTE.warning} />
+                    <Text style={[styles.actionLabel, { color: PALETTE.warning }]}>PEUT ATTENDRE</Text>
+                  </View>
+                  {importantes.map((rec) => (
+                    <Pressable
+                      key={rec.id}
+                      onPress={() => router.push(rec.targetRoute as any)}
+                      style={({ pressed }) => [styles.actionImportantRow, { opacity: pressed ? 0.85 : 1 }]}
+                    >
+                      <View style={styles.actionDot} />
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={styles.recTitle} numberOfLines={1}>{rec.title}</Text>
+                        <Text style={styles.recReason} numberOfLines={1}>{rec.reason}</Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={14} color={PALETTE.textLow} />
+                    </Pressable>
+                  ))}
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={16} color={PALETTE.textLow} />
-              </Pressable>
-            ))}
-          </View>
-        )}
+              )}
+
+              {/* ── SECONDAIRES : OPTIMISATION ── */}
+              {secondaires.length > 0 && (
+                <>
+                  <Pressable
+                    onPress={() => setSecondairesExpanded((v) => !v)}
+                    style={({ pressed }) => [styles.actionOptToggle, { opacity: pressed ? 0.75 : 1 }]}
+                  >
+                    <MaterialCommunityIcons name="tune-vertical" size={10} color="#6b7280" />
+                    <Text style={styles.actionOptLabel}>
+                      OPTIMISATION · {secondaires.length} suggestion{secondaires.length > 1 ? "s" : ""}
+                    </Text>
+                    <MaterialCommunityIcons name={secondairesExpanded ? "chevron-up" : "chevron-down"} size={12} color="#6b7280" />
+                  </Pressable>
+                  {secondairesExpanded && secondaires.map((rec) => (
+                    <Pressable
+                      key={rec.id}
+                      onPress={() => router.push(rec.targetRoute as any)}
+                      style={({ pressed }) => [styles.actionOptRow, { opacity: pressed ? 0.8 : 1 }]}
+                    >
+                      <View style={[styles.actionDot, { backgroundColor: "#6b7280" }]} />
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={styles.recTitle} numberOfLines={1}>{rec.title}</Text>
+                        <Text style={styles.recReason} numberOfLines={1}>{rec.reason}</Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={14} color={PALETTE.textLow} />
+                    </Pressable>
+                  ))}
+                </>
+              )}
+            </View>
+          );
+        })()}
 
         {/* ACTIONS */}
         <SectionHeader label="Cabinet présidentiel" />
@@ -725,6 +844,11 @@ function MinisterRow({ m, onFire }: { m: { id: string; name?: string; loyalty: n
             <View style={[styles.ministerLoyaltyFill, { width: `${m.loyalty}%`, backgroundColor: loyaltyColor }]} />
           </View>
           <Text style={[styles.ministerLoyaltyVal, { color: loyaltyColor }]}>{m.loyalty}</Text>
+          {m.loyalty < 40
+            ? <Text style={[styles.ministerLoyaltyStatus, { color: PALETTE.danger }]}>CRITIQUE</Text>
+            : m.loyalty < 60
+            ? <Text style={[styles.ministerLoyaltyStatus, { color: PALETTE.warning }]}>VIGILANCE</Text>
+            : null}
         </View>
       </View>
       {canFire && (
@@ -834,6 +958,9 @@ const styles = StyleSheet.create({
   barometreGrid: { gap: 8 },
   barometreItem: { gap: 4 },
   barometreLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  barometreLabelWrap: { flexDirection: "row", alignItems: "center", gap: 4 },
+  barometreValWrap: { flexDirection: "row", alignItems: "center", gap: 5 },
+  barometreAlertBadge: { fontSize: 7, fontFamily: FONT.bold, color: PALETTE.danger, letterSpacing: 0.5, opacity: 0.85 },
   barometreLabel: { fontSize: 10, fontFamily: FONT.med, color: PALETTE.textMid, letterSpacing: 0.5 },
   barometreVal: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.textHigh },
   barometreTrack: { height: 4, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
@@ -886,6 +1013,7 @@ const styles = StyleSheet.create({
   ministerLoyaltyTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge, overflow: "hidden" },
   ministerLoyaltyFill: { height: "100%", borderRadius: 2 },
   ministerLoyaltyVal: { fontSize: 9, fontFamily: FONT.bold, width: 22, textAlign: "right" },
+  ministerLoyaltyStatus: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 0.4, flexShrink: 0 },
   fireBtn: { padding: 6, borderRadius: RADIUS.xs, backgroundColor: PALETTE.danger + "22", borderWidth: 1, borderColor: PALETTE.danger + "44" },
 
   secondaryCabinetToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, justifyContent: "center" },
@@ -1018,6 +1146,34 @@ const styles = StyleSheet.create({
   recDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   recTitle: { fontSize: 12, fontFamily: FONT.semi, color: PALETTE.textHigh },
   recReason: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 14 },
+
+  actionSection: { gap: 6 },
+  actionCritiqueCard: { borderRadius: RADIUS.md, borderWidth: 1, borderColor: PALETTE.danger + "55", backgroundColor: PALETTE.danger + "0d", padding: 12, gap: 6 },
+  actionLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  actionLabel: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1.5 },
+  actionCritiqueTitle: { fontSize: 14, fontFamily: FONT.semi, color: PALETTE.textHigh, lineHeight: 19 },
+  actionReason: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 15 },
+  actionCta: { flexDirection: "row", justifyContent: "flex-end", marginTop: 2 },
+  actionCtaText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  actionImportantGroup: { gap: 5 },
+  actionImportantRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge, backgroundColor: PALETTE.panelHi },
+  actionDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0, backgroundColor: PALETTE.info },
+  actionOptToggle: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 6 },
+  actionOptLabel: { flex: 1, fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1.5, color: "#6b7280" },
+  actionOptRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge + "66" },
+
+  showMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: RADIUS.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.panelEdge,
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+  showMoreText: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 0.5 },
 
   protChip: { borderRadius: 3, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2, marginLeft: "auto" },
   protChipText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 1 },

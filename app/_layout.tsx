@@ -11,7 +11,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -19,12 +19,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { track as telemetry } from "@/services/TelemetryService";
 import { CrisisAlertOverlay } from "@/components/CrisisAlertOverlay";
+import { SmartPauseOverlay } from "@/components/SmartPauseOverlay";
+import { OneHandBar } from "@/components/OneHandBar";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { PortraitProvider } from "@/context/PortraitContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { ComfortProvider } from "@/context/ComfortContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
@@ -51,8 +54,9 @@ function PushRegistrar() {
 
 function RootLayoutNav() {
   return (
-    <>
+    <View style={{ flex: 1 }}>
     <CrisisAlertOverlay />
+    <SmartPauseOverlay />
     <Stack
       screenOptions={{
         headerShown: false,
@@ -93,7 +97,8 @@ function RootLayoutNav() {
       <Stack.Screen name="game-over" />
       <Stack.Screen name="shop" options={{ presentation: "modal" }} />
     </Stack>
-    </>
+    <OneHandBar />
+    </View>
   );
 }
 
@@ -136,6 +141,7 @@ export default function RootLayout() {
               <AuthProvider>
                 <PushRegistrar />
                 <ThemeProvider>
+                <ComfortProvider>
                 <EntitlementsProvider>
                   <StrategyProvider>
                     <GameProvider>
@@ -146,6 +152,7 @@ export default function RootLayout() {
                     </GameProvider>
                   </StrategyProvider>
                 </EntitlementsProvider>
+                </ComfortProvider>
                 </ThemeProvider>
               </AuthProvider>
             </KeyboardProvider>

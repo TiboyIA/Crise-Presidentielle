@@ -10,6 +10,7 @@ import Svg, {
   RadialGradient,
   Rect,
   Stop,
+  Text as SvgText,
 } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -33,6 +34,8 @@ import { FloatingMapLegend } from "@/components/FloatingMapLegend";
 import { CountryCommandPanel } from "@/components/CountryCommandPanel";
 import { computeCountryRenderExt } from "@/data/countryStatus";
 import { FONT, PALETTE, STATUS_COLORS } from "@/constants/uiTokens";
+import { useComfort } from "@/context/ComfortContext";
+import { LowLoadBanner } from "@/components/LowLoadBanner";
 import type { ExtMapLayerId } from "@/data/mapLayers";
 import type { CountryId, OperationType } from "@/types/strategy";
 import { COUNTRY_LABEL_ANCHORS } from "@/data/mapLabelAnchors";
@@ -54,6 +57,16 @@ const COUNTRY_SVG   = new Map<string, SvgEntry>(
   GAME_ENTRIES.map(([code, entry]) => [ALPHA2_TO_COUNTRY_ID[code], entry])
 );
 const CID_TO_ALPHA2 = new Map(Object.entries(ALPHA2_TO_COUNTRY_ID).map(([a2, cid]) => [cid, a2]));
+
+const HOTSPOT_LETTERS: Record<string, string> = {
+  crisis:       "!",
+  cyber:        "C",
+  military:     "M",
+  economy:      "E",
+  diplomacy:    "D",
+  intelligence: "R",
+  opportunity:  "O",
+};
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 12;
@@ -254,6 +267,7 @@ export default function WorldMapScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { state } = useStrategy();
+  const { lowLoad } = useComfort();
 
   const [selected, setSelected]         = useState<CountryId | null>(null);
   const [activeLayer, setActiveLayer]   = useState<ExtMapLayerId>("diplomacy");
@@ -589,10 +603,23 @@ export default function WorldMapScreen() {
             const radius = h.severity === "critical" ? 6 : h.severity === "high" ? 4.5 : 3;
             const hx = e.cx + (h.x - 50) * SVG_W * 0.003;
             const hy = e.cy + (h.y - 50) * SVG_H * 0.003;
+            const letter = HOTSPOT_LETTERS[h.type] ?? "?";
             return (
               <G key={h.id}>
                 <Circle cx={hx} cy={hy} r={radius + 5} fill={color} opacity={0.12} />
                 <Circle cx={hx} cy={hy} r={radius}     fill={color} stroke="#000" strokeWidth={0.4} />
+                {h.severity !== "low" && (
+                  <SvgText
+                    x={hx}
+                    y={hy + radius * 0.42}
+                    fontSize={radius * 1.1}
+                    fill="#fff"
+                    textAnchor="middle"
+                    fontWeight="bold"
+                  >
+                    {letter}
+                  </SvgText>
+                )}
               </G>
             );
           })}
@@ -702,6 +729,29 @@ export default function WorldMapScreen() {
             <HudStat value={`${hostileCount}`} label="HOSTILE" color="#ff3040" />
           </View>
         </View>
+
+        {/* PRIORITÉ — Mode Faible Charge Mentale */}
+        {lowLoad && (() => {
+          const criticalRelation = state.relations
+            .filter((r) => r.status === "hostile" || r.score < -40)
+            .sort((a, b) => a.score - b.score)[0];
+          const threatCountry = criticalRelation ? COUNTRIES[criticalRelation.countryId] : null;
+          const isCritical = criticalRelation ? criticalRelation.score < -60 : false;
+          const bannerText = threatCountry
+            ? `Menace principale : ${threatCountry.name} — ${isCritical ? "tension maximale, risque de conflit" : "relations hostiles"}. Surveillance recommandée.`
+            : "Situation géopolitique stable — aucune menace active détectée.";
+          const bannerColor = isCritical ? PALETTE.danger : criticalRelation ? PALETTE.warning : PALETTE.success;
+          const bannerIcon = isCritical ? "sword-cross" : criticalRelation ? "alert-outline" : "earth-check";
+          return (
+            <View style={{ position: "absolute", top: topBarH + 4, left: 12, right: 12 }} pointerEvents="none">
+              <LowLoadBanner
+                text={bannerText}
+                icon={bannerIcon as any}
+                color={bannerColor}
+              />
+            </View>
+          );
+        })()}
 
         {/* Légende couches */}
         <FloatingMapLegend

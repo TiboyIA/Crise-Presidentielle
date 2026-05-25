@@ -15,6 +15,7 @@ import { LEAKAGE_BAND_LABELS, LEAKAGE_BAND_COLORS } from "@/logic/claimsLeakageE
 import { INSURANCE_PRODUCTS } from "@/data/insuranceProducts";
 import { CAT_BOND_DEFS } from "@/logic/catBondEngine";
 import { COST_SHARING_ICONS, COST_SHARING_LABELS } from "@/logic/crisisCostSharingEngine";
+import { useComfort } from "@/context/ComfortContext";
 
 interface Props {
   entry: NewsLogEntry;
@@ -25,8 +26,10 @@ export function NewsCard({ entry, onPress }: Props) {
   const urg = urgencyColor(entry.urgency) || URGENCY_COLORS.routine;
   const icon = typeIcon(entry.type);
   const bannerImg = NEWS_IMG[entry.type];
+  const { enabled: comfort, fs, pad } = useComfort();
 
-  const effectEntries = (Object.entries(entry.effects) as [ResourceKey, number][]).filter(([, v]) => v !== 0);
+  const allEffects = (Object.entries(entry.effects) as [ResourceKey, number][]).filter(([, v]) => v !== 0);
+  const effectEntries = comfort ? allEffects.slice(0, 4) : allEffects;
 
   return (
     <Pressable
@@ -38,11 +41,11 @@ export function NewsCard({ entry, onPress }: Props) {
         start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
         style={[styles.card, { borderColor: PALETTE.panelEdge }]}
       >
-        {/* Urgency stripe */}
-        <View style={[styles.stripe, { backgroundColor: urg }]} />
+        {/* Urgency stripe — masquée en mode Confort */}
+        {!comfort && <View style={[styles.stripe, { backgroundColor: urg }]} />}
 
-        {/* Banner */}
-        {bannerImg && (
+        {/* Banner — masquée en mode Confort pour alléger la charge visuelle */}
+        {bannerImg && !comfort && (
           <View style={styles.bannerWrap}>
             <Image source={bannerImg} style={styles.banner} resizeMode="cover" />
             <LinearGradient colors={["rgba(13,17,25,0.2)", "rgba(13,17,25,0.92)"]} style={StyleSheet.absoluteFill} />
@@ -56,8 +59,8 @@ export function NewsCard({ entry, onPress }: Props) {
           </View>
         )}
 
-        {/* Body */}
-        <View style={styles.body}>
+        {/* Body — padding élargi en mode Confort */}
+        <View style={[styles.body, comfort && { padding: pad(12), gap: pad(6) }]}>
           {!bannerImg && (
             <View style={styles.headerNoImg}>
               <Text style={styles.headerIcon}>{icon}</Text>
@@ -65,7 +68,7 @@ export function NewsCard({ entry, onPress }: Props) {
               <Badge label={entry.urgency} tone={mapUrgency(entry.urgency)} size="xs" />
             </View>
           )}
-          <Text style={styles.title} numberOfLines={2}>{entry.title}</Text>
+          <Text style={[styles.title, comfort && { fontSize: fs(13), lineHeight: fs(17), color: PALETTE.textHigh }]} numberOfLines={2}>{entry.title}</Text>
 
           {entry.choiceLabel && (
             <View style={styles.decisionBox}>
@@ -73,7 +76,7 @@ export function NewsCard({ entry, onPress }: Props) {
                 <View style={styles.decisionTag} />
                 <Text style={styles.decisionLabel}>DÉCISION : {entry.choiceLabel}</Text>
               </View>
-              {entry.consequence && <Text style={styles.consequence} numberOfLines={2}>{entry.consequence}</Text>}
+              {entry.consequence && <Text style={[styles.consequence, comfort && { fontSize: fs(11), color: PALETTE.textMid }]} numberOfLines={2}>{entry.consequence}</Text>}
             </View>
           )}
 

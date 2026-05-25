@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
@@ -12,6 +12,15 @@ import { typeIcon, urgencyColor } from "@/logic/newsEngine";
 import { computeNationalTension } from "@/logic/tensionEngine";
 import { FONT, PALETTE } from "@/constants/uiTokens";
 import type { NewsType } from "@/types/strategy";
+import { useComfort } from "@/context/ComfortContext";
+import { LowLoadBanner } from "@/components/LowLoadBanner";
+
+const URGENCY_SHAPES: Record<string, string> = {
+  critique: "▲",
+  forte:    "◆",
+  moyenne:  "●",
+  faible:   "○",
+};
 
 const TYPE_FILTERS: { label: string; value: NewsType | "all" }[] = [
   { label: "Tout",       value: "all" },
@@ -29,8 +38,11 @@ export default function JournalDeCriseScreen() {
   const { state, resolveInteractiveNews, dismissNews, markNewsRead } = useStrategy();
   const { hPad, width } = useResponsive();
 
+  const { enabled: comfort, fs, pad, lowLoad, reducedInfo, extraConfirm } = useComfort();
   const [filter, setFilter] = useState<NewsType | "all">("all");
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [logExpanded, setLogExpanded] = useState(false);
+  const LOG_INITIAL = 5;
 
   useEffect(() => {
     if (state) markNewsRead();
@@ -61,12 +73,31 @@ export default function JournalDeCriseScreen() {
     <View style={styles.container}>
       <ScreenHeader title="Journal de Crise" kicker="DESK PRÉSIDENTIEL" />
 
+      {/* PRIORITÉ — Mode Faible Charge Mentale */}
+      {lowLoad && (
+        <View style={{ paddingHorizontal: hPad, paddingTop: 8 }}>
+          {pendingInteractive.length > 0 ? (
+            <LowLoadBanner
+              text={`Décision urgente : ${pendingInteractive.length} événement${pendingInteractive.length > 1 ? "s" : ""} en attente de votre arbitrage.`}
+              icon="alert-octagon-outline"
+              color={PALETTE.danger}
+            />
+          ) : (
+            <LowLoadBanner
+              text="Aucune décision urgente — situation sous contrôle."
+              icon="check-circle-outline"
+              color={PALETTE.success}
+            />
+          )}
+        </View>
+      )}
+
       {/* Breaking news ticker */}
       <View style={[styles.tickerWrap, { paddingHorizontal: hPad }]}>
         <View style={styles.tickerBadge}>
           <Text style={styles.tickerBadgeText}>EN DIRECT</Text>
         </View>
-        <Text style={styles.tickerText}>
+        <Text style={[styles.tickerText, comfort && { fontSize: fs(11), color: PALETTE.textHigh }]}>
           {pendingInteractive.length > 0
             ? `${pendingInteractive.length} décision${pendingInteractive.length > 1 ? "s" : ""} requise${pendingInteractive.length > 1 ? "s" : ""}`
             : `${news.log.length} dépêche${news.log.length > 1 ? "s" : ""} archivée${news.log.length > 1 ? "s" : ""}`}
@@ -75,7 +106,7 @@ export default function JournalDeCriseScreen() {
 
       {/* Pending interactive decisions */}
       {pendingInteractive.length > 0 && (
-        <Panel variant="danger" glow style={[styles.urgentPanel, { marginHorizontal: hPad }]}>
+        <Panel variant="danger" glow={!comfort} style={[styles.urgentPanel, { marginHorizontal: hPad }]}>
           <View style={styles.urgentHeader}>
             <MaterialCommunityIcons name="alert-octagon" size={16} color={PALETTE.danger} />
             <Text style={styles.urgentTitle}>DÉCISIONS PRÉSIDENTIELLES EN ATTENTE</Text>
@@ -91,14 +122,15 @@ export default function JournalDeCriseScreen() {
                   style={({ pressed }) => [
                     styles.urgentChip,
                     { borderColor: urg, backgroundColor: urg + "1c", maxWidth: Math.round(width * 0.62), opacity: pressed ? 0.85 : 1 },
+                    comfort && { padding: pad(10), minWidth: 180 },
                   ]}
                 >
                   <View style={styles.urgentChipHeader}>
                     <Text style={styles.urgentChipIcon}>{typeIcon(event.type)}</Text>
-                    <Text style={[styles.urgentChipUrg, { color: urg }]}>{event.urgency.toUpperCase()}</Text>
+                    <Text style={[styles.urgentChipUrg, { color: urg }, comfort && { fontSize: fs(9) }]}>{(URGENCY_SHAPES[event.urgency] ?? "") + " " + event.urgency.toUpperCase()}</Text>
                   </View>
-                  <Text style={[styles.urgentChipTitle, { color: PALETTE.textHigh }]} numberOfLines={2}>{event.title}</Text>
-                  <Text style={[styles.urgentChipCta, { color: urg }]}>Décider →</Text>
+                  <Text style={[styles.urgentChipTitle, { color: PALETTE.textHigh }, comfort && { fontSize: fs(12), lineHeight: fs(16) }]} numberOfLines={2}>{event.title}</Text>
+                  <Text style={[styles.urgentChipCta, { color: urg }, comfort && { fontSize: fs(10), paddingVertical: 2 }]}>Décider →</Text>
                 </Pressable>
               );
             })}
@@ -135,7 +167,7 @@ export default function JournalDeCriseScreen() {
 
       {/* Log */}
       <ScrollView
-        contentContainerStyle={[styles.log, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
+        contentContainerStyle={[styles.log, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }, comfort && { gap: pad(10) }]}
         showsVerticalScrollIndicator={false}
       >
         {filteredLog.length === 0 ? (
@@ -151,9 +183,21 @@ export default function JournalDeCriseScreen() {
         ) : (
           <>
             <SectionHeader label="Archives" count={`${filteredLog.length}`} />
-            {filteredLog.map((entry, i) => (
+            {(reducedInfo && !logExpanded ? filteredLog.slice(0, LOG_INITIAL) : filteredLog).map((entry, i) => (
               <NewsCard key={`${entry.eventId}_${entry.timestamp}_${i}`} entry={entry} />
             ))}
+            {reducedInfo && filteredLog.length > LOG_INITIAL && (
+              <Pressable
+                onPress={() => setLogExpanded((v) => !v)}
+                style={({ pressed }) => [styles.logMoreBtn, { opacity: pressed ? 0.75 : 1 }]}
+              >
+                <Text style={styles.logMoreText}>
+                  {logExpanded
+                    ? "Réduire ↑"
+                    : `${filteredLog.length - LOG_INITIAL} article${filteredLog.length - LOG_INITIAL > 1 ? "s" : ""} supplémentaire${filteredLog.length - LOG_INITIAL > 1 ? "s" : ""} ↓`}
+                </Text>
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -175,8 +219,20 @@ export default function JournalDeCriseScreen() {
           setActiveModal(null);
         }}
         onDismiss={() => {
-          if (activeModal) dismissNews(activeModal);
-          setActiveModal(null);
+          if (!activeModal) return;
+          if (extraConfirm) {
+            Alert.alert(
+              "Ignorer cet événement",
+              "Cet événement sera archivé sans décision prise. Voulez-vous continuer ?",
+              [
+                { text: "Annuler", style: "cancel" },
+                { text: "Ignorer", style: "destructive", onPress: () => { dismissNews(activeModal); setActiveModal(null); } },
+              ],
+            );
+          } else {
+            dismissNews(activeModal);
+            setActiveModal(null);
+          }
         }}
       />
     </View>
@@ -209,4 +265,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
   emptyTitle: { fontSize: 13, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1 },
   emptyText: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, textAlign: "center", lineHeight: 16, maxWidth: 240 },
+  logMoreBtn: { alignItems: "center", paddingVertical: 10 },
+  logMoreText: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 0.5 },
 });

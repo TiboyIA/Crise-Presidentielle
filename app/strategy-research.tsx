@@ -17,6 +17,8 @@ import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import type { StrategyResearchCategory, StrategyResearchId } from "@/types/strategyResearch";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { canAfford } from "@/logic/buildingEngine";
+import { useComfort } from "@/context/ComfortContext";
+import { LowLoadBanner } from "@/components/LowLoadBanner";
 import { useCommand } from "@/hooks/useCommand";
 import { commandId } from "@/core/commands";
 
@@ -40,6 +42,8 @@ export default function StrategyResearchScreen() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { run, isPending } = useCommand();
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+
+  const { enabled: comfort, fs, pad, lowLoad } = useComfort();
 
   if (!state) return null;
 
@@ -83,12 +87,33 @@ export default function StrategyResearchScreen() {
         </Pressable>
         <View style={styles.headerText}>
           <Text style={styles.kicker}>RECHERCHE STRATÉGIQUE</Text>
-          <Text style={styles.title}>Arbre technologique</Text>
+          <Text style={[styles.title, comfort && { fontSize: fs(20) }]}>Arbre technologique</Text>
           <Text style={styles.subtitle}>
             {research.completed.length}/15 recherches · JOUR {state.mandateDay}
           </Text>
         </View>
       </LinearGradient>
+
+      {/* PRIORITÉ — Mode Faible Charge Mentale */}
+      {lowLoad && (() => {
+        const nextRec = STRATEGY_RESEARCH_LIST.find(
+          (r) => !research.completed.includes(r.id) && r.id !== research.inProgress?.id,
+        );
+        if (!nextRec) return (
+          <LowLoadBanner
+            text="Toutes les recherches disponibles sont en cours ou terminées."
+            icon="check-circle-outline"
+            color={PALETTE.success}
+          />
+        );
+        return (
+          <LowLoadBanner
+            text={`Recommandé : ${nextRec.name} — ${nextRec.description}`}
+            icon="flask-outline"
+            color="#a78bfa"
+          />
+        );
+      })()}
 
       {/* In-progress banner */}
       {ip && currentDef && (
@@ -146,7 +171,7 @@ export default function StrategyResearchScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 32 }, comfort && { gap: pad(10) }]}
         renderItem={({ item }) => {
           const isCompleted = research.completed.includes(item.id);
           const isInProgress = ip?.id === item.id;
@@ -201,14 +226,15 @@ const ResearchCard = memo(function ResearchCard({
   statusLabel: string;
   onPress: () => void;
 }) {
+  const { enabled: comfort, fs, pad } = useComfort();
   return (
-    <View style={[styles.card, { borderColor: isCompleted ? catColor + "66" : PALETTE.panelEdge, opacity: isCompleted ? 0.8 : 1 }]}>
-      <View style={styles.cardTop}>
+    <View style={[styles.card, { borderColor: isCompleted ? catColor + "66" : PALETTE.panelEdge, opacity: isCompleted ? 0.8 : 1 }, comfort && { padding: pad(12), gap: pad(8) }]}>
+      <View style={[styles.cardTop, comfort && { gap: pad(10) }]}>
         <View style={[styles.iconBadge, { backgroundColor: catColor + "22", borderColor: catColor + "44" }]}>
           <Text style={styles.iconEmoji}>{item.icon}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardName}>{item.name}</Text>
+          <Text style={[styles.cardName, comfort && { fontSize: fs(14), lineHeight: fs(18) }]}>{item.name}</Text>
           <Text style={[styles.cardCat, { color: catColor }]}>
             {RESEARCH_CATEGORY_LABELS[item.category].toUpperCase()} · {item.durationDays}j
           </Text>
@@ -221,8 +247,8 @@ const ResearchCard = memo(function ResearchCard({
         )}
       </View>
 
-      <Text style={styles.cardDesc}>{item.description}</Text>
-      <Text style={styles.cardBonus}>➜ {item.bonusLabel}</Text>
+      <Text style={[styles.cardDesc, comfort && { fontSize: fs(12), color: PALETTE.textMid }]}>{item.description}</Text>
+      <Text style={[styles.cardBonus, comfort && { fontSize: fs(11) }]}>➜ {item.bonusLabel}</Text>
 
       <Pressable
         onPress={onPress}
@@ -230,9 +256,10 @@ const ResearchCard = memo(function ResearchCard({
         style={({ pressed }) => [
           styles.cardBtn,
           { backgroundColor: disabled ? PALETTE.panelEdge : catColor, opacity: pressed && !disabled ? 0.8 : 1 },
+          comfort && { paddingVertical: pad(9) },
         ]}
       >
-        <Text style={[styles.cardBtnText, { color: disabled ? PALETTE.textLow : "#fff" }]}>
+        <Text style={[styles.cardBtnText, { color: disabled ? PALETTE.textLow : "#fff" }, comfort && { fontSize: fs(11) }]}>
           {statusLabel}
         </Text>
       </Pressable>

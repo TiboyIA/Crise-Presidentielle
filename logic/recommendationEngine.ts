@@ -157,7 +157,7 @@ export function generateRecommendations(state: StrategyGameState): Recommendatio
     rankingPressure(state),
   ].filter((r): r is Recommendation => r !== null);
 
-  // Tri par priorité, dédoublonnage par route, cap à 3
+  // Tri par priorité, dédoublonnage par route
   const seen = new Set<string>();
   return candidates
     .sort((a, b) => a.priority - b.priority)
@@ -165,6 +165,5 @@ export function generateRecommendations(state: StrategyGameState): Recommendatio
       if (seen.has(r.targetRoute)) return false;
       seen.add(r.targetRoute);
       return true;
-    })
-    .slice(0, 3);
+    });
 }

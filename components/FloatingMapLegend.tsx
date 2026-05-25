@@ -1,9 +1,14 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { FONT, PALETTE } from "@/constants/uiTokens";
+import { FONT, PALETTE, STATUS_COLORS } from "@/constants/uiTokens";
 import { EXTENDED_MAP_LAYERS } from "@/data/mapLayers";
 import type { ExtMapLayerId } from "@/data/mapLayers";
+
+const LINE_LEGENDS: Partial<Record<ExtMapLayerId, { label: string; color: string; dashed?: boolean }>> = {
+  alliances: { label: "Alliance",  color: STATUS_COLORS.allied },
+  threat:    { label: "Tension",   color: STATUS_COLORS.hostile, dashed: true },
+};
 
 interface Props {
   activeLayer: ExtMapLayerId;
@@ -87,6 +92,27 @@ export function FloatingMapLegend({
         })}
 
         <View style={styles.hairline} />
+
+        {/* ── Légende lignes couche active ── */}
+        {expanded && LINE_LEGENDS[activeLayer] && (() => {
+          const ll = LINE_LEGENDS[activeLayer]!;
+          return (
+            <>
+              <View style={styles.hairline} />
+              <View style={styles.lineLegendRow}>
+                <View style={[styles.lineSample, { backgroundColor: ll.dashed ? "transparent" : ll.color, borderColor: ll.color }]}>
+                  {ll.dashed && (
+                    <>
+                      <View style={[styles.lineDash, { backgroundColor: ll.color }]} />
+                      <View style={[styles.lineDash, { backgroundColor: ll.color }]} />
+                    </>
+                  )}
+                </View>
+                <Text style={[styles.lineLegendLabel, { color: ll.color }]}>{ll.label}</Text>
+              </View>
+            </>
+          );
+        })()}
 
         {/* ── Signaux (hotspots) — séparé des couches ── */}
         <Pressable
@@ -197,4 +223,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     flex: 1,
   },
+
+  lineLegendRow: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 5 },
+  lineSample: { width: 14, height: 2, borderRadius: 1, flexDirection: "row", alignItems: "center", gap: 3, overflow: "hidden" },
+  lineDash: { width: 4, height: 1.5, borderRadius: 1 },
+  lineLegendLabel: { fontSize: 9, fontFamily: FONT.semi, letterSpacing: 0.3 },
 });

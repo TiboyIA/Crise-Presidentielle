@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
@@ -13,7 +13,9 @@ import { STRATEGY_RESEARCH_LIST } from "@/data/strategyResearch";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
 import { OPERATION_IMG } from "@/constants/assets";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
+import { RESOURCE_LABELS } from "@/types/strategy";
 import type { CountryId, OperationType, ResourceKey } from "@/types/strategy";
+import { useComfort } from "@/context/ComfortContext";
 import { useCommand } from "@/hooks/useCommand";
 import { commandId } from "@/core/commands";
 
@@ -28,12 +30,14 @@ export default function OperationsScreen() {
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (resultTimerRef.current) clearTimeout(resultTimerRef.current); }, []);
 
+  const { enabled: comfort, fs, pad, reducedInfo, extraConfirm } = useComfort();
+
   if (!state) return null;
 
   const relationMap = Object.fromEntries(state.relations.map((r) => [r.countryId, r]));
   const selectedRelation = selectedCountryId ? relationMap[selectedCountryId] : null;
 
-  const handleLaunch = (type: OperationType) => {
+  const doLaunch = (type: OperationType) => {
     if (!selectedCountryId) return;
     const cid = commandId("launch_operation", `${type}:${selectedCountryId}`);
     const res = run(cid, () => launchOperation(type, selectedCountryId));
@@ -46,6 +50,27 @@ export default function OperationsScreen() {
     setResult(res);
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
     resultTimerRef.current = setTimeout(() => setResult(null), 4000);
+  };
+
+  const handleLaunch = (type: OperationType) => {
+    if (!selectedCountryId) return;
+    const op = OPERATIONS[type];
+    const needsConfirm = op.isOffensive || extraConfirm;
+    if (needsConfirm) {
+      const costStr = (Object.entries(op.cost) as [ResourceKey, number][])
+        .map(([k, v]) => `${v} ${RESOURCE_LABELS[k]}`)
+        .join(" · ");
+      Alert.alert(
+        `Opération : ${op.name}`,
+        `${op.description}\n\nCoût : ${costStr}${op.isOffensive ? "\n\nCette action est irréversible une fois lancée." : ""}`,
+        [
+          { text: "Annuler", style: "cancel" },
+          { text: op.isOffensive ? "Lancer" : "Confirmer", style: op.isOffensive ? "destructive" : "default", onPress: () => doLaunch(type) },
+        ],
+      );
+      return;
+    }
+    doLaunch(type);
   };
 
   const ops = Object.values(OPERATIONS);
@@ -63,7 +88,7 @@ export default function OperationsScreen() {
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }, comfort && { gap: pad(10) }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Target selection */}
@@ -112,25 +137,34 @@ export default function OperationsScreen() {
                     start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
                     style={[styles.opCard, { borderColor: op.isOffensive ? PALETTE.danger + "44" : PALETTE.panelEdge }]}
                   >
-                    {/* Banner */}
-                    <View style={styles.opBanner}>
-                      {opImg && <Image source={opImg} style={styles.opImg} resizeMode="cover" />}
-                      <LinearGradient colors={["rgba(13,17,25,0.1)", "rgba(13,17,25,0.96)"]} style={StyleSheet.absoluteFill} />
-                      <View style={styles.opBannerTopRow}>
-                        {op.isOffensive ? (
-                          <Badge label="Offensif" tone="danger" size="xs" dot />
-                        ) : (
-                          <Badge label="Défensif" tone="info" size="xs" dot />
-                        )}
+                    {/* Banner — masquée en mode Confort, remplacée par un en-tête texte compact */}
+                    {!comfort ? (
+                      <View style={styles.opBanner}>
+                        {opImg && <Image source={opImg} style={styles.opImg} resizeMode="cover" />}
+                        <LinearGradient colors={["rgba(13,17,25,0.1)", "rgba(13,17,25,0.96)"]} style={StyleSheet.absoluteFill} />
+                        <View style={styles.opBannerTopRow}>
+                          {op.isOffensive ? (
+                            <Badge label="Offensif" tone="danger" size="xs" dot />
+                          ) : (
+                            <Badge label="Défensif" tone="info" size="xs" dot />
+                          )}
+                        </View>
+                        <View style={styles.opBannerBottom}>
+                          <Text style={styles.opName}>{op.name}</Text>
+                        </View>
                       </View>
-                      <View style={styles.opBannerBottom}>
-                        <Text style={styles.opName}>{op.name}</Text>
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: pad(12), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: PALETTE.panelEdge }}>
+                        {op.isOffensive
+                          ? <Badge label="Offensif" tone="danger" size="xs" dot />
+                          : <Badge label="Défensif" tone="info" size="xs" dot />}
+                        <Text style={{ flex: 1, fontSize: fs(15), fontFamily: FONT.bold, color: PALETTE.textHigh }}>{op.name}</Text>
                       </View>
-                    </View>
+                    )}
 
-                    {/* Body */}
-                    <View style={styles.opBody}>
-                      <Text style={styles.opDesc}>{op.description}</Text>
+                    {/* Body — padding élargi en mode Confort */}
+                    <View style={[styles.opBody, comfort && { padding: pad(12), gap: pad(10) }]}>
+                      <Text style={[styles.opDesc, comfort && { fontSize: fs(11), color: PALETTE.textMid }]}>{op.description}</Text>
 
                       {/* Cost row */}
                       <View style={styles.metricsRow}>
@@ -142,7 +176,7 @@ export default function OperationsScreen() {
                               const ok = have >= val;
                               return (
                                 <Text key={key} style={[styles.costItem, { color: ok ? PALETTE.textHigh : PALETTE.danger }]}>
-                                  {val} <Text style={styles.costKey}>{key}</Text>
+                                  {!ok ? "✕ " : ""}{val} <Text style={styles.costKey}>{key}</Text>
                                 </Text>
                               );
                             })}
@@ -170,7 +204,7 @@ export default function OperationsScreen() {
                         </View>
                       )}
 
-                      {hasResearchBonus && (
+                      {hasResearchBonus && !reducedInfo && (
                         <View style={styles.statusRow}>
                           <MaterialCommunityIcons name="flask-outline" size={12} color="#a78bfa" />
                           <Text style={[styles.statusText, { color: "#a78bfa" }]}>Bonus R&D actif · +5% succès</Text>
@@ -200,6 +234,7 @@ const styles = StyleSheet.create({
   resultBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, padding: 12, borderRadius: RADIUS.sm, borderWidth: 1 },
   resultText: { fontSize: 12, fontFamily: FONT.bold, flex: 1 },
   content: { paddingTop: 12, gap: 10 },
+  // note: gap is overridden inline when comfort enabled
   changeLink: { fontSize: 11, fontFamily: FONT.bold, color: PALETTE.gold },
   helper: { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, fontStyle: "italic", marginBottom: 4 },
 

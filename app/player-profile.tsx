@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -126,8 +126,8 @@ export default function PlayerProfileScreen() {
     }
   }
 
-  async function handleCyber() {
-    if (!auth.accessToken || !entry || cyberSending || cyberSent) return;
+  async function executeCyber() {
+    if (!auth.accessToken || !entry) return;
     setCyberSending(true);
     setCyberError("");
     const result = await launchCyberOp(auth.accessToken, entry.player_id);
@@ -137,6 +137,19 @@ export default function PlayerProfileScreen() {
     } else {
       setCyberError(cyberErrorLabel(result.error));
     }
+  }
+
+  function handleCyber() {
+    if (!auth.accessToken || !entry || cyberSending || cyberSent) return;
+    const targetName = entry.display_name || "ce joueur";
+    Alert.alert(
+      "Lancer une cyberattaque",
+      `Cible : ${targetName}\n\nUn virus sera déployé sur leur prochain score classé (malus −5 à −15 %). Quota : 1 cyberattaque par 24h. Cette action est irréversible.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Attaquer", style: "destructive", onPress: () => void executeCyber() },
+      ],
+    );
   }
 
   async function handleInvite() {
@@ -339,7 +352,7 @@ export default function PlayerProfileScreen() {
                 ) : (
                   <>
                     <Pressable
-                      onPress={() => void handleCyber()}
+                      onPress={handleCyber}
                       disabled={cyberSending}
                       style={({ pressed }) => [styles.cyberRow, { opacity: pressed || cyberSending ? 0.7 : 1 }]}
                     >

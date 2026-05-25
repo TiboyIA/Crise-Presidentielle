@@ -9,6 +9,7 @@ import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS, RESOURCE_LABELS } from "@/types/strategy";
 import type { NewsChoice, NewsEvent, ResourceKey } from "@/types/strategy";
 import { getChaosWarning } from "@/logic/chaosAmplifier";
+import { analyzeChoice } from "@/logic/choiceAnalyzer";
 import { getTensionLevel } from "@/logic/tensionEngine";
 import { computePresidentialClarity } from "@/logic/discourseEngine";
 import { REGISTER_LABELS, REGISTER_COLORS } from "@/logic/registerEngine";
@@ -167,6 +168,13 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                 const isSelected = preview?.id === choice.id;
                 const isConfirming = confirmed && isSelected;
                 const effects = effectEntries(choice);
+                const analysis = analyzeChoice(choice);
+                const showAnalysis = !!(
+                  analysis.costLabel ||
+                  analysis.gainLabel ||
+                  analysis.hiddenRisk ||
+                  analysis.horizon !== "court"
+                );
                 return (
                   <Pressable
                     key={choice.id}
@@ -201,6 +209,33 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                             {RESOURCE_ICONS[key] ?? ""}{val > 0 ? "+" : ""}{val}
                           </Text>
                         ))}
+                      </View>
+                    )}
+                    {/* Fiche de lecture rapide — résumé qualitatif sans chiffres cachés */}
+                    {showAnalysis && (
+                      <View style={styles.analysisRow}>
+                        {analysis.costLabel != null && (
+                          <Text style={styles.analysisTag}>
+                            <Text style={styles.analysisKey}>Coût · </Text>
+                            <Text style={[styles.analysisVal, { color: PALETTE.danger + "bb" }]}>{analysis.costLabel}</Text>
+                          </Text>
+                        )}
+                        {analysis.gainLabel != null && (
+                          <Text style={styles.analysisTag}>
+                            <Text style={styles.analysisKey}>Gain · </Text>
+                            <Text style={[styles.analysisVal, { color: PALETTE.success + "bb" }]}>{analysis.gainLabel}</Text>
+                          </Text>
+                        )}
+                        {analysis.hiddenRisk != null && (
+                          <Text style={[styles.analysisTag, styles.analysisRisk]}>
+                            ⚠ {analysis.hiddenRisk}
+                          </Text>
+                        )}
+                        {analysis.horizon !== "court" && (
+                          <Text style={[styles.analysisTag, styles.analysisHorizon]}>
+                            ⏱ {analysis.horizon === "long" ? "Long terme" : "Moyen terme"}
+                          </Text>
+                        )}
                       </View>
                     )}
                   </Pressable>
@@ -275,4 +310,11 @@ const styles = StyleSheet.create({
   wordingLabel: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 1 },
   riposteWarning: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 3, borderWidth: 1, borderColor: "#FF8040" + "55", backgroundColor: "#FF8040" + "0d" },
   riposteWarningText: { flex: 1, fontSize: 10, fontFamily: FONT.semi, color: "#FF8040" },
+
+  analysisRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginLeft: 26, marginTop: 3, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: PALETTE.panelEdge + "88" },
+  analysisTag: { fontSize: 9, fontFamily: FONT.semi, color: PALETTE.textLow, letterSpacing: 0.3 },
+  analysisKey: { fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow },
+  analysisVal: { fontSize: 9, fontFamily: FONT.bold },
+  analysisRisk: { color: PALETTE.warning + "cc" },
+  analysisHorizon: { color: PALETTE.gold + "99" },
 });
