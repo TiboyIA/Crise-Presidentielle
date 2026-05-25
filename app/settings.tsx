@@ -7,12 +7,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useComfort, PROFILE_LIST } from "@/context/ComfortContext";
 import { isDevSandboxEnabled } from "@/config/devSandbox";
+import { deleteSandboxAll, saveSandboxState } from "@/storage/sandboxStorage";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, startNewGame } = useStrategy();
+  const { state, startNewGame, isSandboxActive, enableSandboxMode, disableSandboxMode } = useStrategy();
   const {
     enabled: comfortEnabled, toggle: toggleComfort,
     oneHand, toggleOneHand,
@@ -21,6 +22,36 @@ export default function SettingsScreen() {
   } = useComfort();
 
   const hasSave = state !== null;
+
+  const handleCloneSave = () => {
+    if (!state) return;
+    Alert.alert(
+      "Cloner la partie",
+      "La partie en cours sera copiée dans le sandbox, écrasant l'état sandbox existant.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Cloner",
+          onPress: () => void saveSandboxState(JSON.parse(JSON.stringify(state))),
+        },
+      ],
+    );
+  };
+
+  const handleResetSandbox = () => {
+    Alert.alert(
+      "Réinitialiser le sandbox",
+      "Toutes les données sandbox seront supprimées et le mode sera désactivé.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Réinitialiser",
+          style: "destructive",
+          onPress: () => void disableSandboxMode().then(() => deleteSandboxAll()),
+        },
+      ],
+    );
+  };
 
   const handleReset = () => {
     if (!state) return;
@@ -267,21 +298,69 @@ export default function SettingsScreen() {
           <>
             <Text style={styles.sectionLabel}>DÉVELOPPEUR</Text>
             <View style={styles.card}>
+              {/* Toggle ON/OFF */}
               <Pressable
-                onPress={() => router.push("/dev-sandbox" as any)}
-                style={({ pressed }) => [styles.resetBtn, { borderLeftColor: "#ff6b3588", opacity: pressed ? 0.75 : 1 }]}
+                onPress={() => isSandboxActive ? void disableSandboxMode() : void enableSandboxMode()}
+                style={({ pressed }) => [styles.comfortRow, { opacity: pressed ? 0.75 : 1 }]}
               >
-                <MaterialCommunityIcons name="flask-outline" size={16} color="#ff6b35" />
+                <View style={[styles.comfortIcon, isSandboxActive && styles.sbIconOn]}>
+                  <MaterialCommunityIcons
+                    name="flask-outline"
+                    size={18}
+                    color={isSandboxActive ? "#ff6b35" : PALETTE.textLow}
+                  />
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.resetBtnTitle, { color: "#ff6b35" }]}>
-                    Bac à sable développeur
+                  <Text style={[styles.comfortTitle, isSandboxActive && styles.sbTitleOn]}>
+                    Mode Bac à Sable
                   </Text>
-                  <Text style={styles.resetBtnSub}>
-                    Tests et mutations d'état — partie normale non affectée.
+                  <Text style={styles.comfortSub}>
+                    {isSandboxActive
+                      ? "Actif — scores et cloud désactivés. Mutations visibles dans le jeu."
+                      : "Inactif — activez pour tester des mutations d'état en temps réel."}
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={16} color="#ff6b3588" />
+                <View style={[styles.toggle, isSandboxActive && styles.sbToggleOn]}>
+                  <View style={[styles.toggleThumb, isSandboxActive && styles.toggleThumbOn]} />
+                </View>
               </Pressable>
+
+              {isSandboxActive && (
+                <>
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: PALETTE.panelEdge }} />
+                  <Pressable
+                    onPress={() => router.push("/dev-sandbox" as any)}
+                    style={({ pressed }) => [styles.sbBtn, { opacity: pressed ? 0.75 : 1 }]}
+                  >
+                    <MaterialCommunityIcons name="console" size={15} color="#ff6b35" />
+                    <Text style={styles.sbBtnText}>Ouvrir console bac à sable</Text>
+                    <MaterialCommunityIcons name="chevron-right" size={15} color="#ff6b3588" />
+                  </Pressable>
+
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: PALETTE.panelEdge }} />
+                  <Pressable
+                    onPress={handleCloneSave}
+                    disabled={!hasSave}
+                    style={({ pressed }) => [styles.sbBtn, { opacity: pressed ? 0.75 : 1 }]}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={15} color={hasSave ? PALETTE.textMid : PALETTE.textLow} />
+                    <Text style={[styles.sbBtnText, { color: hasSave ? PALETTE.textMid : PALETTE.textLow }]}>
+                      Cloner ma partie actuelle en sandbox
+                    </Text>
+                  </Pressable>
+
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: PALETTE.panelEdge }} />
+                  <Pressable
+                    onPress={handleResetSandbox}
+                    style={({ pressed }) => [styles.sbBtn, { opacity: pressed ? 0.75 : 1 }]}
+                  >
+                    <MaterialCommunityIcons name="delete-outline" size={15} color={PALETTE.danger} />
+                    <Text style={[styles.sbBtnText, { color: PALETTE.danger }]}>
+                      Réinitialiser sauvegarde sandbox
+                    </Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           </>
         )}
@@ -454,6 +533,27 @@ const styles = StyleSheet.create({
   },
   rowLabel: { flex: 1, fontSize: 12, fontFamily: FONT.med, color: PALETTE.textMid },
   rowValue: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.textHigh },
+
+  // ── Sandbox ───────────────────────────────────────────────────────────────
+  sbIconOn: {
+    backgroundColor: "rgba(255,107,53,0.12)",
+    borderColor: "#ff6b3550",
+  },
+  sbTitleOn: { color: "#ff6b35" },
+  sbToggleOn: { backgroundColor: "#ff6b35" },
+  sbBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  sbBtnText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: FONT.med,
+    color: "#ff6b35",
+  },
 
   // ── Profil d'accessibilité ────────────────────────────────────────────────
   profileRow: {

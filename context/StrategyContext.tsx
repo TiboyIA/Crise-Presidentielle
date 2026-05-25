@@ -137,7 +137,14 @@ import {
   computePathologyThresholdEffects,
   decayPathologies,
 } from "@/logic/discoursePathologyEngine";
-import { recordEvent as rankRecord, isRankedIntended } from "@/services/RankedService";
+import { recordEvent as _rankRecord, isRankedIntended as _isRankedIntended } from "@/services/RankedService";
+import { isDevSandboxEnabled } from "@/config/devSandbox";
+import {
+  getSandboxActiveFlag,
+  setSandboxActiveFlag,
+  loadSandboxState,
+  saveSandboxState,
+} from "@/storage/sandboxStorage";
 import type {
   AchievementId,
   BuildingId,
@@ -317,6 +324,11 @@ interface StrategyContextValue {
   buyInsurance: (productId: InsuranceProductId) => { success: boolean; reason?: string };
   cancelInsurance: (productId: InsuranceProductId) => void;
   emitCatBond: (typeId: CatBondTypeId) => { success: boolean; reason?: string };
+  // ── Bac à sable développeur ────────────────────────────────────────────────
+  isSandboxActive: boolean;
+  enableSandboxMode:  () => Promise<void>;
+  disableSandboxMode: () => Promise<void>;
+  applySandboxMutation: (fn: (s: StrategyGameState) => StrategyGameState) => void;
 }
 
 const StrategyContext = createContext<StrategyContextValue | null>(null);
@@ -334,6 +346,17 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const prevBuildingsRef    = useRef<StrategyGameState["buildings"]>([]);
   const prevResearchRef     = useRef<StrategyGameState["strategyResearch"]>(undefined);
 
+  // ── Bac à sable ────────────────────────────────────────────────────────────
+  const isSandboxActiveRef = useRef(false);
+  const [isSandboxActive, setIsSandboxActive] = useState(false);
+
+  // Wrappers ranked : neutralisés en sandbox pour ne jamais soumettre de score cheat
+  const rankRecord: typeof _rankRecord = (...args) => {
+    if (isSandboxActiveRef.current) return Promise.resolve();
+    return _rankRecord(...args);
+  };
+  const isRankedIntended = () => _isRankedIntended() && !isSandboxActiveRef.current;
+
   useEffect(() => {
     if (!auth.isEnabled || !auth.accessToken) { allianceBonusRef.current = 0; return; }
     const run = async () => {
@@ -348,11 +371,31 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadStrategy().then((result) => {
-      if (result) {
-        // Migration runs in loadStrategy — state already has all fields filled.
-        // Keep ?? guards here only as a final safety net against future schema changes.
-        const saved = result.state;
+    void (async () => {
+      // Sandbox : si le mode était actif lors de la dernière session, charger la sauvegarde sandbox
+      if (isDevSandboxEnabled()) {
+        const active = await getSandboxActiveFlag();
+        if (active) {
+          const s = await loadSandboxState();
+          if (s) {
+            isSandboxActiveRef.current = true;
+            setIsSandboxActive(true);
+            setState(s);
+            setLoaded(true);
+            return;
+          }
+          // Sauvegarde sandbox introuvable : désactiver le flag et charger normalement
+          await setSandboxActiveFlag(false);
+        }
+      }
+
+      // Chargement normal
+      try {
+        const result = await loadStrategy();
+        if (result) {
+          // Migration runs in loadStrategy — state already has all fields filled.
+          // Keep ?? guards here only as a final safety net against future schema changes.
+          const saved = result.state;
         const merged: StrategyGameState = {
           ...saved,
           news:                saved.news                ?? { ...DEFAULT_NEWS_STATE },
@@ -408,14 +451,20 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         } else if (result.wasMigrated) {
           setSaveStatus("migrated");
         }
-      }
+        }
+      } catch {}
       setLoaded(true);
-    }).catch(() => setLoaded(true));
+    })();
   }, []);
 
   const scheduleSave = useCallback((s: StrategyGameState) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => saveStrategy(s), 1000);
+    // En mode sandbox, persister dans la clé isolée pour ne pas écraser la partie normale
+    if (isSandboxActiveRef.current) {
+      saveTimeoutRef.current = setTimeout(() => void saveSandboxState(s), 1000);
+    } else {
+      saveTimeoutRef.current = setTimeout(() => saveStrategy(s), 1000);
+    }
   }, []);
 
   const update = useCallback(
@@ -1666,6 +1715,44 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     rankRecord("mandate_end", "mandate_end", mandateDaySnap);
   }, [state, update]);
 
+  // ── Fonctions bac à sable ─────────────────────────────────────────────────
+
+  const enableSandboxMode = useCallback(async () => {
+    if (!isDevSandboxEnabled()) return;
+    // Cloner la partie courante en sandbox si aucune sauvegarde sandbox n'existe
+    const existing = await loadSandboxState();
+    if (!existing && state) {
+      await saveSandboxState(JSON.parse(JSON.stringify(state)) as StrategyGameState);
+    }
+    const sandboxState = await loadSandboxState();
+    if (!sandboxState) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    isSandboxActiveRef.current = true;
+    setIsSandboxActive(true);
+    await setSandboxActiveFlag(true);
+    setState(sandboxState);
+  }, [state]);
+
+  const disableSandboxMode = useCallback(async () => {
+    isSandboxActiveRef.current = false;
+    setIsSandboxActive(false);
+    await setSandboxActiveFlag(false);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    // Recharger la vraie sauvegarde
+    try {
+      const result = await loadStrategy();
+      if (result?.state) setState(result.state);
+    } catch {}
+  }, []);
+
+  const applySandboxMutation = useCallback(
+    (fn: (s: StrategyGameState) => StrategyGameState) => {
+      if (!isSandboxActiveRef.current) return;
+      update(fn);
+    },
+    [update],
+  );
+
   const shouldShowPoll =
     state !== null &&
     state.mandateDay > 0 &&
@@ -1687,6 +1774,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       claimDailyReward, contributeFund,
       buyInsurance: buyInsuranceFn, cancelInsurance: cancelInsuranceFn,
       emitCatBond: emitCatBondFn,
+      isSandboxActive,
+      enableSandboxMode,
+      disableSandboxMode,
+      applySandboxMutation,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, loaded, saveStatus, saveWarnings, shouldShowPoll, shouldShowBilan, startNewGame, upgradeBuilding, launchOperation,
@@ -1694,7 +1785,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       acknowledgePoll, startNewMandate, adoptDoctrine, launchReform, fireMinister,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
-      buyInsuranceFn, cancelInsuranceFn, emitCatBondFn],
+      buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
+      isSandboxActive, enableSandboxMode, disableSandboxMode, applySandboxMutation],
   );
 
   return <StrategyContext.Provider value={value}>{children}</StrategyContext.Provider>;

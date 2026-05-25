@@ -21,6 +21,7 @@ import { track as telemetry } from "@/services/TelemetryService";
 import { CrisisAlertOverlay } from "@/components/CrisisAlertOverlay";
 import { SmartPauseOverlay } from "@/components/SmartPauseOverlay";
 import { OneHandBar } from "@/components/OneHandBar";
+import { SandboxWatermark } from "@/components/SandboxWatermark";
 import { GameProvider } from "@/context/GameContext";
 import { EntitlementsProvider } from "@/lib/entitlements";
 import { StrategyProvider } from "@/context/StrategyContext";
@@ -99,6 +100,7 @@ function RootLayoutNav() {
       <Stack.Screen name="shop" options={{ presentation: "modal" }} />
     </Stack>
     <OneHandBar />
+    <SandboxWatermark />
     </View>
   );
 }

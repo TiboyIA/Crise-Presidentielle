@@ -7,8 +7,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { StrategyGameState } from "@/types/strategy";
 
-const SANDBOX_KEY  = "strategy_sandbox_save_v1";
-const SNAPSHOT_KEY = "strategy_sandbox_snapshot_v1";
+const SANDBOX_KEY        = "strategy_sandbox_save_v1";
+const SNAPSHOT_KEY       = "strategy_sandbox_snapshot_v1";
+const SANDBOX_ACTIVE_KEY = "strategy_sandbox_active_v1";
 
 export async function loadSandboxState(): Promise<StrategyGameState | null> {
   try {
@@ -51,5 +52,36 @@ export async function loadSandboxSnapshot(): Promise<StrategyGameState | null> {
     return JSON.parse(json) as StrategyGameState;
   } catch {
     return null;
+  }
+}
+
+// ── Flag de persistance du mode sandbox ───────────────────────────────────────
+
+export async function getSandboxActiveFlag(): Promise<boolean> {
+  try {
+    const v = await AsyncStorage.getItem(SANDBOX_ACTIVE_KEY);
+    return v === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function setSandboxActiveFlag(active: boolean): Promise<void> {
+  try {
+    if (active) {
+      await AsyncStorage.setItem(SANDBOX_ACTIVE_KEY, "1");
+    } else {
+      await AsyncStorage.removeItem(SANDBOX_ACTIVE_KEY);
+    }
+  } catch (e) {
+    console.warn("[SANDBOX] Flag save failed:", e);
+  }
+}
+
+export async function deleteSandboxAll(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([SANDBOX_KEY, SNAPSHOT_KEY, SANDBOX_ACTIVE_KEY]);
+  } catch (e) {
+    console.warn("[SANDBOX] Full delete failed:", e);
   }
 }
