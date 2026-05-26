@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
@@ -29,6 +29,7 @@ import { commandId } from "@/core/commands";
 
 export default function OperationsScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const params = useLocalSearchParams<{ countryId?: CountryId }>();
   const { state, launchOperation } = useStrategy();
   const { hPad } = useResponsive();
@@ -98,7 +99,29 @@ export default function OperationsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Centre d'opérations" kicker="ACTIONS COVERTES" />
+      <ScreenHeader
+        title="Centre d'opérations"
+        kicker="ACTIONS COVERTES"
+        rightSlot={
+          <Pressable
+            onPress={() => router.push("/mission-reports")}
+            hitSlop={10}
+            style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+          >
+            <MaterialCommunityIcons name="file-document-multiple-outline" size={18} color={PALETTE.textLow} />
+            <Text style={{ fontFamily: FONT.med, fontSize: 11, color: PALETTE.textLow }}>
+              Rapports
+            </Text>
+            {(state.missionReports?.length ?? 0) > 0 && (
+              <View style={{ backgroundColor: PALETTE.gold, borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 }}>
+                <Text style={{ fontFamily: FONT.bold, fontSize: 9, color: "#000" }}>
+                  {state.missionReports!.length}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        }
+      />
 
       {result && (
         <View style={[

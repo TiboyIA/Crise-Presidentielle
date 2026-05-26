@@ -1,5 +1,6 @@
 import type { StrategyGameState } from "@/types/strategy";
 import { clamp } from "@/logic/utils";
+import { applyWeatherTrustDelta, TRUST_DELTA } from "@/logic/weatherAlertTrustEngine";
 
 export type ConfidenceLevel = "faible" | "moderee" | "elevee";
 export type ForecastSeverity = "mineure" | "moderee" | "majeure" | "catastrophique";
@@ -179,7 +180,7 @@ export function applyPrepareForecast(
   const isFalseAlarm = Math.random() < forecast.falseAlarmRisk / 100;
   const period = forecastPeriod(state.mandateDay);
 
-  const newState: StrategyGameState = {
+  const baseState: StrategyGameState = {
     ...state,
     resources: { ...state.resources, money: state.resources.money - PREPARE_COST_MONEY },
     hiddenPolitics: {
@@ -196,6 +197,10 @@ export function applyPrepareForecast(
       : clamp((state.administrationMorale ?? 60) + 3),
     lastForecastPreparedPeriod: period,
   };
+  const newState = applyWeatherTrustDelta(
+    baseState,
+    isFalseAlarm ? TRUST_DELTA.prepareFalseAlarm : TRUST_DELTA.prepareCorrect,
+  );
 
   const outcome = isFalseAlarm
     ? "Fausse alerte — les équipes ont été mobilisées inutilement. Coût assumé, moral légèrement atteint."
@@ -218,7 +223,7 @@ export function applyIssuePublicAlert(
   const isFalseAlarm = Math.random() < forecast.falseAlarmRisk / 100;
   const period = forecastPeriod(state.mandateDay);
 
-  const newState: StrategyGameState = {
+  const baseState: StrategyGameState = {
     ...state,
     resources: { ...state.resources, influence: state.resources.influence - ALERT_COST_INFLUENCE },
     nationalIndicators: {
@@ -236,6 +241,10 @@ export function applyIssuePublicAlert(
     },
     lastForecastAlertPeriod: period,
   };
+  const newState = applyWeatherTrustDelta(
+    baseState,
+    isFalseAlarm ? TRUST_DELTA.alertPublicFalseAlarm : TRUST_DELTA.alertPublicCorrect,
+  );
 
   const outcome = isFalseAlarm
     ? "Fausse alerte publique — l'opinion reste sceptique. Crédibilité légèrement entamée."

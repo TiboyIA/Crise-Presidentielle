@@ -119,9 +119,27 @@ import {
   applyIssuePublicAlert,
   canPrepareForecast,
   canIssueAlert,
+  PREPARE_COST_MONEY,
   type ForecastActionResult,
 } from "@/logic/forecastUncertaintyEngine";
 import { tickWeatherEnergyPressure } from "@/logic/weatherEnergyPressureEngine";
+import { generateEnemyOperation, shouldTriggerEnemyOp } from "@/logic/enemyOperationEngine";
+import { tickAgroWeather } from "@/logic/agroWeatherEngine";
+import { tickWeatherOpportunity } from "@/logic/weatherOpportunityEngine";
+import { tickWeatherTransport } from "@/logic/weatherTransportEngine";
+import {
+  WEATHER_ALERT_TRUST_INITIAL,
+  getTrustLevel,
+  TRUST_LEVEL_DEFS,
+  applyWeatherTrustDelta,
+  TRUST_DELTA as WEATHER_TRUST_DELTA,
+} from "@/logic/weatherAlertTrustEngine";
+import {
+  type WeatherDoctrineId,
+  getWeatherDoctrine,
+  computeDoctrineWeatherEffect,
+} from "@/logic/weatherDoctrineEngine";
+import { generateMissionReport } from "@/logic/missionReportEngine";
 import { applySuccession, type MinisterCandidate } from "@/logic/successionEngine";
 import { getDiplomaticWording } from "@/logic/diplomaticWordingEngine";
 import {
@@ -363,6 +381,11 @@ interface StrategyContextValue {
   activateCrisisStaffing: () => { result: StaffingActivationResult | null; failReason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
+  setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
+  deleteMissionReport: (id: string) => void;
+  clearAllMissionReports: () => void;
+  deleteEnemyReport: (id: string) => void;
+  clearAllEnemyReports: () => void;
   trainUnit: (unitId: UnitId, quantity: number) => { success: boolean; reason?: string };
   collectTraining: () => void;
   setMilitaryDoctrine: (id: MilitaryDoctrineId) => { success: boolean; reason?: string };
@@ -960,10 +983,27 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           ? checkMissionProgress(missions, rewardedResources, prev.buildings, power, { type: "spy_country" })
           : missions;
 
+        const prevRelation = prev.relations.find((r) => r.countryId === targetCountryId)!;
+        const prevReports = prev.missionReports ?? [];
+        const missionReport = generateMissionReport({
+          type,
+          success: result.success,
+          targetCountryId,
+          relation: prevRelation,
+          mandateDay: prev.mandateDay,
+          rewards: result.rewards as Partial<StrategyResources>,
+          cost: op.cost,
+          relationDelta: result.relationDelta,
+          rankingPoints: result.rankingPoints,
+          reportIndex: prevReports.length,
+        });
+        const missionReports = [missionReport, ...prevReports].slice(0, 50);
+
         const baseOp = {
           ...prev,
           resources: rewardedResources,
           relations,
+          missionReports,
           stats: {
             ...prev.stats,
             globalPower: power,
@@ -1477,7 +1517,41 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities }, 0);
+        // Confiance dans les alertes météo — modifie les dégâts sociaux + met à jour le trust
+        let weatherAlertTrust = prev.weatherAlertTrust ?? WEATHER_ALERT_TRUST_INITIAL;
+        if (choice?.weatherAlertTrustDelta !== undefined) {
+          const trustLevel = getTrustLevel(weatherAlertTrust);
+          const cohesionMod = TRUST_LEVEL_DEFS[trustLevel].cohesionMod;
+          if (cohesionMod !== 0) {
+            nationalIndicators = applyIndicatorEffects(nationalIndicators, { cohesion: cohesionMod });
+          }
+          weatherAlertTrust = Math.min(100, Math.max(0, Math.round(weatherAlertTrust + choice.weatherAlertTrustDelta)));
+
+          // Doctrine météo — effets additionnels sur coût, cohésion, trust et hiddenPolitics
+          const doctrine = getWeatherDoctrine(prev);
+          const docFx = computeDoctrineWeatherEffect(doctrine, {
+            moneyCost:    choice.effects.money ?? 0,
+            trustDelta:   choice.weatherAlertTrustDelta,
+            cohesionDelta: choice.indicatorEffects?.cohesion ?? 0,
+          });
+          if (docFx.extraMoneyDelta !== 0) {
+            resources = { ...resources, money: Math.max(0, resources.money + docFx.extraMoneyDelta) };
+          }
+          if (docFx.cohesionAdjustment !== 0) {
+            nationalIndicators = applyIndicatorEffects(nationalIndicators, { cohesion: docFx.cohesionAdjustment });
+          }
+          if (docFx.trustDeltaAdjustment !== 0) {
+            weatherAlertTrust = Math.min(100, Math.max(0, weatherAlertTrust + docFx.trustDeltaAdjustment));
+          }
+          if (docFx.popularFatigueBonus !== 0 || docFx.institutionalStabilityBonus !== 0) {
+            hiddenPolitics = applyHiddenPoliticsEffects(hiddenPolitics, {
+              ...(docFx.popularFatigueBonus !== 0         ? { popularFatigue: docFx.popularFatigueBonus }                  : {}),
+              ...(docFx.institutionalStabilityBonus !== 0 ? { institutionalStability: docFx.institutionalStabilityBonus }   : {}),
+            });
+          }
+        }
+
+        return advanceMandateDay({ ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -1815,7 +1889,17 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const r = applyPrepareForecast(prev);
         out = r.result;
         if (!r.result.success) return prev;
-        return withNews(r.newState);
+        let s = r.newState;
+        // Doctrine météo — ajustements post-préparation
+        const doctrine = getWeatherDoctrine(prev);
+        const origDelta = r.result.wasRealEvent ? WEATHER_TRUST_DELTA.prepareCorrect : WEATHER_TRUST_DELTA.prepareFalseAlarm;
+        const docFx = computeDoctrineWeatherEffect(doctrine, { moneyCost: -PREPARE_COST_MONEY, trustDelta: origDelta, cohesionDelta: 0 });
+        if (docFx.extraMoneyDelta !== 0) s = { ...s, resources: { ...s.resources, money: Math.max(0, s.resources.money + docFx.extraMoneyDelta) } };
+        if (docFx.trustDeltaAdjustment !== 0) s = applyWeatherTrustDelta(s, docFx.trustDeltaAdjustment);
+        if (docFx.popularFatigueBonus !== 0 || docFx.institutionalStabilityBonus !== 0) {
+          s = { ...s, hiddenPolitics: applyHiddenPoliticsEffects(s.hiddenPolitics, { ...(docFx.popularFatigueBonus !== 0 ? { popularFatigue: docFx.popularFatigueBonus } : {}), ...(docFx.institutionalStabilityBonus !== 0 ? { institutionalStability: docFx.institutionalStabilityBonus } : {}) }) };
+        }
+        return withNews(s);
       });
       return out;
     },
@@ -1832,12 +1916,57 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const r = applyIssuePublicAlert(prev);
         out = r.result;
         if (!r.result.success) return prev;
-        return withNews(r.newState);
+        let s = r.newState;
+        // Doctrine météo — ajustements post-alerte publique
+        const doctrine = getWeatherDoctrine(prev);
+        const origDelta = r.result.wasRealEvent ? WEATHER_TRUST_DELTA.alertPublicCorrect : WEATHER_TRUST_DELTA.alertPublicFalseAlarm;
+        const docFx = computeDoctrineWeatherEffect(doctrine, { moneyCost: 0, trustDelta: origDelta, cohesionDelta: r.result.wasRealEvent ? 0 : -1 });
+        if (docFx.trustDeltaAdjustment !== 0) s = applyWeatherTrustDelta(s, docFx.trustDeltaAdjustment);
+        if (docFx.cohesionAdjustment !== 0) s = { ...s, nationalIndicators: applyIndicatorEffects(s.nationalIndicators, { cohesion: docFx.cohesionAdjustment }) };
+        if (docFx.popularFatigueBonus !== 0 || docFx.institutionalStabilityBonus !== 0) {
+          s = { ...s, hiddenPolitics: applyHiddenPoliticsEffects(s.hiddenPolitics, { ...(docFx.popularFatigueBonus !== 0 ? { popularFatigue: docFx.popularFatigueBonus } : {}), ...(docFx.institutionalStabilityBonus !== 0 ? { institutionalStability: docFx.institutionalStabilityBonus } : {}) }) };
+        }
+        return withNews(s);
       });
       return out;
     },
     [state, update],
   );
+
+  const setWeatherDoctrine = useCallback(
+    (id: WeatherDoctrineId) => {
+      update((prev) => ({ ...prev, weatherDoctrine: id }));
+    },
+    [update],
+  );
+
+  const deleteMissionReport = useCallback(
+    (id: string) => {
+      update((prev) => ({
+        ...prev,
+        missionReports: (prev.missionReports ?? []).filter((r) => r.id !== id),
+      }));
+    },
+    [update],
+  );
+
+  const clearAllMissionReports = useCallback(() => {
+    update((prev) => ({ ...prev, missionReports: [] }));
+  }, [update]);
+
+  const deleteEnemyReport = useCallback(
+    (id: string) => {
+      update((prev) => ({
+        ...prev,
+        enemyMissionReports: (prev.enemyMissionReports ?? []).filter((r) => r.id !== id),
+      }));
+    },
+    [update],
+  );
+
+  const clearAllEnemyReports = useCallback(() => {
+    update((prev) => ({ ...prev, enemyMissionReports: [] }));
+  }, [update]);
 
   const launchStrategyResearch = useCallback(
     (id: StrategyResearchId): { success: boolean; reason?: string } => {
@@ -1959,6 +2088,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       activateCrisisStaffing, prepareForecast, issuePublicAlert,
+      setWeatherDoctrine,
+      deleteMissionReport, clearAllMissionReports,
+      deleteEnemyReport, clearAllEnemyReports,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlot: saveToSlotFn, loadFromSlot: loadFromSlotFn, deleteSlot: deleteSlotFn,
       claimDailyReward, contributeFund,
@@ -1977,6 +2109,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       activateCrisisStaffing, prepareForecast, issuePublicAlert,
+      setWeatherDoctrine,
+      deleteMissionReport, clearAllMissionReports,
+      deleteEnemyReport, clearAllEnemyReports,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
       buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
@@ -2161,6 +2296,40 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Pression météo sur l'énergie — delta + journal si notable
     s = tickWeatherEnergyPressure(s);
+
+    // Météo agricole — indicateurs + événements de crise
+    s = tickAgroWeather(s);
+
+    // Fenêtre météo favorable — bonus légers si opportunité active ou nouvelle
+    s = tickWeatherOpportunity(s);
+
+    // Perturbations transport météo — effets sur économie, militaire, coûts
+    s = tickWeatherTransport(s);
+
+    // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
+    if (shouldTriggerEnemyOp(s)) {
+      const enemyResult = generateEnemyOperation(s);
+      if (enemyResult) {
+        const prevEnemyReports = s.enemyMissionReports ?? [];
+        const fx = enemyResult.resourceEffects;
+        s = {
+          ...s,
+          lastEnemyOpAt: s.mandateDay,
+          enemyMissionReports: [enemyResult.report, ...prevEnemyReports].slice(0, 50),
+          resources: {
+            money:        Math.max(0, s.resources.money        + (fx.money        ?? 0)),
+            influence:    Math.max(0, s.resources.influence    + (fx.influence    ?? 0)),
+            energy:       Math.max(0, s.resources.energy       + (fx.energy       ?? 0)),
+            intelligence: Math.max(0, s.resources.intelligence + (fx.intelligence ?? 0)),
+            technology:   Math.max(0, s.resources.technology   + (fx.technology   ?? 0)),
+            military:     Math.max(0, s.resources.military     + (fx.military     ?? 0)),
+            cyberDefense: Math.max(0, s.resources.cyberDefense + (fx.cyberDefense ?? 0)),
+          },
+        };
+      } else {
+        s = { ...s, lastEnemyOpAt: s.mandateDay };
+      }
+    }
 
     // Détection des conflits internes (tous les 10 jours)
     s = { ...s, cabinetConflicts: detectCabinetConflicts(s) };

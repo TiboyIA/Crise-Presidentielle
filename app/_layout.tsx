@@ -78,6 +78,7 @@ function RootLayoutNav() {
       <Stack.Screen name="ranking-global" />
       <Stack.Screen name="player-profile" />
       <Stack.Screen name="alliances" />
+      <Stack.Screen name="mission-reports" />
       <Stack.Screen name="spy-ops" />
       <Stack.Screen name="cyber-ops" />
       <Stack.Screen name="entities" />

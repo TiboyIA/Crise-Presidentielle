@@ -1,7 +1,8 @@
 import type { StrategyGameState, NewsLogEntry } from "@/types/strategy";
 import { generateWeatherState } from "@/logic/weatherEngine";
-import type { WeatherTypeId } from "@/data/weatherEvents";
+import type { WeatherTypeId, VigilanceLevel } from "@/data/weatherEvents";
 import { clamp } from "@/logic/utils";
+import { queueNews } from "@/logic/newsEngine";
 
 // ── 5 effets météo sur l'énergie ──────────────────────────────────────────────
 //
@@ -102,6 +103,14 @@ const ENERGY_EFFECTS: Record<WeatherTypeId, EnergyWeatherEffect> = {
 
 const MAX_LOG = 30;
 
+const MIN_MED_GAP = 20; // jours de mandat entre deux événements méditerranéens
+
+const MED_EVENT_BY_VIGILANCE: Partial<Record<VigilanceLevel, string>> = {
+  jaune:  "episode_mediterraneen_surveillance",
+  orange: "episode_mediterraneen_alerte_orange",
+  rouge:  "episode_mediterraneen_alerte_rouge",
+};
+
 // ── Réduction selon le niveau du ministère de l'Énergie ──────────────────────
 
 function energyMinistryReduction(state: StrategyGameState): number {
@@ -118,7 +127,22 @@ export function tickWeatherEnergyPressure(state: StrategyGameState): StrategyGam
   const typeId  = weather.typeDef.id as WeatherTypeId;
   const effect  = ENERGY_EFFECTS[typeId];
 
-  if (!effect || effect.energyDelta === 0) return state;
+  // ── Épisodes méditerranéens — événements interactifs ──────────────────────
+
+  let newState: StrategyGameState = state;
+  if (typeId === "episode_mediterraneen") {
+    const lastAt  = state.lastMediterraneanEventAt ?? -999;
+    const eventId = MED_EVENT_BY_VIGILANCE[weather.vigilance.level] ?? null;
+    if (eventId && state.mandateDay - lastAt >= MIN_MED_GAP) {
+      newState = {
+        ...newState,
+        lastMediterraneanEventAt: state.mandateDay,
+        news: queueNews(newState.news, eventId),
+      };
+    }
+  }
+
+  if (!effect || effect.energyDelta === 0) return newState;
 
   const reduction    = energyMinistryReduction(state);
   const adjustedDelta = effect.energyDelta > 0
@@ -128,9 +152,9 @@ export function tickWeatherEnergyPressure(state: StrategyGameState): StrategyGam
   const currentEnergy = state.resources.energy;
   const newEnergy     = clamp(currentEnergy + adjustedDelta);
 
-  let newState: StrategyGameState = {
-    ...state,
-    resources: { ...state.resources, energy: newEnergy },
+  newState = {
+    ...newState,
+    resources: { ...newState.resources, energy: newEnergy },
   };
 
   // ── Entrée dans le Journal de Crise ───────────────────────────────────────

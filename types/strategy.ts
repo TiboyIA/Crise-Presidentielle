@@ -609,6 +609,8 @@ export interface NewsChoice {
   communicationRegister?: CommunicationRegister;
   /** Thèmes sémantiques du choix — utilisés pour détecter une contamination active. */
   semanticThemes?: string[];
+  /** Delta de confiance dans les alertes météo — positif = renforce la confiance, négatif = l'érode. */
+  weatherAlertTrustDelta?: number;
   /** Formulation diplomatique — produit des effets sur les relations, la tension et l'opinion. */
   diplomaticWording?: DiplomaticWordingId;
   /** Thème de la déclaration publique — alimente la mémoire des contradictions. */
@@ -785,6 +787,30 @@ export interface StrategyGameState {
   lastStaffingAt?: number;    // news.actionCount de la dernière activation
   staffingUseCount?: number;  // total d'activations (dégrade les outcomes sur usage répété)
   // Prévisions météo incertaines — optional for backward compat
-  lastForecastPreparedPeriod?: number;  // période (floor(mandateDay/4)) de la dernière préparation
-  lastForecastAlertPeriod?: number;     // période de la dernière alerte publique émise
+  lastForecastPreparedPeriod?: number;
+  lastForecastAlertPeriod?: number;
+  // Rapports de mission — optional for backward compat (max 50)
+  missionReports?: import("@/types/missionReport").MissionReport[];
+  // Rapports d'opérations adverses interceptées (max 50)
+  enemyMissionReports?: import("@/types/missionReport").MissionReport[];
+  lastEnemyOpAt?: number;
+  // Météo agricole — indicateurs cumulatifs (MODE DELTA)
+  agroWeather?: {
+    soilMoisture:    number;   // humidité du sol 0-100
+    cropStress:      number;   // stress des cultures 0-100
+    harvestForecast: "bonne" | "moyenne" | "mauvaise";
+    lastEventAt?:    number;   // mandateDay du dernier événement agricole déclenché
+  };
+  // Épisodes méditerranéens — anti-spam
+  lastMediterraneanEventAt?: number;
+  // Confiance dans les alertes météo — 0-100 (initial 60)
+  weatherAlertTrust?: number;
+  // Doctrine météo présidentielle
+  weatherDoctrine?: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId;
+  // Fenêtre météo favorable — opportunité temporaire active
+  weatherOpportunity?: {
+    id:        import("@/logic/weatherOpportunityEngine").WeatherOpportunityId;
+    spawnedAt: number;
+    expiresAt: number;
+  };
 }
