@@ -383,6 +383,16 @@ export default function SettingsScreen() {
                 <Text style={styles.sbBtnText}>Exporter diagnostic</Text>
                 <MaterialCommunityIcons name="export-variant" size={15} color={PALETTE.textLow} />
               </Pressable>
+
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: PALETTE.panelEdge }} />
+              <Pressable
+                onPress={() => router.push("/dev-ops" as any)}
+                style={({ pressed }) => [styles.sbBtn, { opacity: pressed ? 0.75 : 1 }]}
+              >
+                <MaterialCommunityIcons name="view-dashboard-outline" size={15} color={PALETTE.info} />
+                <Text style={[styles.sbBtnText, { color: PALETTE.info }]}>Tableau de bord OPS</Text>
+                <MaterialCommunityIcons name="chevron-right" size={15} color={PALETTE.info + "88"} />
+              </Pressable>
             </View>
           </>
         )}
