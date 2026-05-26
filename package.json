@@ -20,7 +20,9 @@
     "preflight": "tsx scripts/preflight-build.ts",
     "preflight:prod": "tsx scripts/preflight-build.ts --prod",
     "changelog": "tsx scripts/add-changelog-entry.ts",
-    "build:manifest": "tsx scripts/build-manifest.ts"
+    "build:manifest": "tsx scripts/build-manifest.ts",
+    "clean": "tsx scripts/clean-project.ts",
+    "clean:hard": "tsx scripts/clean-project.ts --hard"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
