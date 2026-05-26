@@ -817,4 +817,6 @@ export interface StrategyGameState {
   spaceNationsState?: import("@/logic/spaceNationsEngine").SpaceNationsState;
   // La Cité d'Orion — hub diplomatique interstellaire (optional pour backward compat)
   orionCityState?: import("@/logic/orionCityEngine").OrionCityState;
+  // La Chambre du Seuil — négociation morale Aurora/Obscurium (optional pour backward compat)
+  moralNegotiationState?: import("@/logic/moralNegotiationEngine").MoralNegotiationState;
 }

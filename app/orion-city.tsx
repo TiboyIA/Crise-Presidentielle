@@ -20,9 +20,16 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useStrategy } from "@/context/StrategyContext";
+import { DEFAULT_ORION_CITY_STATE } from "@/logic/orionCityEngine";
+import { DEFAULT_MORAL_NEGOTIATION_STATE } from "@/logic/moralNegotiationEngine";
 import {
-  DEFAULT_ORION_CITY_STATE,
-} from "@/logic/orionCityEngine";
+  getMoralBalanceLabel,
+  getMoralBalanceColor,
+  getAuroraTrustLabel,
+  getObscuriumDebtLabel,
+  PACT_LABELS,
+  PACT_DESCRIPTIONS,
+} from "@/data/moralNegotiations";
 import {
   ORION_DISTRICT_LIST,
   ACCESS_LEVEL_LABELS,
@@ -214,6 +221,9 @@ export default function OrionCityScreen() {
           })}
         </View>
 
+        {/* Chambre du Seuil */}
+        {discovered && <ChambreSection state={state} />}
+
         {/* Note Obscurium */}
         {discovered && oc.obscuriumTrace > 0 && (
           <View style={s.hintBox}>
@@ -235,6 +245,70 @@ export default function OrionCityScreen() {
         )}
 
       </ScrollView>
+    </View>
+  );
+}
+
+// ── Chambre du Seuil — composant narratif ─────────────────────────────────────
+
+function ChambreSection({ state }: { state: StrategyGameState }) {
+  const mn = state.moralNegotiationState ?? DEFAULT_MORAL_NEGOTIATION_STATE;
+  const hasActivity = mn.lastNegotiationAt > 0 || mn.obscuriumDebt > 0;
+
+  const balanceLabel = getMoralBalanceLabel(mn.moralBalance);
+  const balanceColor = getMoralBalanceColor(mn.moralBalance);
+  const auroraLabel  = getAuroraTrustLabel(mn.auroraTrust);
+  const debtLabel    = getObscuriumDebtLabel(mn.obscuriumDebt);
+  const pactLabel    = PACT_LABELS[mn.activePact];
+  const pactDesc     = PACT_DESCRIPTIONS[mn.activePact];
+
+  const pactColor =
+    mn.activePact === "aurora"    ? "#7ec8f7" :
+    mn.activePact === "obscurium" ? "#9b6fd4" :
+    mn.activePact === "neutral"   ? "#4caf82" :
+    PALETTE.textLow;
+
+  return (
+    <View style={s.chambreBox}>
+      <View style={s.chambreHeader}>
+        <MaterialCommunityIcons name="scale-balance" size={13} color="#c8a87e" />
+        <Text style={s.chambreTitle}>CHAMBRE DU SEUIL</Text>
+      </View>
+
+      {!hasActivity ? (
+        <Text style={s.chambreInactive}>
+          La Chambre du Seuil n'a pas encore été activée. Aurora et Obscurium attendent dans un silence poli.
+        </Text>
+      ) : (
+        <>
+          {/* Équilibre moral */}
+          <View style={[s.chambreRow, { borderColor: balanceColor + "33" }]}>
+            <Text style={s.chambreRowLabel}>ÉQUILIBRE MORAL</Text>
+            <Text style={[s.chambreRowValue, { color: balanceColor }]}>{balanceLabel}</Text>
+          </View>
+
+          {/* Pacte actif */}
+          <View style={[s.chambreRow, { borderColor: pactColor + "33" }]}>
+            <Text style={s.chambreRowLabel}>PACTE</Text>
+            <Text style={[s.chambreRowValue, { color: pactColor }]}>{pactLabel}</Text>
+            <Text style={s.chambreRowDesc}>{pactDesc}</Text>
+          </View>
+
+          {/* Aurora */}
+          <View style={[s.chambreRow, { borderColor: "#7ec8f733" }]}>
+            <Text style={s.chambreRowLabel}>AURORA</Text>
+            <Text style={[s.chambreRowValue, { color: "#7ec8f7" }]}>{auroraLabel}</Text>
+          </View>
+
+          {/* Obscurium */}
+          {mn.obscuriumDebt > 0 && (
+            <View style={[s.chambreRow, { borderColor: "#9b6fd433" }]}>
+              <Text style={s.chambreRowLabel}>OBSCURIUM</Text>
+              <Text style={[s.chambreRowValue, { color: "#9b6fd4" }]}>{debtLabel}</Text>
+            </View>
+          )}
+        </>
+      )}
     </View>
   );
 }
@@ -336,4 +410,21 @@ const s = StyleSheet.create({
     padding: 10,
   },
   hintText: { flex: 1, fontFamily: FONT.reg, fontSize: 10, color: PALETTE.textLow, lineHeight: 15 },
+
+  chambreBox: {
+    backgroundColor: "#0c0e1a",
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: "#c8a87e22",
+    padding: 12, gap: 8,
+  },
+  chambreHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
+  chambreTitle:  { fontFamily: FONT.bold, fontSize: 8, letterSpacing: 2.5, color: "#c8a87e" },
+  chambreInactive: { fontFamily: FONT.reg, fontSize: 10, color: PALETTE.textLow, lineHeight: 14, fontStyle: "italic" },
+
+  chambreRow: {
+    borderRadius: RADIUS.sm, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 7, gap: 2,
+  },
+  chambreRowLabel: { fontFamily: FONT.bold, fontSize: 7, letterSpacing: 2, color: PALETTE.textLow },
+  chambreRowValue: { fontFamily: FONT.bold, fontSize: 11 },
+  chambreRowDesc:  { fontFamily: FONT.reg, fontSize: 9, color: PALETTE.textLow, lineHeight: 13, marginTop: 2 },
 });

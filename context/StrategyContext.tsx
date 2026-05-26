@@ -199,6 +199,7 @@ import { isDevSandboxEnabled } from "@/config/devSandbox";
 import { logSandboxAction } from "@/logic/diagnosticEngine";
 import { tickSpaceNations, DEFAULT_SPACE_NATIONS_STATE } from "@/logic/spaceNationsEngine";
 import { tickOrionCity, DEFAULT_ORION_CITY_STATE } from "@/logic/orionCityEngine";
+import { tickMoralNegotiation, DEFAULT_MORAL_NEGOTIATION_STATE } from "@/logic/moralNegotiationEngine";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -347,7 +348,8 @@ function buildInitialState(
     strategyResearch: { ...DEFAULT_RESEARCH_STATE },
     cosmicInfluence: { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
     spaceNationsState: { ...DEFAULT_SPACE_NATIONS_STATE },
-    orionCityState:    { ...DEFAULT_ORION_CITY_STATE },
+    orionCityState:         { ...DEFAULT_ORION_CITY_STATE },
+    moralNegotiationState:  { ...DEFAULT_MORAL_NEGOTIATION_STATE },
     discoursePathology: { ...DEFAULT_PATHOLOGY },
     semanticContamination: [],
   };
@@ -501,7 +503,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           strategyResearch:    saved.strategyResearch    ?? { ...DEFAULT_RESEARCH_STATE },
           cosmicInfluence:     saved.cosmicInfluence     ?? { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
           spaceNationsState:   saved.spaceNationsState   ?? { ...DEFAULT_SPACE_NATIONS_STATE },
-          orionCityState:      saved.orionCityState      ?? { ...DEFAULT_ORION_CITY_STATE },
+          orionCityState:         saved.orionCityState         ?? { ...DEFAULT_ORION_CITY_STATE },
+          moralNegotiationState:  saved.moralNegotiationState  ?? { ...DEFAULT_MORAL_NEGOTIATION_STATE },
         };
         // ── Migration simulationClock ──────────────────────────────────────────
         // Convertit les anciens timestamps réels (ms) en heures jeu absolues.
@@ -2319,6 +2322,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // La Cité d'Orion — réputation et accès au hub diplomatique interstellaire
     s = tickOrionCity(s);
+
+    // La Chambre du Seuil — équilibre moral Aurora/Obscurium
+    s = tickMoralNegotiation(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {
