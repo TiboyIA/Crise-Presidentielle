@@ -18,7 +18,8 @@
     "test:golden": "tsx --tsconfig tsconfig.json tests/run.ts",
     "doctor": "tsx scripts/system-doctor.ts",
     "preflight": "tsx scripts/preflight-build.ts",
-    "preflight:prod": "tsx scripts/preflight-build.ts --prod"
+    "preflight:prod": "tsx scripts/preflight-build.ts --prod",
+    "changelog": "tsx scripts/add-changelog-entry.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
