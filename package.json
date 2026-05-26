@@ -15,7 +15,8 @@
     "play-store:assets": "node scripts/generate-play-store-assets.js",
     "assets:compress": "node scripts/compress-assets.js",
     "assets:compress:dry": "node scripts/compress-assets.js --dry-run",
-    "test:golden": "tsx --tsconfig tsconfig.json tests/run.ts"
+    "test:golden": "tsx --tsconfig tsconfig.json tests/run.ts",
+    "doctor": "tsx scripts/system-doctor.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
