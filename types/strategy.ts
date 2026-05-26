@@ -815,4 +815,6 @@ export interface StrategyGameState {
   };
   // Nations de l'Espace — assemblée interstellaire observant l'humanité (optional pour backward compat)
   spaceNationsState?: import("@/logic/spaceNationsEngine").SpaceNationsState;
+  // La Cité d'Orion — hub diplomatique interstellaire (optional pour backward compat)
+  orionCityState?: import("@/logic/orionCityEngine").OrionCityState;
 }

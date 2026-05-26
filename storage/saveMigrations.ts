@@ -13,6 +13,7 @@
  *               realTime, strategyResearch, premiumGold, playerUnits, militaryDoctrine
  *   v3 — Added: cosmicInfluence, dailyLoginReward
  *   v4 — Added: spaceNationsState
+ *   v5 — Added: orionCityState
  */
 
 import { DEFAULT_NEWS_STATE } from "@/logic/newsEngine";
@@ -21,7 +22,7 @@ import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import { MINISTER_LIST } from "@/data/strategyMinisters";
 import type { StrategyGameState } from "@/types/strategy";
 
-export const CURRENT_SAVE_VERSION = 4;
+export const CURRENT_SAVE_VERSION = 5;
 
 export interface MigrationResult {
   state: StrategyGameState;
@@ -269,6 +270,29 @@ function migrateV3ToV4(s: Raw, warnings: string[]): Raw {
   return { ...patched, version: 4 };
 }
 
+/**
+ * V4 → V5
+ * Adds orionCityState (La Cité d'Orion layer).
+ */
+function migrateV4ToV5(s: Raw, warnings: string[]): Raw {
+  const patched: Raw = { ...s };
+
+  if (!isObject(patched.orionCityState)) {
+    patched.orionCityState = {
+      discovered:         false,
+      orionStanding:      0,
+      accessLevel:        "inconnu",
+      auroraEmbassyTrust: 10,
+      obscuriumTrace:     0,
+      lastVisitAt:        0,
+      knownDistricts:     [],
+    };
+    warnings.push("v4→v5: orionCityState defaulted");
+  }
+
+  return { ...patched, version: 5 };
+}
+
 // ── Sanitize pass ─────────────────────────────────────────────────────────────
 // Runs after all migrations to fix corrupt numeric values and repair sub-objects.
 // Never resets a field to zero if it had a plausible value.
@@ -399,6 +423,7 @@ function buildRecoveryFallback(raw: unknown): StrategyGameState {
     dailyLoginReward:     { lastLoginRewardAt: 0, currentStreak: 0, totalDaysClaimed: 0 },
     cosmicInfluence:      { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
     spaceNationsState:    { cosmicCredibility: 20, auroraSupport: 15, obscuriumCorruption: 10, councilAttention: 0, lastCouncilVoteAt: 0, discovered: false, discoveryStage: "hidden" },
+    orionCityState:       { discovered: false, orionStanding: 0, accessLevel: "inconnu", auroraEmbassyTrust: 10, obscuriumTrace: 0, lastVisitAt: 0, knownDistricts: [] },
   };
 }
 
@@ -424,6 +449,7 @@ export function migrateSave(raw: unknown): MigrationResult | null {
     if ((s.version as number) < 2) s = migrateV1ToV2(s, warnings);
     if ((s.version as number) < 3) s = migrateV2ToV3(s, warnings);
     if ((s.version as number) < 4) s = migrateV3ToV4(s, warnings);
+    if ((s.version as number) < 5) s = migrateV4ToV5(s, warnings);
 
     // Sanitize pass — fix corrupt values without resetting good data
     s = sanitize(s, warnings);

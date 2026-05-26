@@ -151,6 +151,21 @@ export default function EntitiesScreen() {
           <MaterialCommunityIcons name="chevron-right" size={16} color="#7ec8f744" />
         </Pressable>
 
+        {/* Lien vers la Cité d'Orion */}
+        <Pressable
+          onPress={() => router.push("/orion-city" as any)}
+          style={({ pressed }) => [styles.spaceLink, styles.orionLink, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="city-variant-outline" size={14} color="#c8a87e" />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.spaceLinkTitle, { color: "#c8a87e" }]}>La Cité d'Orion</Text>
+            <Text style={styles.spaceLinkSub}>
+              Hub diplomatique interstellaire — 7 quartiers, secrets et sanctions
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={16} color="#c8a87e44" />
+        </Pressable>
+
         {/* Footer doctrine */}
         <View style={styles.footer}>
           <View style={styles.footerLine} />
@@ -667,6 +682,7 @@ const styles = StyleSheet.create({
   },
   spaceLinkTitle: { fontFamily: FONT.bold, fontSize: 12, color: "#7ec8f7" },
   spaceLinkSub:   { fontFamily: FONT.reg,  fontSize: 10, color: PALETTE.textLow, marginTop: 1 },
+  orionLink:      { borderColor: "#c8a87e33", backgroundColor: "#100e0a" },
 
   // ── FOOTER ───────────────────────────────────────────────────
   footer: {
