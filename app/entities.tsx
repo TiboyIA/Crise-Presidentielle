@@ -136,6 +136,21 @@ export default function EntitiesScreen() {
           discovered={discovered}
         />
 
+        {/* Lien vers les Nations de l'Espace */}
+        <Pressable
+          onPress={() => router.push("/space-nations" as any)}
+          style={({ pressed }) => [styles.spaceLink, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="telescope" size={14} color="#7ec8f7" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.spaceLinkTitle}>Les Nations de l'Espace</Text>
+            <Text style={styles.spaceLinkSub}>
+              Assemblée interstellaire — 7 nations observent l'humanité
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={16} color="#7ec8f744" />
+        </Pressable>
+
         {/* Footer doctrine */}
         <View style={styles.footer}>
           <View style={styles.footerLine} />
@@ -642,6 +657,16 @@ const styles = StyleSheet.create({
     color: PALETTE.textMid,
     lineHeight: 17,
   },
+
+  // ── LIEN NATIONS DE L'ESPACE ─────────────────────────────────
+  spaceLink: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "#0d1220",
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: "#7ec8f733",
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  spaceLinkTitle: { fontFamily: FONT.bold, fontSize: 12, color: "#7ec8f7" },
+  spaceLinkSub:   { fontFamily: FONT.reg,  fontSize: 10, color: PALETTE.textLow, marginTop: 1 },
 
   // ── FOOTER ───────────────────────────────────────────────────
   footer: {

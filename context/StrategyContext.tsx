@@ -197,6 +197,7 @@ import {
 import { recordEvent as _rankRecord, isRankedIntended as _isRankedIntended } from "@/services/RankedService";
 import { isDevSandboxEnabled } from "@/config/devSandbox";
 import { logSandboxAction } from "@/logic/diagnosticEngine";
+import { tickSpaceNations, DEFAULT_SPACE_NATIONS_STATE } from "@/logic/spaceNationsEngine";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -344,6 +345,7 @@ function buildInitialState(
     realTime: initRealTime(now),
     strategyResearch: { ...DEFAULT_RESEARCH_STATE },
     cosmicInfluence: { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
+    spaceNationsState: { ...DEFAULT_SPACE_NATIONS_STATE },
     discoursePathology: { ...DEFAULT_PATHOLOGY },
     semanticContamination: [],
   };
@@ -496,6 +498,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           realTime:            saved.realTime            ?? initRealTime(clockNow()),
           strategyResearch:    saved.strategyResearch    ?? { ...DEFAULT_RESEARCH_STATE },
           cosmicInfluence:     saved.cosmicInfluence     ?? { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
+          spaceNationsState:   saved.spaceNationsState   ?? { ...DEFAULT_SPACE_NATIONS_STATE },
         };
         // ── Migration simulationClock ──────────────────────────────────────────
         // Convertit les anciens timestamps réels (ms) en heures jeu absolues.
@@ -2307,6 +2310,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Perturbations transport météo — effets sur économie, militaire, coûts
     s = tickWeatherTransport(s);
+
+    // Nations de l'Espace — dérive lente de la crédibilité cosmique
+    s = tickSpaceNations(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {

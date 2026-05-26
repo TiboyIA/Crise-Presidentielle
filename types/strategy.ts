@@ -813,4 +813,6 @@ export interface StrategyGameState {
     spawnedAt: number;
     expiresAt: number;
   };
+  // Nations de l'Espace — assemblée interstellaire observant l'humanité (optional pour backward compat)
+  spaceNationsState?: import("@/logic/spaceNationsEngine").SpaceNationsState;
 }

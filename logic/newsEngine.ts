@@ -173,6 +173,12 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     has_infowar:                 (state.strategyResearch?.completed ?? []).includes("research_infowar"),
     cosmic_auroria_eligible:     indicators.cohesion >= 50 && hp.institutionalStability >= 55 && hp.scandalRisk < 50,
     cosmic_obscurium_active:     hp.scandalRisk > 40 || resources.cyberDefense < 40 || hp.popularFatigue > 55,
+    // Nations de l'Espace
+    sn_aurora_contact:   (state.spaceNationsState?.cosmicCredibility ?? 0) >= 45 && (state.spaceNationsState?.auroraSupport ?? 0) >= 35,
+    sn_council_eligible: (state.spaceNationsState?.councilAttention ?? 0) >= 30 && (state.spaceNationsState?.cosmicCredibility ?? 0) >= 30,
+    sn_noctyra_active:   (state.spaceNationsState?.obscuriumCorruption ?? 0) >= 45 || hp.scandalRisk > 55,
+    sn_sanction_risk:    (state.spaceNationsState?.cosmicCredibility ?? 0) < 25 && (state.spaceNationsState?.councilAttention ?? 0) >= 35,
+    sn_tribunal:         state.mandateDay >= 80 && (state.spaceNationsState?.councilAttention ?? 0) >= 25 && (state.spaceNationsState?.discovered ?? false),
     low_administration_morale:      (state.administrationMorale ?? 60) <= 40,
     very_low_administration_morale: (state.administrationMorale ?? 60) <= 20,
     active_high_cabinet_conflict:   (state.cabinetConflicts ?? []).some((c) => c.intensity > 65),

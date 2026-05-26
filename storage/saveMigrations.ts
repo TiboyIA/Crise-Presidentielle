@@ -12,6 +12,7 @@
  *   v2 — Added: reforms, ministers, achievements, publicMemory, oppositionPower,
  *               realTime, strategyResearch, premiumGold, playerUnits, militaryDoctrine
  *   v3 — Added: cosmicInfluence, dailyLoginReward
+ *   v4 — Added: spaceNationsState
  */
 
 import { DEFAULT_NEWS_STATE } from "@/logic/newsEngine";
@@ -20,7 +21,7 @@ import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import { MINISTER_LIST } from "@/data/strategyMinisters";
 import type { StrategyGameState } from "@/types/strategy";
 
-export const CURRENT_SAVE_VERSION = 3;
+export const CURRENT_SAVE_VERSION = 4;
 
 export interface MigrationResult {
   state: StrategyGameState;
@@ -245,6 +246,29 @@ function migrateV2ToV3(s: Raw, warnings: string[]): Raw {
   return { ...patched, version: 3 };
 }
 
+/**
+ * V3 → V4
+ * Adds spaceNationsState (Nations de l'Espace layer).
+ */
+function migrateV3ToV4(s: Raw, warnings: string[]): Raw {
+  const patched: Raw = { ...s };
+
+  if (!isObject(patched.spaceNationsState)) {
+    patched.spaceNationsState = {
+      cosmicCredibility:   20,
+      auroraSupport:       15,
+      obscuriumCorruption: 10,
+      councilAttention:    0,
+      lastCouncilVoteAt:   0,
+      discovered:          false,
+      discoveryStage:      "hidden",
+    };
+    warnings.push("v3→v4: spaceNationsState defaulted");
+  }
+
+  return { ...patched, version: 4 };
+}
+
 // ── Sanitize pass ─────────────────────────────────────────────────────────────
 // Runs after all migrations to fix corrupt numeric values and repair sub-objects.
 // Never resets a field to zero if it had a plausible value.
@@ -374,6 +398,7 @@ function buildRecoveryFallback(raw: unknown): StrategyGameState {
     strategyResearch:     { ...DEFAULT_RESEARCH_STATE },
     dailyLoginReward:     { lastLoginRewardAt: 0, currentStreak: 0, totalDaysClaimed: 0 },
     cosmicInfluence:      { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
+    spaceNationsState:    { cosmicCredibility: 20, auroraSupport: 15, obscuriumCorruption: 10, councilAttention: 0, lastCouncilVoteAt: 0, discovered: false, discoveryStage: "hidden" },
   };
 }
 
@@ -398,6 +423,7 @@ export function migrateSave(raw: unknown): MigrationResult | null {
     if (startVersion < 1) s = migrateV0ToV1(s, warnings);
     if ((s.version as number) < 2) s = migrateV1ToV2(s, warnings);
     if ((s.version as number) < 3) s = migrateV2ToV3(s, warnings);
+    if ((s.version as number) < 4) s = migrateV3ToV4(s, warnings);
 
     // Sanitize pass — fix corrupt values without resetting good data
     s = sanitize(s, warnings);
