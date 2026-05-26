@@ -196,6 +196,7 @@ import {
 } from "@/logic/discoursePathologyEngine";
 import { recordEvent as _rankRecord, isRankedIntended as _isRankedIntended } from "@/services/RankedService";
 import { isDevSandboxEnabled } from "@/config/devSandbox";
+import { logSandboxAction } from "@/logic/diagnosticEngine";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -2063,6 +2064,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
   const applySandboxMutation = useCallback(
     (fn: (s: StrategyGameState) => StrategyGameState) => {
       if (!isSandboxActiveRef.current) return;
+      logSandboxAction(fn.name || "mutation");
       update(fn);
     },
     [update],

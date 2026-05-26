@@ -1,12 +1,14 @@
 import React from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
+import { useAuth } from "@/context/AuthContext";
 import { useComfort, PROFILE_LIST } from "@/context/ComfortContext";
 import { isDevSandboxEnabled } from "@/config/devSandbox";
+import { buildDiagnostic, exportDiagnosticJSON } from "@/logic/diagnosticEngine";
 import { deleteSandboxAll, saveSandboxState } from "@/storage/sandboxStorage";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
@@ -14,6 +16,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, startNewGame, isSandboxActive, enableSandboxMode, disableSandboxMode } = useStrategy();
+  const auth = useAuth();
   const {
     enabled: comfortEnabled, toggle: toggleComfort,
     oneHand, toggleOneHand,
@@ -36,6 +39,15 @@ export default function SettingsScreen() {
         },
       ],
     );
+  };
+
+  const handleExportDiagnostic = () => {
+    const diagnostic = buildDiagnostic(state, auth, isSandboxActive);
+    const json = exportDiagnosticJSON(diagnostic);
+    void Share.share({
+      title: "Diagnostic — État de Crise",
+      message: json,
+    });
   };
 
   const handleResetSandbox = () => {
@@ -361,6 +373,16 @@ export default function SettingsScreen() {
                   </Pressable>
                 </>
               )}
+
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: PALETTE.panelEdge }} />
+              <Pressable
+                onPress={handleExportDiagnostic}
+                style={({ pressed }) => [styles.sbBtn, { opacity: pressed ? 0.75 : 1 }]}
+              >
+                <MaterialCommunityIcons name="bug-outline" size={15} color={PALETTE.textMid} />
+                <Text style={styles.sbBtnText}>Exporter diagnostic</Text>
+                <MaterialCommunityIcons name="export-variant" size={15} color={PALETTE.textLow} />
+              </Pressable>
             </View>
           </>
         )}

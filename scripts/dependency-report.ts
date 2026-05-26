@@ -276,13 +276,6 @@ const CATALOG: Record<string, PkgMeta> = {
     prudence: "Utilisé uniquement dans les scripts Node (generate-play-store-assets.js). Pas dans le bundle app.",
     category: "assets",
   },
-  "expo-image": {
-    role:     "Composant image optimisé (cache disque, WebP, lazy load, blurhash)",
-    critique: false, impact: "moyen",
-    prudence: "Remplace Image de react-native. API différente (source={{uri}} vs source={require()}). Tester les deux modes.",
-    category: "assets",
-  },
-
   // ── TypeScript / Build ───────────────────────────────────────────────────────
   "@babel/core": {
     role:     "Compilateur Babel — transformation JS pour Metro bundler",
