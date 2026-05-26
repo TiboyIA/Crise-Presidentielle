@@ -16,7 +16,9 @@
     "assets:compress": "node scripts/compress-assets.js",
     "assets:compress:dry": "node scripts/compress-assets.js --dry-run",
     "test:golden": "tsx --tsconfig tsconfig.json tests/run.ts",
-    "doctor": "tsx scripts/system-doctor.ts"
+    "doctor": "tsx scripts/system-doctor.ts",
+    "preflight": "tsx scripts/preflight-build.ts",
+    "preflight:prod": "tsx scripts/preflight-build.ts --prod"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
