@@ -49,3 +49,4 @@ play-store/
 # Rapports locaux générés par les scripts admin
 build-manifest.json
 preflight-report.json
+dependencies-report.md

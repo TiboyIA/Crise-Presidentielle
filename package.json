@@ -22,7 +22,8 @@
     "changelog": "tsx scripts/add-changelog-entry.ts",
     "build:manifest": "tsx scripts/build-manifest.ts",
     "clean": "tsx scripts/clean-project.ts",
-    "clean:hard": "tsx scripts/clean-project.ts --hard"
+    "clean:hard": "tsx scripts/clean-project.ts --hard",
+    "deps:report": "tsx scripts/dependency-report.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
