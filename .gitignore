@@ -45,3 +45,7 @@ play-store/
 
 .env
 .claude/
+
+# Rapports locaux générés par les scripts admin
+build-manifest.json
+preflight-report.json
