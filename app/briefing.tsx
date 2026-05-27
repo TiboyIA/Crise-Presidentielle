@@ -12,6 +12,7 @@ import { useResponsive } from "@/utils/responsive";
 import type { DecisionTrace, HiddenPolitics, NationalIndicators, PromiseDomain, PromiseStatus } from "@/types/strategy";
 import { computeNationalTension, getTensionLevel, getTensionLabel, getTensionColor } from "@/logic/tensionEngine";
 import { generateStateBriefing } from "@/logic/briefingTextEngine";
+import { getSignalBandInfo, DEFAULT_SIGNAL_NOISE_RATIO } from "@/logic/signalNoiseEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -128,6 +129,8 @@ export default function BriefingScreen() {
     .reverse();
   const tension = computeNationalTension(state);
   const compressedBriefing = generateStateBriefing(ind, hp, state.news.pendingIds.length, oppositionPower, tension);
+  const signalRatio = state.signalNoiseRatio ?? DEFAULT_SIGNAL_NOISE_RATIO;
+  const signalInfo  = getSignalBandInfo(signalRatio);
   const tensionLevel = getTensionLevel(tension);
   const tensionLabel = getTensionLabel(tensionLevel);
   const tensionColor = getTensionColor(tensionLevel);
@@ -422,6 +425,26 @@ export default function BriefingScreen() {
           </View>
         </Panel>
 
+        {/* RENSEIGNEMENT — QUALITÉ DU SIGNAL */}
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="signal-variant" size={14} color={signalInfo.color} />
+            <Text style={[styles.sectionTitle, { color: signalInfo.color }]}>RENSEIGNEMENT — QUALITÉ DU SIGNAL</Text>
+            <View style={[styles.signalPill, { borderColor: signalInfo.color + "55", backgroundColor: signalInfo.color + "18" }]}>
+              <Text style={[styles.signalPillText, { color: signalInfo.color }]}>{signalInfo.label.toUpperCase()}</Text>
+            </View>
+          </View>
+          <View style={styles.indicatorRow}>
+            <MaterialCommunityIcons name="signal" size={14} color={signalInfo.color} style={{ width: 18 }} />
+            <Text style={styles.indicatorLabel}>Ratio S/B</Text>
+            <View style={styles.indicatorTrack}>
+              <View style={[styles.indicatorFill, { width: `${signalRatio}%`, backgroundColor: signalInfo.color }]} />
+            </View>
+            <Text style={[styles.indicatorVal, { color: signalInfo.color }]}>{signalRatio}</Text>
+          </View>
+          <Text style={styles.signalMessage}>{signalInfo.message}</Text>
+        </Panel>
+
         </View>{/* /panelGrid */}
 
         {/* ACTIONS */}
@@ -510,6 +533,9 @@ const styles = StyleSheet.create({
   briefingLabel: { fontSize: 7, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1.5, width: 56, marginTop: 2 },
   briefingText: { flex: 1, fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textHigh, lineHeight: 17 },
 
+  signalPill:     { borderWidth: 1, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  signalPillText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.8 },
+  signalMessage:  { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 17, fontStyle: "italic" },
   actions: { gap: 8, marginTop: 4 },
   ctaBtn: { borderRadius: RADIUS.sm, overflow: "hidden" },
   ctaInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14 },

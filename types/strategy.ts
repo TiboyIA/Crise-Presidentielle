@@ -845,4 +845,6 @@ export interface StrategyGameState {
   orbitalWindow?: import("@/logic/orbitalWindowEngine").OrbitalWindowState;
   // Tempête solaire active — crise physique rare (optional pour backward compat)
   solarStorm?: import("@/logic/solarStormEngine").SolarStormState;
+  // Ratio signal/bruit du renseignement — 0-100 (optional pour backward compat)
+  signalNoiseRatio?: number;
 }

@@ -205,6 +205,7 @@ import { createWaveFromEvent, tickCrisisWaves, dampWavesByChoice } from "@/logic
 import { tickThermalStress, applyThermalReduction } from "@/logic/thermalStressEngine";
 import { tickOrbitalWindow } from "@/logic/orbitalWindowEngine";
 import { tickSolarStorm } from "@/logic/solarStormEngine";
+import { tickSignalNoise } from "@/logic/signalNoiseEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2424,6 +2425,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickGridPhysics(s);
       s = tickThermalStress(s);
       s = tickOrbitalWindow(s);
+      s = tickSignalNoise(s);
     }
   }
 
