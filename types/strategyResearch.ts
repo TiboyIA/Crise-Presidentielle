@@ -15,7 +15,16 @@ export type StrategyResearchId =
   | "research_missiles"
   | "research_military_bases"
   | "research_trade_routes"
-  | "research_infowar";
+  | "research_infowar"
+  // ── MODE DELTA — Physiques avancées ──────────────────────────────────────────
+  | "research_inertial_storage"
+  | "research_self_healing_materials"
+  | "research_datacenter_cooling"
+  | "research_adaptive_orbits"
+  | "research_em_shielding"
+  | "research_quantum_sensors"
+  | "research_superconducting_grid"
+  | "research_digital_twin";
 
 export type StrategyResearchCategory =
   | "cyber"

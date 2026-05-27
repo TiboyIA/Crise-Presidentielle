@@ -229,7 +229,8 @@ export function computeBreakpoints(state: StrategyGameState): SystemBreakpoint[]
 export function getVisibleBreakpoints(state: StrategyGameState): SystemBreakpoint[] {
   const all = computeBreakpoints(state);
   const snr = state.signalNoiseRatio ?? DEFAULT_SIGNAL_NOISE_RATIO;
-  if (snr >= 60) return all;
+  const hasQuantumSensors = (state.strategyResearch?.completed ?? []).includes("research_quantum_sensors");
+  if (hasQuantumSensors || snr >= 60) return all;
   if (snr >= 40) return all.filter((b) => b.status === "critique" || b.status === "rupture");
   return all.filter((b) => b.status === "rupture");
 }

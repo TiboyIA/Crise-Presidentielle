@@ -209,6 +209,7 @@ import { tickSignalNoise } from "@/logic/signalNoiseEngine";
 import { applyPressureConservation } from "@/logic/pressureConservationEngine";
 import { evaluateResonance } from "@/logic/socialResonanceEngine";
 import { tickBreakpoints, reinforceBreakpointMargins } from "@/logic/breakpointEngine";
+import { applyPhysicsResearchEffects } from "@/logic/physicsResearchEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2400,6 +2401,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Seuils de rupture — surveillance des 7 systèmes, effets et mise à jour des statuts
     s = tickBreakpoints(s);
+
+    // Recherches physiques avancées — effets passifs cumulatifs (MODE DELTA)
+    s = applyPhysicsResearchEffects(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {
