@@ -252,6 +252,9 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     // ── Qualité du codage hospitalier ────────────────────────────────────────
     hospital_coding_critical: (state.hospitalCodingQuality ?? 55) < 25 && state.mandateDay >= 15,
     hospital_coding_audit:    (state.hospitalCodingQuality ?? 55) >= 25 && (state.hospitalCodingQuality ?? 55) < 55 && state.mandateDay >= 20,
+    // ── Retard de remontée des données de santé ───────────────────────────────
+    health_delay_critical: (state.healthReportingDelay ?? 8) >= 22 && state.mandateDay >= 20,
+    health_delay_high:     (state.healthReportingDelay ?? 8) >= 14 && (state.healthReportingDelay ?? 8) < 22 && state.mandateDay >= 15,
   };
 }
 

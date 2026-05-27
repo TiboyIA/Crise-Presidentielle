@@ -857,4 +857,6 @@ export interface StrategyGameState {
   medicalDataQuality?: number;
   // Qualité du codage médico-administratif hospitalier — MODE DELTA (optional pour backward compat)
   hospitalCodingQuality?: number;
+  // Retard de remontée des données de santé — nombre d'actions (optional pour backward compat)
+  healthReportingDelay?: number;
 }

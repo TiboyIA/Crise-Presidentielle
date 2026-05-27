@@ -212,6 +212,7 @@ import { tickBreakpoints, reinforceBreakpointMargins } from "@/logic/breakpointE
 import { applyPhysicsResearchEffects } from "@/logic/physicsResearchEngine";
 import { tickMedicalDataQuality } from "@/logic/medicalInformationEngine";
 import { tickHospitalCodingQuality } from "@/logic/hospitalCodingQualityEngine";
+import { tickHealthReportingDelay } from "@/logic/healthReportingDelayEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2454,6 +2455,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickSignalNoise(s);
       s = tickMedicalDataQuality(s);
       s = tickHospitalCodingQuality(s);
+      s = tickHealthReportingDelay(s);
     }
   }
 

@@ -41,6 +41,7 @@ import { getSolarStormInfo } from "@/logic/solarStormEngine";
 import { computeBreakpoints } from "@/logic/breakpointEngine";
 import { getMedicalBandInfo, DEFAULT_MEDICAL_DATA_QUALITY } from "@/logic/medicalInformationEngine";
 import { getHospitalCodingBandInfo, DEFAULT_HOSPITAL_CODING_QUALITY } from "@/logic/hospitalCodingQualityEngine";
+import { getHealthReportingBandInfo, DEFAULT_HEALTH_REPORTING_DELAY } from "@/logic/healthReportingDelayEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -143,6 +144,8 @@ export default function JournalDeCriseScreen() {
   const medicalInfo     = getMedicalBandInfo(medicalQuality);
   const codingQuality   = state.hospitalCodingQuality ?? DEFAULT_HOSPITAL_CODING_QUALITY;
   const codingInfo      = getHospitalCodingBandInfo(codingQuality);
+  const reportingDelay  = state.healthReportingDelay ?? DEFAULT_HEALTH_REPORTING_DELAY;
+  const reportingInfo   = getHealthReportingBandInfo(reportingDelay);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -291,6 +294,25 @@ export default function JournalDeCriseScreen() {
             </Text>
           </View>
           <Text style={styles.stormDesc}>{codingInfo.message}</Text>
+        </View>
+      )}
+
+      {/* ── Retard remontée données santé ───────────────────────────────── */}
+      {state.mandateDay >= 5 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: reportingInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="database-clock-outline" size={12} color={reportingInfo.color} />
+            <Text style={[styles.waveTitle, { color: reportingInfo.color }]}>DONNÉES SANTÉ</Text>
+            <View style={[styles.waveBadge, { backgroundColor: reportingInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: reportingInfo.color }]}>
+                {reportingInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: reportingInfo.color, marginLeft: 4 }]}>
+              {`−${Math.round(reportingDelay)} actions`}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{reportingInfo.message}</Text>
         </View>
       )}
 
