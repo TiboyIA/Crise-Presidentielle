@@ -625,6 +625,8 @@ export interface NewsChoice {
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
   wearReduction?: number;
+  /** Réduction du stress thermique — appliquée au thermalStress de l'état. */
+  thermalReduction?: number;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -837,4 +839,6 @@ export interface StrategyGameState {
   crisisWaves?: import("@/logic/crisisWaveEngine").CrisisWave[];
   // Usure physique des infrastructures — Record<BuildingId, 0-100> (optional pour backward compat)
   infrastructureWear?: Partial<Record<BuildingId, number>>;
+  // Stress thermique des systèmes nationaux — 0-100 (optional pour backward compat)
+  thermalStress?: number;
 }

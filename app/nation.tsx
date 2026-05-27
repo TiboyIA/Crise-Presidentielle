@@ -41,6 +41,7 @@ import {
 } from "@/logic/resilienceFundEngine";
 import type { ContributionTier } from "@/logic/resilienceFundEngine";
 import { GridStabilityBadge } from "@/components/GridStabilityBadge";
+import { ThermalStressBadge } from "@/components/ThermalStressBadge";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -362,6 +363,11 @@ export default function NationScreen() {
         {/* RÉSEAU ÉLECTRIQUE — stabilité discrète */}
         {state.gridStability !== undefined && (
           <GridStabilityBadge stability={state.gridStability} />
+        )}
+
+        {/* STRESS THERMIQUE — charge des systèmes nationaux */}
+        {state.thermalStress !== undefined && (
+          <ThermalStressBadge stress={state.thermalStress} />
         )}
 
         {/* BAROMÈTRE NATIONAL */}

@@ -202,6 +202,7 @@ import { DEFAULT_COSMIC_STATE } from "@/types/cosmic";
 import { tickInertia, queueInertiaChoiceEffects } from "@/logic/inertiaEngine";
 import { tickGridPhysics } from "@/logic/gridPhysicsEngine";
 import { createWaveFromEvent, tickCrisisWaves, dampWavesByChoice } from "@/logic/crisisWaveEngine";
+import { tickThermalStress, applyThermalReduction } from "@/logic/thermalStressEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1604,7 +1605,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withWear = choice?.wearReduction
           ? applyWearReduction(withWaveTick, choice.wearReduction)
           : withWaveTick;
-        return advanceMandateDay(withWear, 0);
+        // Réduction thermique — si le choix inclut un refroidissement
+        const withThermal = choice?.thermalReduction
+          ? applyThermalReduction(withWear, choice.thermalReduction)
+          : withWear;
+        return advanceMandateDay(withThermal, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -2412,6 +2417,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickAdministrationMorale(s);
       s = tickCabinetConflicts(s);
       s = tickGridPhysics(s);
+      s = tickThermalStress(s);
     }
   }
 

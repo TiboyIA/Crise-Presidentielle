@@ -222,6 +222,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     grid_stable_opportunity: (state.gridStability ?? 72) >= 60 && state.mandateDay >= 30,
     // ── Ondes de crise ────────────────────────────────────────────────────
     wave_active_strong:      (state.crisisWaves ?? []).some((w) => w.intensity >= 50),
+    // ── Stress thermique ───────────────────────────────────────────────────
+    thermal_critical_stress:  (state.thermalStress ?? 22) >= 80,
+    thermal_high_stress:      (state.thermalStress ?? 22) >= 55 && state.mandateDay >= 15,
+    thermal_cooling_window:   (state.thermalStress ?? 22) < 35 && state.mandateDay >= 25,
     // ── Usure infrastructures ──────────────────────────────────────────────
     infra_critical_wear:     Object.values(state.infrastructureWear ?? {}).some((w) => (w ?? 0) >= 88),
     infra_high_wear:         (() => { const w = state.infrastructureWear ?? {}; const active = state.buildings.filter((b) => b.level > 0); if (active.length === 0) return false; const avg = active.reduce((s, b) => s + (w[b.id] ?? 0), 0) / active.length; return avg >= 55 && state.mandateDay >= 20; })(),
