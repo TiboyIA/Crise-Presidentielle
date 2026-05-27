@@ -851,4 +851,6 @@ export interface StrategyGameState {
   recentPressureNote?: string;
   // Note de résonance sociale — description du dernier cas de résonance déclenché (optional)
   resonanceNote?: string;
+  // Seuils de rupture des systèmes critiques — marges et statuts (optional pour backward compat)
+  breakpoints?: import("@/logic/breakpointEngine").BreakpointState;
 }

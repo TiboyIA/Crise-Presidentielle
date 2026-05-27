@@ -38,6 +38,7 @@ import { LowLoadBanner } from "@/components/LowLoadBanner";
 import { getActiveWaveSummary } from "@/logic/crisisWaveEngine";
 import { CrisisWaveCard } from "@/components/CrisisWaveCard";
 import { getSolarStormInfo } from "@/logic/solarStormEngine";
+import { computeBreakpoints } from "@/logic/breakpointEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -135,6 +136,7 @@ export default function JournalDeCriseScreen() {
   const { news } = state;
 
   const activeWaves = getActiveWaveSummary(state.crisisWaves ?? []);
+  const rupturedSystems = computeBreakpoints(state).filter((b) => b.status === "rupture");
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -245,6 +247,24 @@ export default function JournalDeCriseScreen() {
             <Text style={[styles.waveTitle, { color: "#f472b6" }]}>RÉSONANCE SOCIALE</Text>
           </View>
           <Text style={styles.stormDesc}>{state.resonanceNote}</Text>
+        </View>
+      )}
+
+      {/* ── Ruptures systémiques actives ─────────────────────────────────── */}
+      {rupturedSystems.length > 0 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#e5484833" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="alert-octagon" size={12} color="#e54848" />
+            <Text style={[styles.waveTitle, { color: "#e54848" }]}>RUPTURES SYSTÉMIQUES</Text>
+            <View style={[styles.waveBadge, { backgroundColor: "#e5484822" }]}>
+              <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>{rupturedSystems.length}</Text>
+            </View>
+          </View>
+          {rupturedSystems.map((bp) => (
+            <Text key={bp.id} style={styles.stormDesc}>
+              {"▲ "}{bp.label} — stress {Math.round(bp.stress)} / seuil {Math.round(bp.threshold)}
+            </Text>
+          ))}
         </View>
       )}
 

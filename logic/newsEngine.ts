@@ -239,6 +239,12 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     infra_critical_wear:     Object.values(state.infrastructureWear ?? {}).some((w) => (w ?? 0) >= 88),
     infra_high_wear:         (() => { const w = state.infrastructureWear ?? {}; const active = state.buildings.filter((b) => b.level > 0); if (active.length === 0) return false; const avg = active.reduce((s, b) => s + (w[b.id] ?? 0), 0) / active.length; return avg >= 55 && state.mandateDay >= 20; })(),
     infra_maintenance_due:   (() => { const w = state.infrastructureWear ?? {}; const active = state.buildings.filter((b) => b.level > 0); if (active.length === 0) return false; const avg = active.reduce((s, b) => s + (w[b.id] ?? 0), 0) / active.length; return avg >= 35 && state.mandateDay >= 15; })(),
+    // ── Seuils de rupture ─────────────────────────────────────────────────────
+    breakpoint_grid_rupture:    state.breakpoints?.statuses?.grid            === "rupture",
+    breakpoint_trust_rupture:   state.breakpoints?.statuses?.publicTrust     === "rupture",
+    breakpoint_infra_rupture:   state.breakpoints?.statuses?.infrastructure  === "rupture",
+    breakpoint_cyber_rupture:   state.breakpoints?.statuses?.cyber           === "rupture",
+    breakpoint_finance_rupture: state.breakpoints?.statuses?.publicFinance   === "rupture",
   };
 }
 

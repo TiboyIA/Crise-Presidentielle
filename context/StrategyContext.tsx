@@ -208,6 +208,7 @@ import { tickSolarStorm } from "@/logic/solarStormEngine";
 import { tickSignalNoise } from "@/logic/signalNoiseEngine";
 import { applyPressureConservation } from "@/logic/pressureConservationEngine";
 import { evaluateResonance } from "@/logic/socialResonanceEngine";
+import { tickBreakpoints, reinforceBreakpointMargins } from "@/logic/breakpointEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1621,8 +1622,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withNote = pressureNote
           ? { ...withPressure, recentPressureNote: pressureNote }
           : withPressure;
+        // Renforcement des marges de rupture — si le choix est un investissement structurel
+        const withBreakpoint = choice ? reinforceBreakpointMargins(withNote, choice) : withNote;
         // Résonance sociale — amplification si contexte sensible
-        const { state: withResonance, note: resonanceNote } = evaluateResonance(withNote, event);
+        const { state: withResonance, note: resonanceNote } = evaluateResonance(withBreakpoint, event);
         const withResonanceNote = resonanceNote
           ? { ...withResonance, resonanceNote }
           : withResonance;
@@ -2394,6 +2397,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Tempêtes solaires — déclenchement rare, drain passif, expiration automatique
     s = tickSolarStorm(s);
+
+    // Seuils de rupture — surveillance des 7 systèmes, effets et mise à jour des statuts
+    s = tickBreakpoints(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {

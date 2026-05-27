@@ -14,6 +14,7 @@ import { computeNationalTension, getTensionLevel, getTensionLabel, getTensionCol
 import { generateStateBriefing } from "@/logic/briefingTextEngine";
 import { getSignalBandInfo, DEFAULT_SIGNAL_NOISE_RATIO } from "@/logic/signalNoiseEngine";
 import { computeResonanceRisk } from "@/logic/socialResonanceEngine";
+import { getVisibleBreakpoints } from "@/logic/breakpointEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -135,6 +136,7 @@ export default function BriefingScreen() {
   const resonanceRisk  = computeResonanceRisk(state);
   const resonanceColor = resonanceRisk >= 60 ? "#e54848" : resonanceRisk >= 35 ? "#e8864f" : "#8bc34a";
   const resonanceLabel = resonanceRisk >= 60 ? "ÉLEVÉ" : resonanceRisk >= 35 ? "MODÉRÉ" : "FAIBLE";
+  const visibleBreakpoints = getVisibleBreakpoints(state).filter((b) => b.status !== "stable");
   const tensionLevel = getTensionLevel(tension);
   const tensionLabel = getTensionLabel(tensionLevel);
   const tensionColor = getTensionColor(tensionLevel);
@@ -475,6 +477,32 @@ export default function BriefingScreen() {
           </Text>
         </Panel>
 
+        {/* SYSTÈMES CRITIQUES — seuils de rupture */}
+        {visibleBreakpoints.length > 0 && (
+          <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="alert-octagon-outline" size={14} color="#e8864f" />
+              <Text style={[styles.sectionTitle, { color: "#e8864f" }]}>SYSTÈMES CRITIQUES</Text>
+              <View style={[styles.signalPill, { borderColor: "#e8864f55", backgroundColor: "#e8864f18" }]}>
+                <Text style={[styles.signalPillText, { color: "#e8864f" }]}>{visibleBreakpoints.length} ALERTE{visibleBreakpoints.length > 1 ? "S" : ""}</Text>
+              </View>
+            </View>
+            {visibleBreakpoints.map((bp) => (
+              <View key={bp.id} style={styles.indicatorRow}>
+                <MaterialCommunityIcons
+                  name={bp.status === "rupture" ? "alert-circle" : bp.status === "critique" ? "alert" : "alert-outline"}
+                  size={14} color={bp.color} style={{ width: 18 }}
+                />
+                <Text style={[styles.indicatorLabel, { flex: 1 }]}>{bp.label}</Text>
+                <View style={[styles.bpStatusPill, { borderColor: bp.color + "55", backgroundColor: bp.color + "18" }]}>
+                  <Text style={[styles.bpStatusText, { color: bp.color }]}>{bp.status.toUpperCase()}</Text>
+                </View>
+                <Text style={[styles.indicatorVal, { color: bp.color, minWidth: 26 }]}>{Math.round(bp.stress)}</Text>
+              </View>
+            ))}
+          </Panel>
+        )}
+
         </View>{/* /panelGrid */}
 
         {/* ACTIONS */}
@@ -566,6 +594,8 @@ const styles = StyleSheet.create({
   signalPill:     { borderWidth: 1, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   signalPillText: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.8 },
   signalMessage:  { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 17, fontStyle: "italic" },
+  bpStatusPill:   { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  bpStatusText:   { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 0.8 },
   actions: { gap: 8, marginTop: 4 },
   ctaBtn: { borderRadius: RADIUS.sm, overflow: "hidden" },
   ctaInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14 },
