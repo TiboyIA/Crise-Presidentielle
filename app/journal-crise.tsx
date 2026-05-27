@@ -237,6 +237,17 @@ export default function JournalDeCriseScreen() {
         </View>
       )}
 
+      {/* ── Résonance sociale — dernier cas déclenché ────────────────────── */}
+      {state.resonanceNote && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#f472b633" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="sine-wave" size={12} color="#f472b6" />
+            <Text style={[styles.waveTitle, { color: "#f472b6" }]}>RÉSONANCE SOCIALE</Text>
+          </View>
+          <Text style={styles.stormDesc}>{state.resonanceNote}</Text>
+        </View>
+      )}
+
       {/* ── Ondes de crise actives ──────────────────────────────────────── */}
       {activeWaves.length > 0 && !lowLoad && (
         <View style={[styles.waveBlock, { marginHorizontal: hPad }]}>

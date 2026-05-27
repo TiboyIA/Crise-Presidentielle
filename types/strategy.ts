@@ -849,4 +849,6 @@ export interface StrategyGameState {
   signalNoiseRatio?: number;
   // Note de pression conservée — court résumé du déplacement le plus récent (optional)
   recentPressureNote?: string;
+  // Note de résonance sociale — description du dernier cas de résonance déclenché (optional)
+  resonanceNote?: string;
 }

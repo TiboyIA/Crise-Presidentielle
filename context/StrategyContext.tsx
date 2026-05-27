@@ -207,6 +207,7 @@ import { tickOrbitalWindow } from "@/logic/orbitalWindowEngine";
 import { tickSolarStorm } from "@/logic/solarStormEngine";
 import { tickSignalNoise } from "@/logic/signalNoiseEngine";
 import { applyPressureConservation } from "@/logic/pressureConservationEngine";
+import { evaluateResonance } from "@/logic/socialResonanceEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1620,7 +1621,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withNote = pressureNote
           ? { ...withPressure, recentPressureNote: pressureNote }
           : withPressure;
-        return advanceMandateDay(withNote, 0);
+        // Résonance sociale — amplification si contexte sensible
+        const { state: withResonance, note: resonanceNote } = evaluateResonance(withNote, event);
+        const withResonanceNote = resonanceNote
+          ? { ...withResonance, resonanceNote }
+          : withResonance;
+        return advanceMandateDay(withResonanceNote, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {

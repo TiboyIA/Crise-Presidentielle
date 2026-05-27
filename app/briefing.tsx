@@ -13,6 +13,7 @@ import type { DecisionTrace, HiddenPolitics, NationalIndicators, PromiseDomain, 
 import { computeNationalTension, getTensionLevel, getTensionLabel, getTensionColor } from "@/logic/tensionEngine";
 import { generateStateBriefing } from "@/logic/briefingTextEngine";
 import { getSignalBandInfo, DEFAULT_SIGNAL_NOISE_RATIO } from "@/logic/signalNoiseEngine";
+import { computeResonanceRisk } from "@/logic/socialResonanceEngine";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -129,8 +130,11 @@ export default function BriefingScreen() {
     .reverse();
   const tension = computeNationalTension(state);
   const compressedBriefing = generateStateBriefing(ind, hp, state.news.pendingIds.length, oppositionPower, tension);
-  const signalRatio = state.signalNoiseRatio ?? DEFAULT_SIGNAL_NOISE_RATIO;
-  const signalInfo  = getSignalBandInfo(signalRatio);
+  const signalRatio    = state.signalNoiseRatio ?? DEFAULT_SIGNAL_NOISE_RATIO;
+  const signalInfo     = getSignalBandInfo(signalRatio);
+  const resonanceRisk  = computeResonanceRisk(state);
+  const resonanceColor = resonanceRisk >= 60 ? "#e54848" : resonanceRisk >= 35 ? "#e8864f" : "#8bc34a";
+  const resonanceLabel = resonanceRisk >= 60 ? "ÉLEVÉ" : resonanceRisk >= 35 ? "MODÉRÉ" : "FAIBLE";
   const tensionLevel = getTensionLevel(tension);
   const tensionLabel = getTensionLabel(tensionLevel);
   const tensionColor = getTensionColor(tensionLevel);
@@ -443,6 +447,32 @@ export default function BriefingScreen() {
             <Text style={[styles.indicatorVal, { color: signalInfo.color }]}>{signalRatio}</Text>
           </View>
           <Text style={styles.signalMessage}>{signalInfo.message}</Text>
+        </Panel>
+
+        {/* RÉSONANCE SOCIALE */}
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="sine-wave" size={14} color={resonanceColor} />
+            <Text style={[styles.sectionTitle, { color: resonanceColor }]}>RÉSONANCE SOCIALE</Text>
+            <View style={[styles.signalPill, { borderColor: resonanceColor + "55", backgroundColor: resonanceColor + "18" }]}>
+              <Text style={[styles.signalPillText, { color: resonanceColor }]}>{resonanceLabel}</Text>
+            </View>
+          </View>
+          <View style={styles.indicatorRow}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={14} color={resonanceColor} style={{ width: 18 }} />
+            <Text style={styles.indicatorLabel}>Risque d'amplification</Text>
+            <View style={styles.indicatorTrack}>
+              <View style={[styles.indicatorFill, { width: `${resonanceRisk}%`, backgroundColor: resonanceColor }]} />
+            </View>
+            <Text style={[styles.indicatorVal, { color: resonanceColor }]}>{resonanceRisk}</Text>
+          </View>
+          <Text style={styles.signalMessage}>
+            {resonanceRisk >= 60
+              ? "Le contexte est fortement sensibilisé. Les prochaines crises risquent d'être amplifiées par l'environnement social."
+              : resonanceRisk >= 35
+              ? "Certains facteurs de vulnérabilité sont actifs. Une crise dans ce domaine pourrait résonner plus fortement."
+              : "L'environnement social est relativement stable. Les crises seront absorbées dans des conditions normales."}
+          </Text>
         </Panel>
 
         </View>{/* /panelGrid */}
