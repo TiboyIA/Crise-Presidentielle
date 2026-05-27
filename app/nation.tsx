@@ -40,6 +40,7 @@ import {
   getProtectionLabel,
 } from "@/logic/resilienceFundEngine";
 import type { ContributionTier } from "@/logic/resilienceFundEngine";
+import { GridStabilityBadge } from "@/components/GridStabilityBadge";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -357,6 +358,11 @@ export default function NationScreen() {
             />
           ))}
         </ScrollView>
+
+        {/* RÉSEAU ÉLECTRIQUE — stabilité discrète */}
+        {state.gridStability !== undefined && (
+          <GridStabilityBadge stability={state.gridStability} />
+        )}
 
         {/* BAROMÈTRE NATIONAL */}
         <SectionHeader label="Baromètre national" trailing={

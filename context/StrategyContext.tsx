@@ -200,6 +200,7 @@ import { logSandboxAction } from "@/logic/diagnosticEngine";
 import { tickCosmic, applyCosmicEffects } from "@/logic/cosmicEngine";
 import { DEFAULT_COSMIC_STATE } from "@/types/cosmic";
 import { tickInertia, queueInertiaChoiceEffects } from "@/logic/inertiaEngine";
+import { tickGridPhysics } from "@/logic/gridPhysicsEngine";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -2364,13 +2365,14 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
     }
   }
 
-  // Tick fatigue RH + moral administratif + conflits (cap à 7j pour éviter les rattrapages excessifs)
+  // Tick fatigue RH + moral administratif + conflits + réseau électrique (cap à 7j)
   if (days > 0) {
     const clampedDays = Math.min(days, 7);
     for (let d = 0; d < clampedDays; d++) {
       s = tickMinisterFatigue(s);
       s = tickAdministrationMorale(s);
       s = tickCabinetConflicts(s);
+      s = tickGridPhysics(s);
     }
   }
 

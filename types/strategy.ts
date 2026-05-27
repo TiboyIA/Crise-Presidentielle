@@ -827,4 +827,6 @@ export interface StrategyGameState {
   cosmicState?: import("@/types/cosmic").CosmicState;
   // Inertie physique de l'État — effets différés en file d'attente (optional pour backward compat)
   inertiaQueue?: import("@/logic/inertiaEngine").InertiaEffect[];
+  // Stabilité du réseau électrique — indicateur physique discret 0-100 (optional pour backward compat)
+  gridStability?: number;
 }

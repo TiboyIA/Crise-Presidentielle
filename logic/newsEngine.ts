@@ -216,6 +216,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     low_administration_morale:      (state.administrationMorale ?? 60) <= 40,
     very_low_administration_morale: (state.administrationMorale ?? 60) <= 20,
     active_high_cabinet_conflict:   (state.cabinetConflicts ?? []).some((c) => c.intensity > 65),
+    // ── Réseau électrique ──────────────────────────────────────────────────
+    grid_critical:           (state.gridStability ?? 72) < 25,
+    grid_tension:            (state.gridStability ?? 72) >= 25 && (state.gridStability ?? 72) < 50,
+    grid_stable_opportunity: (state.gridStability ?? 72) >= 60 && state.mandateDay >= 30,
   };
 }
 
