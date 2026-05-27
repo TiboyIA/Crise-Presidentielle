@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
 import { BuildingCard } from "@/components/BuildingCard";
 import { ScreenHeader, SectionHeader } from "@/components/ui";
 import { BUILDINGS, BUILDING_LIST } from "@/data/buildings";
 import { canAfford, isUnlocked } from "@/logic/buildingEngine";
-import { FONT, PALETTE } from "@/constants/uiTokens";
+import { getAverageWear, getWearBandInfo, canPerformMaintenance, MAINTENANCE_COST } from "@/logic/infrastructureWearEngine";
+import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { BuildingId } from "@/types/strategy";
 import { useCommand } from "@/hooks/useCommand";
 import { commandId } from "@/core/commands";
@@ -20,7 +22,7 @@ const CATEGORIES: { label: string; ids: BuildingId[] }[] = [
 
 export default function BuildingsScreen() {
   const insets = useSafeAreaInsets();
-  const { state, upgradeBuilding } = useStrategy();
+  const { state, upgradeBuilding, performMaintenance } = useStrategy();
   const { hPad } = useResponsive();
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,6 +49,16 @@ export default function BuildingsScreen() {
   const buildingMap = Object.fromEntries(state.buildings.map((b) => [b.id, b]));
   const totalLevels = state.buildings.reduce((acc, b) => acc + b.level, 0);
   const upgrading = state.buildings.filter((b) => b.upgradeEndTime !== null).length;
+
+  const avgWear = getAverageWear(state);
+  const wearInfo = getWearBandInfo(avgWear);
+  const canMaintain = canPerformMaintenance(state);
+
+  const handleMaintenance = () => {
+    const result = performMaintenance();
+    if (!result.success) showToast(result.reason ?? "Maintenance impossible");
+    else showToast("Maintenance effectuée — infrastructures stabilisées.");
+  };
 
   return (
     <View style={styles.container}>
@@ -80,6 +92,27 @@ export default function BuildingsScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24, paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
       >
+        {avgWear >= 20 && (
+          <View style={[styles.wearPanel, { borderColor: wearInfo.color + "55" }]}>
+            <View style={styles.wearRow}>
+              <MaterialCommunityIcons name="wrench-outline" size={14} color={wearInfo.color} />
+              <Text style={styles.wearLabel}>USURE DES INFRASTRUCTURES</Text>
+              <View style={[styles.wearPill, { backgroundColor: wearInfo.color + "22", borderColor: wearInfo.color + "55" }]}>
+                <Text style={[styles.wearPillText, { color: wearInfo.color }]}>{wearInfo.label.toUpperCase()}</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={handleMaintenance}
+              disabled={!canMaintain}
+              style={[styles.maintainBtn, !canMaintain && styles.maintainBtnDisabled]}
+            >
+              <Text style={[styles.maintainBtnText, !canMaintain && styles.maintainBtnTextDisabled]}>
+                Maintenance préventive — {MAINTENANCE_COST.toLocaleString()} €
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         <Text style={styles.intro}>
           Améliorez vos ministères pour augmenter la production de ressources, débloquer de nouvelles options stratégiques et renforcer votre puissance nationale.
         </Text>
@@ -127,4 +160,13 @@ const styles = StyleSheet.create({
   list: { paddingTop: 4, gap: 16 },
   intro: { fontSize: 12, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 18, fontStyle: "italic" },
   categoryBlock: { gap: 10 },
+  wearPanel: { borderWidth: 1, borderRadius: RADIUS.sm, padding: 12, gap: 10, backgroundColor: PALETTE.panel },
+  wearRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  wearLabel: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.2, flex: 1 },
+  wearPill: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  wearPillText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 1 },
+  maintainBtn: { borderRadius: RADIUS.xs, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: PALETTE.gold + "22", borderWidth: 1, borderColor: PALETTE.gold + "55", alignItems: "center" },
+  maintainBtnDisabled: { opacity: 0.4 },
+  maintainBtnText: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.gold },
+  maintainBtnTextDisabled: { color: PALETTE.textMid },
 });

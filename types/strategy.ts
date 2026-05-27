@@ -623,6 +623,8 @@ export interface NewsChoice {
   inertiaEffects?: Partial<Record<import("@/logic/inertiaEngine").InertiaDomain, number>>;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
+  /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
+  wearReduction?: number;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -833,4 +835,6 @@ export interface StrategyGameState {
   gridStability?: number;
   // Ondes de propagation des crises actives (optional pour backward compat)
   crisisWaves?: import("@/logic/crisisWaveEngine").CrisisWave[];
+  // Usure physique des infrastructures — Record<BuildingId, 0-100> (optional pour backward compat)
+  infrastructureWear?: Partial<Record<BuildingId, number>>;
 }

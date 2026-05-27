@@ -203,6 +203,13 @@ import { tickInertia, queueInertiaChoiceEffects } from "@/logic/inertiaEngine";
 import { tickGridPhysics } from "@/logic/gridPhysicsEngine";
 import { createWaveFromEvent, tickCrisisWaves, dampWavesByChoice } from "@/logic/crisisWaveEngine";
 import {
+  tickInfrastructureWear,
+  applyWearReduction,
+  MAINTENANCE_COST,
+  MAINTENANCE_WEAR_REDUCTION,
+  canPerformMaintenance,
+} from "@/logic/infrastructureWearEngine";
+import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
   loadSandboxState,
@@ -406,6 +413,7 @@ interface StrategyContextValue {
   buyInsurance: (productId: InsuranceProductId) => { success: boolean; reason?: string };
   cancelInsurance: (productId: InsuranceProductId) => void;
   emitCatBond: (typeId: CatBondTypeId) => { success: boolean; reason?: string };
+  performMaintenance: () => { success: boolean; reason?: string };
   // ── Bac à sable développeur ────────────────────────────────────────────────
   isSandboxActive: boolean;
   enableSandboxMode:  () => Promise<void>;
@@ -750,6 +758,24 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     },
     [state, update],
   );
+
+  const performMaintenance = useCallback((): { success: boolean; reason?: string } => {
+    if (!state) return { success: false, reason: "Jeu non initialisé" };
+    if (!canPerformMaintenance(state)) {
+      return { success: false, reason: state.resources.money < MAINTENANCE_COST ? "Fonds insuffisants" : "Usure trop faible pour intervenir" };
+    }
+    update((prev) => {
+      const resources = { ...prev.resources, money: prev.resources.money - MAINTENANCE_COST };
+      const withResources = { ...prev, resources };
+      const withWear = applyWearReduction(withResources, MAINTENANCE_WEAR_REDUCTION);
+      const instability = Math.min(100, (withWear.hiddenPolitics?.institutionalStability ?? 60) + 3);
+      return {
+        ...withWear,
+        hiddenPolitics: { ...withWear.hiddenPolitics, institutionalStability: instability },
+      };
+    });
+    return { success: true };
+  }, [state, update]);
 
   // ── Anti-triche classé : collecte d'événements côté client ──────────────────
   // Aucune validation ici — les données sont envoyées au serveur à la soumission.
@@ -1574,7 +1600,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withWave     = createWaveFromEvent(withInertia, event);
         const withDamping  = choice?.waveDamping ? dampWavesByChoice(withWave, choice.waveDamping) : withWave;
         const withWaveTick = tickCrisisWaves(withDamping);
-        return advanceMandateDay(withWaveTick, 0);
+        // Réduction d'usure — si le choix inclut une maintenance
+        const withWear = choice?.wearReduction
+          ? applyWearReduction(withWaveTick, choice.wearReduction)
+          : withWaveTick;
+        return advanceMandateDay(withWear, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -2120,6 +2150,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       claimDailyReward, contributeFund,
       buyInsurance: buyInsuranceFn, cancelInsurance: cancelInsuranceFn,
       emitCatBond: emitCatBondFn,
+      performMaintenance,
       isSandboxActive,
       enableSandboxMode,
       disableSandboxMode,
@@ -2138,7 +2169,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       deleteEnemyReport, clearAllEnemyReports,
       trainUnit, collectTraining, setMilitaryDoctrine, launchStrategyResearch, tick,
       saveToSlotFn, loadFromSlotFn, deleteSlotFn, claimDailyReward, contributeFund,
-      buyInsuranceFn, cancelInsuranceFn, emitCatBondFn,
+      buyInsuranceFn, cancelInsuranceFn, emitCatBondFn, performMaintenance,
       isSandboxActive, enableSandboxMode, disableSandboxMode, applySandboxMutation],
   );
 
@@ -2335,6 +2366,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Inertie physique — déploiement progressif des effets différés
     s = tickInertia(s);
+
+    // Usure physique des infrastructures — drain et pression sur stabilité
+    s = tickInfrastructureWear(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {
