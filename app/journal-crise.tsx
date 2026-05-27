@@ -37,6 +37,7 @@ import { useComfort } from "@/context/ComfortContext";
 import { LowLoadBanner } from "@/components/LowLoadBanner";
 import { getActiveWaveSummary } from "@/logic/crisisWaveEngine";
 import { CrisisWaveCard } from "@/components/CrisisWaveCard";
+import { getSolarStormInfo } from "@/logic/solarStormEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -205,6 +206,25 @@ export default function JournalDeCriseScreen() {
           </ScrollView>
         </Panel>
       )}
+
+      {/* ── Tempête solaire active ───────────────────────────────────────── */}
+      {state.solarStorm && !lowLoad && (() => {
+        const storm = getSolarStormInfo(state.solarStorm.level);
+        return (
+          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: storm.color + "33" }]}>
+            <View style={styles.waveHeader}>
+              <MaterialCommunityIcons name="weather-sunny-alert" size={12} color={storm.color} />
+              <Text style={[styles.waveTitle, { color: storm.color }]}>TEMPÊTE SOLAIRE ACTIVE</Text>
+              <View style={[styles.waveBadge, { backgroundColor: storm.color + "22" }]}>
+                <Text style={[styles.waveBadgeText, { color: storm.color }]}>
+                  {storm.level.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.stormDesc}>{storm.description}</Text>
+          </View>
+        );
+      })()}
 
       {/* ── Ondes de crise actives ──────────────────────────────────────── */}
       {activeWaves.length > 0 && !lowLoad && (
@@ -794,4 +814,5 @@ const styles = StyleSheet.create({
   waveTitle:     { flex: 1, fontSize: 9, fontFamily: FONT.bold, color: "#e8864f", letterSpacing: 1.2 },
   waveBadge:     { paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.pill },
   waveBadgeText: { fontSize: 8, fontFamily: FONT.bold, color: "#e8864f" },
+  stormDesc:     { fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 },
 });

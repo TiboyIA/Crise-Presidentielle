@@ -204,6 +204,7 @@ import { tickGridPhysics } from "@/logic/gridPhysicsEngine";
 import { createWaveFromEvent, tickCrisisWaves, dampWavesByChoice } from "@/logic/crisisWaveEngine";
 import { tickThermalStress, applyThermalReduction } from "@/logic/thermalStressEngine";
 import { tickOrbitalWindow } from "@/logic/orbitalWindowEngine";
+import { tickSolarStorm } from "@/logic/solarStormEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2375,6 +2376,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Usure physique des infrastructures — drain et pression sur stabilité
     s = tickInfrastructureWear(s);
+
+    // Tempêtes solaires — déclenchement rare, drain passif, expiration automatique
+    s = tickSolarStorm(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {

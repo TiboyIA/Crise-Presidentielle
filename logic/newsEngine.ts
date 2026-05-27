@@ -222,6 +222,11 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     grid_stable_opportunity: (state.gridStability ?? 72) >= 60 && state.mandateDay >= 30,
     // ── Ondes de crise ────────────────────────────────────────────────────
     wave_active_strong:      (state.crisisWaves ?? []).some((w) => w.intensity >= 50),
+    // ── Tempêtes solaires ────────────────────────────────────────────────
+    solar_storm_faible:   state.solarStorm?.level === "faible",
+    solar_storm_moderee:  state.solarStorm?.level === "modérée",
+    solar_storm_forte:    state.solarStorm?.level === "forte",
+    solar_storm_extreme:  state.solarStorm?.level === "extrême",
     // ── Fenêtres orbitales ────────────────────────────────────────────────
     orbital_tempete_solaire:   state.orbitalWindow?.current === "tempête_solaire",
     orbital_window_favorable:  state.orbitalWindow?.current === "favorable" && state.mandateDay >= 20,

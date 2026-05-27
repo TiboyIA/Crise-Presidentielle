@@ -5,6 +5,7 @@ import { WAVE_EVENTS } from "@/data/waveEvents";
 import { WEAR_EVENTS } from "@/data/wearEvents";
 import { THERMAL_EVENTS } from "@/data/thermalEvents";
 import { ORBITAL_EVENTS } from "@/data/orbitalEvents";
+import { SOLAR_STORM_EVENTS } from "@/data/solarStormEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3656,6 +3657,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...THERMAL_EVENTS,
   // ── FENÊTRES ORBITALES ───────────────────────────────────────────────────────
   ...ORBITAL_EVENTS,
+  // ── TEMPÊTES SOLAIRES ────────────────────────────────────────────────────────
+  ...SOLAR_STORM_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

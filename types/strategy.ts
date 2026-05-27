@@ -843,4 +843,6 @@ export interface StrategyGameState {
   thermalStress?: number;
   // Fenêtre orbitale des satellites — état discret (optional pour backward compat)
   orbitalWindow?: import("@/logic/orbitalWindowEngine").OrbitalWindowState;
+  // Tempête solaire active — crise physique rare (optional pour backward compat)
+  solarStorm?: import("@/logic/solarStormEngine").SolarStormState;
 }
