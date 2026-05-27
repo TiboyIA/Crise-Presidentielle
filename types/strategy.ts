@@ -621,6 +621,8 @@ export interface NewsChoice {
   cosmicEffects?: import("@/types/cosmic").CosmicStateEffects;
   /** Effets inertiels — fractionnés en immédiat + différé par inertiaEngine. */
   inertiaEffects?: Partial<Record<import("@/logic/inertiaEngine").InertiaDomain, number>>;
+  /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
+  waveDamping?: number;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -829,4 +831,6 @@ export interface StrategyGameState {
   inertiaQueue?: import("@/logic/inertiaEngine").InertiaEffect[];
   // Stabilité du réseau électrique — indicateur physique discret 0-100 (optional pour backward compat)
   gridStability?: number;
+  // Ondes de propagation des crises actives (optional pour backward compat)
+  crisisWaves?: import("@/logic/crisisWaveEngine").CrisisWave[];
 }

@@ -220,6 +220,8 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     grid_critical:           (state.gridStability ?? 72) < 25,
     grid_tension:            (state.gridStability ?? 72) >= 25 && (state.gridStability ?? 72) < 50,
     grid_stable_opportunity: (state.gridStability ?? 72) >= 60 && state.mandateDay >= 30,
+    // ── Ondes de crise ────────────────────────────────────────────────────
+    wave_active_strong:      (state.crisisWaves ?? []).some((w) => w.intensity >= 50),
   };
 }
 

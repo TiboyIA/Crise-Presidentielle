@@ -35,6 +35,8 @@ import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { NewsType } from "@/types/strategy";
 import { useComfort } from "@/context/ComfortContext";
 import { LowLoadBanner } from "@/components/LowLoadBanner";
+import { getActiveWaveSummary } from "@/logic/crisisWaveEngine";
+import { CrisisWaveCard } from "@/components/CrisisWaveCard";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -131,6 +133,8 @@ export default function JournalDeCriseScreen() {
   if (!state) return null;
   const { news } = state;
 
+  const activeWaves = getActiveWaveSummary(state.crisisWaves ?? []);
+
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
   return (
@@ -200,6 +204,22 @@ export default function JournalDeCriseScreen() {
             })}
           </ScrollView>
         </Panel>
+      )}
+
+      {/* ── Ondes de crise actives ──────────────────────────────────────── */}
+      {activeWaves.length > 0 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="wave" size={12} color="#e8864f" />
+            <Text style={styles.waveTitle}>ONDES DE PROPAGATION ACTIVES</Text>
+            <View style={[styles.waveBadge, { backgroundColor: "#e8864f22" }]}>
+              <Text style={styles.waveBadgeText}>{activeWaves.length}</Text>
+            </View>
+          </View>
+          {activeWaves.map((wave) => (
+            <CrisisWaveCard key={wave.id} wave={wave} />
+          ))}
+        </View>
       )}
 
       {/* ── Prévisions météo incertaines ──────────────────────────────── */}
@@ -763,4 +783,15 @@ const styles = StyleSheet.create({
   doctrineTradeoffs: { flexDirection: "row", gap: 14, paddingHorizontal: 2 },
   doctrineTradeoffItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   doctrineTradeoffText: { fontSize: 9, fontFamily: FONT.semi },
+  // ── Ondes de crise ────────────────────────────────────────────────────────
+  waveBlock: {
+    marginBottom: 8,
+    backgroundColor: PALETTE.panel, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: "#e8864f33",
+    padding: 12, gap: 4,
+  },
+  waveHeader:    { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  waveTitle:     { flex: 1, fontSize: 9, fontFamily: FONT.bold, color: "#e8864f", letterSpacing: 1.2 },
+  waveBadge:     { paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.pill },
+  waveBadgeText: { fontSize: 8, fontFamily: FONT.bold, color: "#e8864f" },
 });

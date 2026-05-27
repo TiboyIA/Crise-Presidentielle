@@ -201,6 +201,7 @@ import { tickCosmic, applyCosmicEffects } from "@/logic/cosmicEngine";
 import { DEFAULT_COSMIC_STATE } from "@/types/cosmic";
 import { tickInertia, queueInertiaChoiceEffects } from "@/logic/inertiaEngine";
 import { tickGridPhysics } from "@/logic/gridPhysicsEngine";
+import { createWaveFromEvent, tickCrisisWaves, dampWavesByChoice } from "@/logic/crisisWaveEngine";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -1569,7 +1570,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
-        return advanceMandateDay(withInertia, 0);
+        // Ondes de crise — création depuis l'événement, puis amortissement du choix, puis tick
+        const withWave     = createWaveFromEvent(withInertia, event);
+        const withDamping  = choice?.waveDamping ? dampWavesByChoice(withWave, choice.waveDamping) : withWave;
+        const withWaveTick = tickCrisisWaves(withDamping);
+        return advanceMandateDay(withWaveTick, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
