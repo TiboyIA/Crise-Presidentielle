@@ -15,15 +15,17 @@
  *   v4 — Added: spaceNationsState
  *   v5 — Added: orionCityState
  *   v6 — Added: moralNegotiationState
+ *   v7 — Added: cosmicState (unifie spaceNationsState + orionCityState + moralNegotiationState)
  */
 
 import { DEFAULT_NEWS_STATE } from "@/logic/newsEngine";
+import { DEFAULT_COSMIC_STATE } from "@/types/cosmic";
 import { DEFAULT_REALTIME_STATE } from "@/logic/realTimeEngine";
 import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import { MINISTER_LIST } from "@/data/strategyMinisters";
 import type { StrategyGameState } from "@/types/strategy";
 
-export const CURRENT_SAVE_VERSION = 6;
+export const CURRENT_SAVE_VERSION = 7;
 
 export interface MigrationResult {
   state: StrategyGameState;
@@ -317,6 +319,54 @@ function migrateV5ToV6(s: Raw, warnings: string[]): Raw {
   return { ...patched, version: 6 };
 }
 
+/**
+ * V6 → V7
+ * Adds cosmicState — état unifié qui consolide spaceNationsState, orionCityState
+ * et moralNegotiationState. Les anciens états restent présents (backward compat)
+ * mais ne sont plus la source de vérité principale.
+ */
+function migrateV6ToV7(s: Raw, warnings: string[]): Raw {
+  const patched: Raw = { ...s };
+
+  if (!isObject(patched.cosmicState)) {
+    // Récupère les données existantes des anciens états si disponibles
+    const sn = isObject(patched.spaceNationsState) ? (patched.spaceNationsState as Raw) : {};
+    const oc = isObject(patched.orionCityState)    ? (patched.orionCityState as Raw)    : {};
+    const mn = isObject(patched.moralNegotiationState) ? (patched.moralNegotiationState as Raw) : {};
+
+    patched.cosmicState = {
+      ...DEFAULT_COSMIC_STATE,
+      // Conseil Interstellaire (depuis spaceNationsState)
+      discoveryStage:        safeString(sn.discoveryStage, "hidden"),
+      firstDiscoveredAt:     safeNumber(sn.discovered ? (sn.lastCouncilVoteAt ?? 0) : 0, 0),
+      cosmicCredibility:     safeNumber(sn.cosmicCredibility, DEFAULT_COSMIC_STATE.cosmicCredibility),
+      councilAttention:      safeNumber(sn.councilAttention, DEFAULT_COSMIC_STATE.councilAttention),
+      auroraSupport:         safeNumber(sn.auroraSupport, DEFAULT_COSMIC_STATE.auroraSupport),
+      obscuriumInfluence:    safeNumber(sn.obscuriumCorruption, DEFAULT_COSMIC_STATE.obscuriumInfluence),
+      lastCouncilVoteAt:     safeNumber(sn.lastCouncilVoteAt, 0),
+      // Cité d'Orion (depuis orionCityState)
+      orionDiscovered:       typeof oc.discovered === "boolean" ? oc.discovered : false,
+      orionStanding:         safeNumber(oc.orionStanding, DEFAULT_COSMIC_STATE.orionStanding),
+      orionAccessLevel:      safeString(oc.accessLevel, "inconnu"),
+      auroraEmbassyTrust:    safeNumber(oc.auroraEmbassyTrust, DEFAULT_COSMIC_STATE.auroraEmbassyTrust),
+      obscuriumTrace:        safeNumber(oc.obscuriumTrace, DEFAULT_COSMIC_STATE.obscuriumTrace),
+      knownDistricts:        Array.isArray(oc.knownDistricts) ? oc.knownDistricts : [],
+      lastOrionEventAt:      safeNumber(oc.lastVisitAt, DEFAULT_COSMIC_STATE.lastOrionEventAt),
+      // Chambre du Seuil (depuis moralNegotiationState)
+      auroraTrust:           safeNumber(mn.auroraTrust, DEFAULT_COSMIC_STATE.auroraTrust),
+      obscuriumDebt:         safeNumber(mn.obscuriumDebt, DEFAULT_COSMIC_STATE.obscuriumDebt),
+      moralBalance:          safeNumber(mn.moralBalance, DEFAULT_COSMIC_STATE.moralBalance),
+      activePact:            safeString(mn.activePact, "none"),
+      pactExpiresAtAction:   safeNumber(mn.pactExpiresAtAction, 0),
+      auroraConditionBroken: typeof mn.auroraConditionBroken === "boolean" ? mn.auroraConditionBroken : false,
+      lastNegotiationAt:     safeNumber(mn.lastNegotiationAt, 0),
+    };
+    warnings.push("v6→v7: cosmicState créé depuis les états existants");
+  }
+
+  return { ...patched, version: 7 };
+}
+
 // ── Sanitize pass ─────────────────────────────────────────────────────────────
 // Runs after all migrations to fix corrupt numeric values and repair sub-objects.
 // Never resets a field to zero if it had a plausible value.
@@ -449,6 +499,7 @@ function buildRecoveryFallback(raw: unknown): StrategyGameState {
     spaceNationsState:    { cosmicCredibility: 20, auroraSupport: 15, obscuriumCorruption: 10, councilAttention: 0, lastCouncilVoteAt: 0, discovered: false, discoveryStage: "hidden" },
     orionCityState:          { discovered: false, orionStanding: 0, accessLevel: "inconnu", auroraEmbassyTrust: 10, obscuriumTrace: 0, lastVisitAt: 0, knownDistricts: [] },
     moralNegotiationState:   { auroraTrust: 20, obscuriumDebt: 0, moralBalance: 0, lastNegotiationAt: 0, activePact: "none", pactExpiresAtAction: 0, auroraConditionBroken: false },
+    cosmicState:             { ...DEFAULT_COSMIC_STATE },
   };
 }
 
@@ -476,6 +527,7 @@ export function migrateSave(raw: unknown): MigrationResult | null {
     if ((s.version as number) < 4) s = migrateV3ToV4(s, warnings);
     if ((s.version as number) < 5) s = migrateV4ToV5(s, warnings);
     if ((s.version as number) < 6) s = migrateV5ToV6(s, warnings);
+    if ((s.version as number) < 7) s = migrateV6ToV7(s, warnings);
 
     // Sanitize pass — fix corrupt values without resetting good data
     s = sanitize(s, warnings);

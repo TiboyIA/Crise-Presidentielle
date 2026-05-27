@@ -25,6 +25,8 @@ import { THEME_LABELS } from "@/logic/contradictionMemoryEngine";
 import { computeSolvencyScore } from "@/logic/solvencyEngine";
 import { LIABILITY_DEFS, LIABILITY_CATEGORY_LABELS, computeTotalExposure, getLiabilityColor } from "@/logic/longTailLiabilityEngine";
 import { getRiskAppetiteDef } from "@/logic/riskAppetiteEngine";
+import { DEFAULT_COSMIC_STATE, COSMIC_STAGE_LABELS } from "@/types/cosmic";
+import { getMoralBalanceLabel, getMoralBalanceColor, getCosmicCredibilityLabel } from "@/logic/cosmicEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -626,6 +628,72 @@ export default function MandateReviewScreen() {
         )}
 
         </View>{/* /panelGrid */}
+
+        {/* VERDICT COSMIQUE */}
+        {(() => {
+          const cosmic = state.cosmicState ?? DEFAULT_COSMIC_STATE;
+          const hasCosmicActivity = cosmic.discoveryStage !== "hidden" || state.news.log.some((l) =>
+            l.eventId.startsWith("sn_") || l.eventId.startsWith("oc_") || l.eventId.startsWith("ch_") || l.eventId.startsWith("cv_"),
+          );
+          if (!hasCosmicActivity) return null;
+
+          const stageLabel   = COSMIC_STAGE_LABELS[cosmic.discoveryStage];
+          const credLabel    = getCosmicCredibilityLabel(cosmic.cosmicCredibility);
+          const moralLabel   = getMoralBalanceLabel(cosmic.moralBalance);
+          const moralColor   = getMoralBalanceColor(cosmic.moralBalance);
+          const stageReached = cosmic.discoveryStage !== "hidden";
+
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="orbit-variant" size={14} color="#a78bfa" />
+                <Text style={styles.sectionTitle}>VERDICT COSMIQUE</Text>
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow }}>Stade atteint</Text>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: "#a78bfa" }}>{stageLabel}</Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow }}>Crédibilité cosmique</Text>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: "#4a9fff" }}>{credLabel} ({cosmic.cosmicCredibility})</Text>
+                </View>
+                {cosmic.orionDiscovered && (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow }}>Réputation Cité d'Orion</Text>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: "#c8a87e" }}>{cosmic.orionStanding} / 100</Text>
+                  </View>
+                )}
+                {cosmic.lastNegotiationAt > 0 && (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow }}>Équilibre moral</Text>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: moralColor }}>{moralLabel}</Text>
+                  </View>
+                )}
+                {cosmic.activePact !== "none" && (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow }}>Pacte en fin de mandat</Text>
+                    <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: cosmic.activePact === "aurora" ? "#7ec8f7" : "#9b6fd4" }}>
+                      {cosmic.activePact === "aurora" ? "Pacte Aurora" : "Engagement Obscurium"}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ marginTop: 4, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#a78bfa22" }}>
+                  <Text style={{ fontSize: 8, fontFamily: FONT.reg, color: PALETTE.textLow, lineHeight: 13, fontStyle: "italic" }}>
+                    {cosmic.moralBalance >= 40
+                      ? "La Chambre du Seuil a enregistré ce mandat comme un exemple de crédibilité humaine."
+                      : cosmic.moralBalance <= -40
+                      ? "Obscurium a laissé une empreinte durable sur ce mandat. Les Archives stellaires en gardent trace."
+                      : cosmic.cosmicCredibility >= 60
+                      ? "Le Conseil interstellaire a maintenu un regard bienveillant sur la Terre durant ce mandat."
+                      : "Le Conseil a observé. Son jugement définitif reste dans les délibérations scellées du Tribunal."}
+                  </Text>
+                </View>
+              </View>
+            </Panel>
+          );
+        })()}
 
         {/* RÉCOMPENSES */}
         {(reward.money > 0 || reward.influence > 0 || reward.points > 0) && (

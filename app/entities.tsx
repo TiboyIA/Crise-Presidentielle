@@ -166,6 +166,21 @@ export default function EntitiesScreen() {
           <MaterialCommunityIcons name="chevron-right" size={16} color="#c8a87e44" />
         </Pressable>
 
+        {/* Lien vers le Système Cosmique V2 */}
+        <Pressable
+          onPress={() => router.push("/cosmic" as any)}
+          style={({ pressed }) => [styles.spaceLink, styles.cosmicLink, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="orbit-variant" size={14} color="#a78bfa" />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.spaceLinkTitle, { color: "#a78bfa" }]}>Tableau de bord cosmique</Text>
+            <Text style={styles.spaceLinkSub}>
+              Vue unifiée — Conseil, Cité d'Orion, Chambre du Seuil
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={16} color="#a78bfa44" />
+        </Pressable>
+
         {/* Footer doctrine */}
         <View style={styles.footer}>
           <View style={styles.footerLine} />
@@ -683,6 +698,7 @@ const styles = StyleSheet.create({
   spaceLinkTitle: { fontFamily: FONT.bold, fontSize: 12, color: "#7ec8f7" },
   spaceLinkSub:   { fontFamily: FONT.reg,  fontSize: 10, color: PALETTE.textLow, marginTop: 1 },
   orionLink:      { borderColor: "#c8a87e33", backgroundColor: "#100e0a" },
+  cosmicLink:     { borderColor: "#a78bfa33", backgroundColor: "#0d0a15" },
 
   // ── FOOTER ───────────────────────────────────────────────────
   footer: {

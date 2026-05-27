@@ -197,9 +197,8 @@ import {
 import { recordEvent as _rankRecord, isRankedIntended as _isRankedIntended } from "@/services/RankedService";
 import { isDevSandboxEnabled } from "@/config/devSandbox";
 import { logSandboxAction } from "@/logic/diagnosticEngine";
-import { tickSpaceNations, DEFAULT_SPACE_NATIONS_STATE } from "@/logic/spaceNationsEngine";
-import { tickOrionCity, DEFAULT_ORION_CITY_STATE } from "@/logic/orionCityEngine";
-import { tickMoralNegotiation, DEFAULT_MORAL_NEGOTIATION_STATE } from "@/logic/moralNegotiationEngine";
+import { tickCosmic, applyCosmicEffects } from "@/logic/cosmicEngine";
+import { DEFAULT_COSMIC_STATE } from "@/types/cosmic";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -347,9 +346,7 @@ function buildInitialState(
     realTime: initRealTime(now),
     strategyResearch: { ...DEFAULT_RESEARCH_STATE },
     cosmicInfluence: { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
-    spaceNationsState: { ...DEFAULT_SPACE_NATIONS_STATE },
-    orionCityState:         { ...DEFAULT_ORION_CITY_STATE },
-    moralNegotiationState:  { ...DEFAULT_MORAL_NEGOTIATION_STATE },
+    cosmicState: { ...DEFAULT_COSMIC_STATE },
     discoursePathology: { ...DEFAULT_PATHOLOGY },
     semanticContamination: [],
   };
@@ -502,9 +499,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           realTime:            saved.realTime            ?? initRealTime(clockNow()),
           strategyResearch:    saved.strategyResearch    ?? { ...DEFAULT_RESEARCH_STATE },
           cosmicInfluence:     saved.cosmicInfluence     ?? { auroria: 10, obscurium: 10, lastCosmicEventAt: 0, discovered: false },
-          spaceNationsState:   saved.spaceNationsState   ?? { ...DEFAULT_SPACE_NATIONS_STATE },
-          orionCityState:         saved.orionCityState         ?? { ...DEFAULT_ORION_CITY_STATE },
-          moralNegotiationState:  saved.moralNegotiationState  ?? { ...DEFAULT_MORAL_NEGOTIATION_STATE },
+          cosmicState:         saved.cosmicState         ?? { ...DEFAULT_COSMIC_STATE },
         };
         // ── Migration simulationClock ──────────────────────────────────────────
         // Convertit les anciens timestamps réels (ms) en heures jeu absolues.
@@ -1073,6 +1068,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Effets cosmiques V2 — appliqués si le choix définit des cosmicEffects.
+        let cosmicState = prev.cosmicState ?? { ...DEFAULT_COSMIC_STATE };
+        if (choice?.cosmicEffects) {
+          cosmicState = applyCosmicEffects(cosmicState, choice.cosmicEffects, prev.news.actionCount);
+        }
+
         // Fonds National de Résilience — absorbe une partie du coût en argent
         // pour les crises forte/critique avec drain significatif.
         let resilienceFund = prev.resilienceFund ?? { ...INITIAL_RESILIENCE_FUND };
@@ -1561,7 +1562,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust }, 0);
+        return advanceMandateDay({ ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState }, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -2317,14 +2318,8 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
     // Perturbations transport météo — effets sur économie, militaire, coûts
     s = tickWeatherTransport(s);
 
-    // Nations de l'Espace — dérive lente de la crédibilité cosmique
-    s = tickSpaceNations(s);
-
-    // La Cité d'Orion — réputation et accès au hub diplomatique interstellaire
-    s = tickOrionCity(s);
-
-    // La Chambre du Seuil — équilibre moral Aurora/Obscurium
-    s = tickMoralNegotiation(s);
+    // Système Cosmique V2 — tick unifié (Conseil + Cité d'Orion + Chambre du Seuil)
+    s = tickCosmic(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {

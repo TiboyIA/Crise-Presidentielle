@@ -617,6 +617,8 @@ export interface NewsChoice {
   declarationTheme?: ContradictionTheme;
   /** Position sur le thème : "pro" = pour, "contre" = contre. */
   declarationStance?: "pro" | "contre";
+  /** Effets cosmiques V2 — appliqués au CosmicState lors de la résolution du choix. */
+  cosmicEffects?: import("@/types/cosmic").CosmicStateEffects;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -819,4 +821,6 @@ export interface StrategyGameState {
   orionCityState?: import("@/logic/orionCityEngine").OrionCityState;
   // La Chambre du Seuil — négociation morale Aurora/Obscurium (optional pour backward compat)
   moralNegotiationState?: import("@/logic/moralNegotiationEngine").MoralNegotiationState;
+  // Système Cosmique V2 — état unifié (remplace les trois états séparés ci-dessus)
+  cosmicState?: import("@/types/cosmic").CosmicState;
 }

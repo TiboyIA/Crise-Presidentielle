@@ -1,4 +1,5 @@
 import type { NewsEvent } from "@/types/strategy";
+import { COSMIC_V2_EVENTS } from "@/data/cosmicEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3638,6 +3639,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
       },
     ],
   },
+  // ── SYSTÈME COSMIQUE V2 ──────────────────────────────────────────────────────
+  ...COSMIC_V2_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));
