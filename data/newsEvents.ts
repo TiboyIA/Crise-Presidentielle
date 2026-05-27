@@ -7,6 +7,7 @@ import { THERMAL_EVENTS } from "@/data/thermalEvents";
 import { ORBITAL_EVENTS } from "@/data/orbitalEvents";
 import { SOLAR_STORM_EVENTS } from "@/data/solarStormEvents";
 import { BREAKPOINT_EVENTS } from "@/data/breakpointEvents";
+import { MEDICAL_EVENTS } from "@/data/medicalIndicators";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3662,6 +3663,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...SOLAR_STORM_EVENTS,
   // ── SEUILS DE RUPTURE ────────────────────────────────────────────────────────
   ...BREAKPOINT_EVENTS,
+  // ── CELLULE DIM NATIONALE ────────────────────────────────────────────────────
+  ...MEDICAL_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

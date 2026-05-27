@@ -853,4 +853,6 @@ export interface StrategyGameState {
   resonanceNote?: string;
   // Seuils de rupture des systèmes critiques — marges et statuts (optional pour backward compat)
   breakpoints?: import("@/logic/breakpointEngine").BreakpointState;
+  // Qualité du système d'information sanitaire national — Cellule DIM (optional pour backward compat)
+  medicalDataQuality?: number;
 }

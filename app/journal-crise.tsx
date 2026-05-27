@@ -39,6 +39,7 @@ import { getActiveWaveSummary } from "@/logic/crisisWaveEngine";
 import { CrisisWaveCard } from "@/components/CrisisWaveCard";
 import { getSolarStormInfo } from "@/logic/solarStormEngine";
 import { computeBreakpoints } from "@/logic/breakpointEngine";
+import { getMedicalBandInfo, DEFAULT_MEDICAL_DATA_QUALITY } from "@/logic/medicalInformationEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -137,6 +138,8 @@ export default function JournalDeCriseScreen() {
 
   const activeWaves = getActiveWaveSummary(state.crisisWaves ?? []);
   const rupturedSystems = computeBreakpoints(state).filter((b) => b.status === "rupture");
+  const medicalQuality  = state.medicalDataQuality ?? DEFAULT_MEDICAL_DATA_QUALITY;
+  const medicalInfo     = getMedicalBandInfo(medicalQuality);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -247,6 +250,25 @@ export default function JournalDeCriseScreen() {
             <Text style={[styles.waveTitle, { color: "#f472b6" }]}>RÉSONANCE SOCIALE</Text>
           </View>
           <Text style={styles.stormDesc}>{state.resonanceNote}</Text>
+        </View>
+      )}
+
+      {/* ── Cellule DIM Nationale — qualité du système d'information sanitaire */}
+      {state.mandateDay >= 5 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: medicalInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="hospital-box-outline" size={12} color={medicalInfo.color} />
+            <Text style={[styles.waveTitle, { color: medicalInfo.color }]}>CELLULE DIM NATIONALE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: medicalInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: medicalInfo.color }]}>
+                {medicalInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: medicalInfo.color, marginLeft: 4 }]}>
+              {Math.round(medicalQuality)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{medicalInfo.message}</Text>
         </View>
       )}
 

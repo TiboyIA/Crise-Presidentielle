@@ -245,6 +245,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     breakpoint_infra_rupture:   state.breakpoints?.statuses?.infrastructure  === "rupture",
     breakpoint_cyber_rupture:   state.breakpoints?.statuses?.cyber           === "rupture",
     breakpoint_finance_rupture: state.breakpoints?.statuses?.publicFinance   === "rupture",
+    // ── Cellule DIM Nationale ─────────────────────────────────────────────────
+    medical_quality_critical: (state.medicalDataQuality ?? 50) < 25  && state.mandateDay >= 10,
+    medical_quality_degraded: (state.medicalDataQuality ?? 50) >= 25 && (state.medicalDataQuality ?? 50) < 50 && state.mandateDay >= 20,
+    medical_quality_high:     (state.medicalDataQuality ?? 50) >= 75 && state.mandateDay >= 30,
   };
 }
 
