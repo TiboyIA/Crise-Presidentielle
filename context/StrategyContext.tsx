@@ -206,6 +206,7 @@ import { tickThermalStress, applyThermalReduction } from "@/logic/thermalStressE
 import { tickOrbitalWindow } from "@/logic/orbitalWindowEngine";
 import { tickSolarStorm } from "@/logic/solarStormEngine";
 import { tickSignalNoise } from "@/logic/signalNoiseEngine";
+import { applyPressureConservation } from "@/logic/pressureConservationEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1612,7 +1613,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withThermal = choice?.thermalReduction
           ? applyThermalReduction(withWear, choice.thermalReduction)
           : withWear;
-        return advanceMandateDay(withThermal, 0);
+        // Conservation de la pression — déplacement si choix puissant
+        const { state: withPressure, note: pressureNote } = choice
+          ? applyPressureConservation(withThermal, choice)
+          : { state: withThermal, note: null };
+        const withNote = pressureNote
+          ? { ...withPressure, recentPressureNote: pressureNote }
+          : withPressure;
+        return advanceMandateDay(withNote, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {

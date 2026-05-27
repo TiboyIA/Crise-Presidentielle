@@ -226,6 +226,17 @@ export default function JournalDeCriseScreen() {
         );
       })()}
 
+      {/* ── Pression conservée — résumé du dernier déplacement ───────────── */}
+      {state.recentPressureNote && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#a78bfa33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="transfer-right" size={12} color="#a78bfa" />
+            <Text style={[styles.waveTitle, { color: "#a78bfa" }]}>PRESSION CONSERVÉE</Text>
+          </View>
+          <Text style={styles.stormDesc}>{state.recentPressureNote}</Text>
+        </View>
+      )}
+
       {/* ── Ondes de crise actives ──────────────────────────────────────── */}
       {activeWaves.length > 0 && !lowLoad && (
         <View style={[styles.waveBlock, { marginHorizontal: hPad }]}>

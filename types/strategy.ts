@@ -847,4 +847,6 @@ export interface StrategyGameState {
   solarStorm?: import("@/logic/solarStormEngine").SolarStormState;
   // Ratio signal/bruit du renseignement — 0-100 (optional pour backward compat)
   signalNoiseRatio?: number;
+  // Note de pression conservée — court résumé du déplacement le plus récent (optional)
+  recentPressureNote?: string;
 }
