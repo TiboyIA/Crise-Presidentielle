@@ -42,6 +42,7 @@ import {
 import type { ContributionTier } from "@/logic/resilienceFundEngine";
 import { GridStabilityBadge } from "@/components/GridStabilityBadge";
 import { ThermalStressBadge } from "@/components/ThermalStressBadge";
+import { OrbitalWindowBadge } from "@/components/OrbitalWindowBadge";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -368,6 +369,11 @@ export default function NationScreen() {
         {/* STRESS THERMIQUE — charge des systèmes nationaux */}
         {state.thermalStress !== undefined && (
           <ThermalStressBadge stress={state.thermalStress} />
+        )}
+
+        {/* FENÊTRE ORBITALE — disponibilité satellitaire */}
+        {state.orbitalWindow !== undefined && (
+          <OrbitalWindowBadge orbitalWindow={state.orbitalWindow} />
         )}
 
         {/* BAROMÈTRE NATIONAL */}

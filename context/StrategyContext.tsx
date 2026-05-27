@@ -203,6 +203,7 @@ import { tickInertia, queueInertiaChoiceEffects } from "@/logic/inertiaEngine";
 import { tickGridPhysics } from "@/logic/gridPhysicsEngine";
 import { createWaveFromEvent, tickCrisisWaves, dampWavesByChoice } from "@/logic/crisisWaveEngine";
 import { tickThermalStress, applyThermalReduction } from "@/logic/thermalStressEngine";
+import { tickOrbitalWindow } from "@/logic/orbitalWindowEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2418,6 +2419,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickCabinetConflicts(s);
       s = tickGridPhysics(s);
       s = tickThermalStress(s);
+      s = tickOrbitalWindow(s);
     }
   }
 

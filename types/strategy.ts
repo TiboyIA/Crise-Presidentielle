@@ -841,4 +841,6 @@ export interface StrategyGameState {
   infrastructureWear?: Partial<Record<BuildingId, number>>;
   // Stress thermique des systèmes nationaux — 0-100 (optional pour backward compat)
   thermalStress?: number;
+  // Fenêtre orbitale des satellites — état discret (optional pour backward compat)
+  orbitalWindow?: import("@/logic/orbitalWindowEngine").OrbitalWindowState;
 }
