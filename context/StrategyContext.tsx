@@ -199,6 +199,7 @@ import { isDevSandboxEnabled } from "@/config/devSandbox";
 import { logSandboxAction } from "@/logic/diagnosticEngine";
 import { tickCosmic, applyCosmicEffects } from "@/logic/cosmicEngine";
 import { DEFAULT_COSMIC_STATE } from "@/types/cosmic";
+import { tickInertia, queueInertiaChoiceEffects } from "@/logic/inertiaEngine";
 import {
   getSandboxActiveFlag,
   setSandboxActiveFlag,
@@ -1074,6 +1075,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           cosmicState = applyCosmicEffects(cosmicState, choice.cosmicEffects, prev.news.actionCount);
         }
 
+
         // Fonds National de Résilience — absorbe une partie du coût en argent
         // pour les crises forte/critique avec drain significatif.
         let resilienceFund = prev.resilienceFund ?? { ...INITIAL_RESILIENCE_FUND };
@@ -1562,7 +1564,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        return advanceMandateDay({ ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState }, 0);
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState };
+        const withInertia = choice?.inertiaEffects
+          ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
+          : assembled;
+        return advanceMandateDay(withInertia, 0);
       });
       rankRecord("crisis_choice", eventId, state?.mandateDay ?? 0, choiceId);
       void telemetry("crisis_choice_made", {
@@ -2320,6 +2326,9 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
 
     // Système Cosmique V2 — tick unifié (Conseil + Cité d'Orion + Chambre du Seuil)
     s = tickCosmic(s);
+
+    // Inertie physique — déploiement progressif des effets différés
+    s = tickInertia(s);
 
     // Opérations adverses — déclenchées si un ennemi/rival est actif et si l'intervalle est écoulé
     if (shouldTriggerEnemyOp(s)) {

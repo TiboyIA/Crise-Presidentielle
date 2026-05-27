@@ -619,6 +619,8 @@ export interface NewsChoice {
   declarationStance?: "pro" | "contre";
   /** Effets cosmiques V2 — appliqués au CosmicState lors de la résolution du choix. */
   cosmicEffects?: import("@/types/cosmic").CosmicStateEffects;
+  /** Effets inertiels — fractionnés en immédiat + différé par inertiaEngine. */
+  inertiaEffects?: Partial<Record<import("@/logic/inertiaEngine").InertiaDomain, number>>;
   queuesDelayedConsequence?: {
     id: string;
     delayActions: number;
@@ -823,4 +825,6 @@ export interface StrategyGameState {
   moralNegotiationState?: import("@/logic/moralNegotiationEngine").MoralNegotiationState;
   // Système Cosmique V2 — état unifié (remplace les trois états séparés ci-dessus)
   cosmicState?: import("@/types/cosmic").CosmicState;
+  // Inertie physique de l'État — effets différés en file d'attente (optional pour backward compat)
+  inertiaQueue?: import("@/logic/inertiaEngine").InertiaEffect[];
 }
