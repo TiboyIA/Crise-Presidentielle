@@ -24,6 +24,7 @@
 
 import type { StrategyGameState } from "@/types/strategy";
 import { DEFAULT_SIGNAL_NOISE_RATIO } from "@/logic/signalNoiseEngine";
+import { DEFAULT_HOSPITAL_CODING_QUALITY } from "@/logic/hospitalCodingQualityEngine";
 
 export type MedicalQualityBand =
   | "optimal"
@@ -136,6 +137,13 @@ export function computeMedicalQualityTarget(state: StrategyGameState): number {
   const activeRuptures = Object.values(bpStatuses).filter((s) => s === "rupture").length;
   if (activeRuptures >= 2) score -= 10;
   else if (activeRuptures === 1) score -= 5;
+
+  // Qualité du codage hospitalier — précision des données remontées à la Cellule DIM
+  const coding = state.hospitalCodingQuality ?? DEFAULT_HOSPITAL_CODING_QUALITY;
+  if (coding >= 75) score += 6;
+  else if (coding >= 50) score += 2;
+  else if (coding < 30) score -= 6;
+  else if (coding < 15) score -= 12;
 
   return Math.max(0, Math.min(100, score));
 }

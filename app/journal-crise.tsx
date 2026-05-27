@@ -40,6 +40,7 @@ import { CrisisWaveCard } from "@/components/CrisisWaveCard";
 import { getSolarStormInfo } from "@/logic/solarStormEngine";
 import { computeBreakpoints } from "@/logic/breakpointEngine";
 import { getMedicalBandInfo, DEFAULT_MEDICAL_DATA_QUALITY } from "@/logic/medicalInformationEngine";
+import { getHospitalCodingBandInfo, DEFAULT_HOSPITAL_CODING_QUALITY } from "@/logic/hospitalCodingQualityEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -140,6 +141,8 @@ export default function JournalDeCriseScreen() {
   const rupturedSystems = computeBreakpoints(state).filter((b) => b.status === "rupture");
   const medicalQuality  = state.medicalDataQuality ?? DEFAULT_MEDICAL_DATA_QUALITY;
   const medicalInfo     = getMedicalBandInfo(medicalQuality);
+  const codingQuality   = state.hospitalCodingQuality ?? DEFAULT_HOSPITAL_CODING_QUALITY;
+  const codingInfo      = getHospitalCodingBandInfo(codingQuality);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -269,6 +272,25 @@ export default function JournalDeCriseScreen() {
             </Text>
           </View>
           <Text style={styles.stormDesc}>{medicalInfo.message}</Text>
+        </View>
+      )}
+
+      {/* ── Codage hospitalier — qualité médico-administrative ───────────── */}
+      {state.mandateDay >= 5 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: codingInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="clipboard-pulse-outline" size={12} color={codingInfo.color} />
+            <Text style={[styles.waveTitle, { color: codingInfo.color }]}>CODAGE HOSPITALIER</Text>
+            <View style={[styles.waveBadge, { backgroundColor: codingInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: codingInfo.color }]}>
+                {codingInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: codingInfo.color, marginLeft: 4 }]}>
+              {Math.round(codingQuality)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{codingInfo.message}</Text>
         </View>
       )}
 

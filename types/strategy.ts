@@ -855,4 +855,6 @@ export interface StrategyGameState {
   breakpoints?: import("@/logic/breakpointEngine").BreakpointState;
   // Qualité du système d'information sanitaire national — Cellule DIM (optional pour backward compat)
   medicalDataQuality?: number;
+  // Qualité du codage médico-administratif hospitalier — MODE DELTA (optional pour backward compat)
+  hospitalCodingQuality?: number;
 }
