@@ -213,6 +213,7 @@ import { applyPhysicsResearchEffects } from "@/logic/physicsResearchEngine";
 import { tickMedicalDataQuality } from "@/logic/medicalInformationEngine";
 import { tickHospitalCodingQuality } from "@/logic/hospitalCodingQualityEngine";
 import { tickHealthReportingDelay } from "@/logic/healthReportingDelayEngine";
+import { tickHospitalPressure } from "@/logic/hospitalPressureEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2453,6 +2454,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickThermalStress(s);
       s = tickOrbitalWindow(s);
       s = tickSignalNoise(s);
+      s = tickHospitalPressure(s);
       s = tickMedicalDataQuality(s);
       s = tickHospitalCodingQuality(s);
       s = tickHealthReportingDelay(s);

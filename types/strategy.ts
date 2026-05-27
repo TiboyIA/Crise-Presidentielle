@@ -859,4 +859,6 @@ export interface StrategyGameState {
   hospitalCodingQuality?: number;
   // Retard de remontée des données de santé — nombre d'actions (optional pour backward compat)
   healthReportingDelay?: number;
+  // Pression sur le système de soins national — 0-100 (optional pour backward compat)
+  hospitalPressure?: number;
 }

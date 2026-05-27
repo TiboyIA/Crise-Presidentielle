@@ -42,6 +42,7 @@ import { computeBreakpoints } from "@/logic/breakpointEngine";
 import { getMedicalBandInfo, DEFAULT_MEDICAL_DATA_QUALITY } from "@/logic/medicalInformationEngine";
 import { getHospitalCodingBandInfo, DEFAULT_HOSPITAL_CODING_QUALITY } from "@/logic/hospitalCodingQualityEngine";
 import { getHealthReportingBandInfo, DEFAULT_HEALTH_REPORTING_DELAY } from "@/logic/healthReportingDelayEngine";
+import { getHospitalPressureBandInfo, DEFAULT_HOSPITAL_PRESSURE } from "@/logic/hospitalPressureEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -81,6 +82,12 @@ const agroBarStyles = StyleSheet.create({
   track: { flex: 1, height: 5, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden" },
   fill:  { height: "100%", borderRadius: 3 },
   pct:   { fontFamily: FONT.bold, fontSize: 10, width: 36, textAlign: "right" },
+});
+
+const hospStyles = StyleSheet.create({
+  bar:  { height: 6, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden", marginTop: 6, marginBottom: 4, position: "relative" },
+  fill: { position: "absolute", top: 0, left: 0, height: "100%", borderRadius: 3 },
+  tick: { position: "absolute", top: 0, width: 1, height: "100%", backgroundColor: PALETTE.panelEdge + "cc" },
 });
 
 export default function JournalDeCriseScreen() {
@@ -144,8 +151,10 @@ export default function JournalDeCriseScreen() {
   const medicalInfo     = getMedicalBandInfo(medicalQuality);
   const codingQuality   = state.hospitalCodingQuality ?? DEFAULT_HOSPITAL_CODING_QUALITY;
   const codingInfo      = getHospitalCodingBandInfo(codingQuality);
-  const reportingDelay  = state.healthReportingDelay ?? DEFAULT_HEALTH_REPORTING_DELAY;
-  const reportingInfo   = getHealthReportingBandInfo(reportingDelay);
+  const reportingDelay   = state.healthReportingDelay ?? DEFAULT_HEALTH_REPORTING_DELAY;
+  const reportingInfo    = getHealthReportingBandInfo(reportingDelay);
+  const hospPressure     = state.hospitalPressure ?? DEFAULT_HOSPITAL_PRESSURE;
+  const hospPressureInfo = getHospitalPressureBandInfo(hospPressure);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -256,6 +265,31 @@ export default function JournalDeCriseScreen() {
             <Text style={[styles.waveTitle, { color: "#f472b6" }]}>RÉSONANCE SOCIALE</Text>
           </View>
           <Text style={styles.stormDesc}>{state.resonanceNote}</Text>
+        </View>
+      )}
+
+      {/* ── Pression hospitalière — saturation du système de soins ─────────── */}
+      {state.mandateDay >= 5 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: hospPressureInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="hospital-building" size={12} color={hospPressureInfo.color} />
+            <Text style={[styles.waveTitle, { color: hospPressureInfo.color }]}>PRESSION HOSPITALIÈRE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: hospPressureInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: hospPressureInfo.color }]}>
+                {hospPressureInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: hospPressureInfo.color, marginLeft: 4 }]}>
+              {Math.round(hospPressure)}
+            </Text>
+          </View>
+          <View style={hospStyles.bar}>
+            <View style={[hospStyles.fill, { width: `${hospPressure}%` as `${number}%`, backgroundColor: hospPressureInfo.color }]} />
+            {([31, 61, 81] as const).map((t) => (
+              <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
+            ))}
+          </View>
+          <Text style={styles.stormDesc}>{hospPressureInfo.message}</Text>
         </View>
       )}
 

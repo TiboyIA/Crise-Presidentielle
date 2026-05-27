@@ -255,6 +255,11 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     // ── Retard de remontée des données de santé ───────────────────────────────
     health_delay_critical: (state.healthReportingDelay ?? 8) >= 22 && state.mandateDay >= 20,
     health_delay_high:     (state.healthReportingDelay ?? 8) >= 14 && (state.healthReportingDelay ?? 8) < 22 && state.mandateDay >= 15,
+    // ── Saturation hospitalière ────────────────────────────────────────────────
+    hospital_pressure_crisis:      (state.hospitalPressure ?? 30) >= 81 && state.mandateDay >= 15,
+    hospital_pressure_saturation:  (state.hospitalPressure ?? 30) >= 61 && (state.hospitalPressure ?? 30) < 81 && state.mandateDay >= 10,
+    hospital_pressure_tension:     (state.hospitalPressure ?? 30) >= 40 && (state.hospitalPressure ?? 30) < 61 && state.mandateDay >= 10,
+    hospital_plan_opportunity:     (state.hospitalPressure ?? 30) < 35 && state.mandateDay >= 20,
   };
 }
 
