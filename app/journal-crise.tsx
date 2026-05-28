@@ -44,6 +44,7 @@ import { getHospitalCodingBandInfo, DEFAULT_HOSPITAL_CODING_QUALITY } from "@/lo
 import { getHealthReportingBandInfo, DEFAULT_HEALTH_REPORTING_DELAY } from "@/logic/healthReportingDelayEngine";
 import { getHospitalPressureBandInfo, DEFAULT_HOSPITAL_PRESSURE } from "@/logic/hospitalPressureEngine";
 import { getHealthDataTrustBandInfo, DEFAULT_HEALTH_DATA_TRUST } from "@/logic/healthDataTrustEngine";
+import { canLaunchDimAudit, DIM_AUDIT_COST_MONEY, DIM_AUDIT_COST_INFLUENCE } from "@/logic/dimAuditEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -93,7 +94,7 @@ const hospStyles = StyleSheet.create({
 
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine } = useStrategy();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit } = useStrategy();
   const { hPad, width } = useResponsive();
 
   const { prepareForecast, issuePublicAlert } = useStrategy();
@@ -453,6 +454,62 @@ export default function JournalDeCriseScreen() {
             </View>
             <Text style={styles.stormDesc}>{medicalInfo.message}</Text>
           </View>
+
+          {/* ── Action : Audit DIM National ──────────────────────────────── */}
+          {(() => {
+            const auditCheck = canLaunchDimAudit(state);
+            const canAudit   = auditCheck.ok;
+            return (
+              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#4a9fff33" }]}>
+                <View style={styles.waveHeader}>
+                  <MaterialCommunityIcons name="magnify-scan" size={12} color="#4a9fff" />
+                  <Text style={[styles.waveTitle, { color: "#4a9fff" }]}>AUDIT DIM NATIONAL</Text>
+                </View>
+                <Text style={[styles.stormDesc, { marginBottom: 8 }]}>
+                  Commandite un audit indépendant des données hospitalières. Améliore la qualité du codage et des données sanitaires, mais peut révéler des anomalies à risque politique.
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.forecastBtn,
+                    !canAudit && styles.forecastBtnDim,
+                    { opacity: pressed ? 0.75 : 1, alignSelf: "flex-start" },
+                  ]}
+                  disabled={!canAudit}
+                  onPress={() => {
+                    if (!canAudit) {
+                      Alert.alert("Audit indisponible", auditCheck.reason ?? "Conditions non remplies.", [{ text: "OK" }]);
+                      return;
+                    }
+                    Alert.alert(
+                      "Lancer l'audit DIM ?",
+                      `Coût : ${DIM_AUDIT_COST_MONEY} M€ · ${DIM_AUDIT_COST_INFLUENCE} Influence\n\nLe résultat est incertain et dépend de l'état du système de santé.`,
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        {
+                          text: "Lancer l'audit",
+                          onPress: () => {
+                            const r = launchDimAudit();
+                            if (r.failReason) {
+                              Alert.alert("Audit impossible", r.failReason, [{ text: "OK" }]);
+                            } else if (r.result) {
+                              Alert.alert(r.result.def.label, r.result.def.description, [{ text: "OK" }]);
+                            }
+                          },
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <MaterialCommunityIcons name="magnify-scan" size={11} color={canAudit ? "#4a9fff" : PALETTE.textLow} />
+                  <Text style={[styles.forecastBtnText, { color: canAudit ? "#4a9fff" : PALETTE.textLow }]}>
+                    {canAudit
+                      ? `Lancer l'audit — ${DIM_AUDIT_COST_MONEY} M€ · ${DIM_AUDIT_COST_INFLUENCE} INF`
+                      : (auditCheck.reason ?? "Indisponible")}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })()}
 
           {/* ── Codage hospitalier ────────────────────────────────────────── */}
           <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: codingInfo.color + "33" }]}>

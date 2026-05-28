@@ -863,4 +863,6 @@ export interface StrategyGameState {
   hospitalPressure?: number;
   // Confiance dans les chiffres de santé officiels — 0-100 (optional pour backward compat)
   healthDataTrust?: number;
+  // Dernier audit DIM lancé — actionCount (optional pour backward compat)
+  lastDimAuditAt?: number;
 }

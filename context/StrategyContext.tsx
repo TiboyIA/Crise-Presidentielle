@@ -115,6 +115,11 @@ import {
   type StaffingActivationResult,
 } from "@/logic/crisisStaffingEngine";
 import {
+  canLaunchDimAudit,
+  launchDimAudit as executeDimAudit,
+  type DimAuditResult,
+} from "@/logic/dimAuditEngine";
+import {
   applyPrepareForecast,
   applyIssuePublicAlert,
   canPrepareForecast,
@@ -406,6 +411,7 @@ interface StrategyContextValue {
   reconnaissancePublique: () => { success: boolean; reason?: string };
   stabilisationCabinet: () => void;
   activateCrisisStaffing: () => { result: StaffingActivationResult | null; failReason?: string };
+  launchDimAudit: () => { result: DimAuditResult | null; failReason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -1963,6 +1969,23 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const launchDimAuditCb = useCallback(
+    (): { result: DimAuditResult | null; failReason?: string } => {
+      if (!state) return { result: null, failReason: "Jeu non initialisé." };
+      const check = canLaunchDimAudit(state);
+      if (!check.ok) return { result: null, failReason: check.reason };
+      let out: { result: DimAuditResult | null; failReason?: string } = { result: null };
+      update((prev) => {
+        const activation = executeDimAudit(prev);
+        out = { result: activation.result, failReason: activation.failReason };
+        if (!activation.result) return prev;
+        return withNews(activation.newState);
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const prepareForecast = useCallback(
     (): ForecastActionResult => {
       if (!state) return { success: false, reason: "Jeu non initialisé." };
@@ -2172,7 +2195,8 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       fireMinister, restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
-      activateCrisisStaffing, prepareForecast, issuePublicAlert,
+      activateCrisisStaffing, launchDimAudit: launchDimAuditCb,
+      prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
       deleteEnemyReport, clearAllEnemyReports,
@@ -2194,7 +2218,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
-      activateCrisisStaffing, prepareForecast, issuePublicAlert,
+      activateCrisisStaffing, launchDimAuditCb, prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
       deleteEnemyReport, clearAllEnemyReports,
