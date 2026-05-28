@@ -260,6 +260,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     hospital_pressure_saturation:  (state.hospitalPressure ?? 30) >= 61 && (state.hospitalPressure ?? 30) < 81 && state.mandateDay >= 10,
     hospital_pressure_tension:     (state.hospitalPressure ?? 30) >= 40 && (state.hospitalPressure ?? 30) < 61 && state.mandateDay >= 10,
     hospital_plan_opportunity:     (state.hospitalPressure ?? 30) < 35 && state.mandateDay >= 20,
+    // ── Confiance dans les chiffres de santé ──────────────────────────────────
+    health_trust_critical: (state.healthDataTrust ?? 65) < 20 && state.mandateDay >= 15,
+    health_trust_low:      (state.healthDataTrust ?? 65) >= 20 && (state.healthDataTrust ?? 65) < 40 && state.mandateDay >= 10,
+    health_trust_high:     (state.healthDataTrust ?? 65) >= 80 && state.mandateDay >= 25,
   };
 }
 

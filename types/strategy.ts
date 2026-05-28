@@ -861,4 +861,6 @@ export interface StrategyGameState {
   healthReportingDelay?: number;
   // Pression sur le système de soins national — 0-100 (optional pour backward compat)
   hospitalPressure?: number;
+  // Confiance dans les chiffres de santé officiels — 0-100 (optional pour backward compat)
+  healthDataTrust?: number;
 }
