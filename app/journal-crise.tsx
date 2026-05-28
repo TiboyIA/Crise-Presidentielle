@@ -46,6 +46,7 @@ import { getHospitalPressureBandInfo, DEFAULT_HOSPITAL_PRESSURE } from "@/logic/
 import { getHealthDataTrustBandInfo, DEFAULT_HEALTH_DATA_TRUST } from "@/logic/healthDataTrustEngine";
 import { canLaunchDimAudit, DIM_AUDIT_COST_MONEY, DIM_AUDIT_COST_INFLUENCE } from "@/logic/dimAuditEngine";
 import { DEFAULT_UNDER_DETECTION_PRESSURE } from "@/logic/healthUnderDetectionEngine";
+import { generateHealthSnapshot } from "@/logic/anonymizedHealthRecordsEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -104,6 +105,7 @@ export default function JournalDeCriseScreen() {
   const [filter, setFilter] = useState<NewsType | "all">("all");
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [logExpanded, setLogExpanded] = useState(false);
+  const [dimExpanded, setDimExpanded] = useState(false);
   const LOG_INITIAL = 5;
 
   useEffect(() => {
@@ -163,6 +165,7 @@ export default function JournalDeCriseScreen() {
   const healthTrustInfo  = getHealthDataTrustBandInfo(healthTrust);
   const underDetection   = state.underDetectionPressure ?? DEFAULT_UNDER_DETECTION_PRESSURE;
   const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85;
+  const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -512,6 +515,90 @@ export default function JournalDeCriseScreen() {
               </View>
             );
           })()}
+
+          {/* ── Rapports DIM anonymisés (agrégats fictifs) ───────────────── */}
+          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#4a9fff22" }]}>
+            <Pressable
+              style={styles.waveHeader}
+              onPress={() => setDimExpanded((v) => !v)}
+            >
+              <MaterialCommunityIcons name="file-chart-outline" size={12} color="#4a9fff" />
+              <Text style={[styles.waveTitle, { color: "#4a9fff" }]}>RAPPORTS DIM — AGRÉGATS FICTIFS</Text>
+              <View style={[styles.waveBadge, { backgroundColor: "#4a9fff22" }]}>
+                <Text style={[styles.waveBadgeText, { color: "#4a9fff" }]}>SEM.{Math.ceil(state.mandateDay / 7) + 1}</Text>
+              </View>
+              <MaterialCommunityIcons
+                name={dimExpanded ? "chevron-up" : "chevron-down"}
+                size={12} color="#4a9fff"
+                style={{ marginLeft: "auto" }}
+              />
+            </Pressable>
+
+            {/* Agrégats synthétiques — toujours visibles */}
+            <View style={{ gap: 4, marginTop: 6 }}>
+              <View style={dimStyles.row}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={10} color={PALETTE.textLow} />
+                <Text style={dimStyles.label}>Passages urgences (fictif)</Text>
+                <Text style={[dimStyles.value, { color: healthSnapshot.urgencyTrend === "hausse" ? PALETTE.danger : healthSnapshot.urgencyTrend === "baisse" ? PALETTE.success : PALETTE.textHigh }]}>
+                  {healthSnapshot.urgencyPassages.toLocaleString("fr-FR")}
+                  {healthSnapshot.urgencyTrend === "hausse" ? " ↑" : healthSnapshot.urgencyTrend === "baisse" ? " ↓" : " →"}
+                </Text>
+              </View>
+              <View style={dimStyles.row}>
+                <MaterialCommunityIcons name="clock-outline" size={10} color={PALETTE.textLow} />
+                <Text style={dimStyles.label}>Délai médian attente (fictif)</Text>
+                <Text style={[dimStyles.value, { color: healthSnapshot.averageWaitMinutes >= 200 ? PALETTE.danger : healthSnapshot.averageWaitMinutes >= 120 ? PALETTE.warning : PALETTE.textHigh }]}>
+                  {healthSnapshot.averageWaitMinutes >= 60
+                    ? `${Math.floor(healthSnapshot.averageWaitMinutes / 60)}h${String(healthSnapshot.averageWaitMinutes % 60).padStart(2, "0")}`
+                    : `${healthSnapshot.averageWaitMinutes} min`}
+                </Text>
+              </View>
+              <View style={dimStyles.row}>
+                <MaterialCommunityIcons name="bed-outline" size={10} color={PALETTE.textLow} />
+                <Text style={dimStyles.label}>Occupation lits (fictif)</Text>
+                <Text style={[dimStyles.value, { color: healthSnapshot.bedOccupancyRate >= 95 ? PALETTE.danger : healthSnapshot.bedOccupancyRate >= 88 ? PALETTE.warning : PALETTE.textHigh }]}>
+                  {healthSnapshot.bedOccupancyRate} %
+                </Text>
+              </View>
+              <View style={dimStyles.row}>
+                <MaterialCommunityIcons name="alert-outline" size={10} color={PALETTE.textLow} />
+                <Text style={dimStyles.label}>Anomalies codage (fictif)</Text>
+                <Text style={[dimStyles.value, { color: healthSnapshot.codingAnomalyRate >= 1.5 ? PALETTE.danger : healthSnapshot.codingAnomalyRate >= 0.8 ? PALETTE.warning : PALETTE.textHigh }]}>
+                  {healthSnapshot.codingAnomalies.toLocaleString("fr-FR")} ({healthSnapshot.codingAnomalyRate.toFixed(2)} %)
+                </Text>
+              </View>
+            </View>
+
+            {/* Signaux faibles */}
+            {healthSnapshot.weakSignals.length > 0 && (
+              <View style={{ marginTop: 8, gap: 3 }}>
+                {healthSnapshot.weakSignals.map((sig) => (
+                  <View key={sig.code} style={dimStyles.signalRow}>
+                    <Text style={[dimStyles.signalCode, { color: sig.color }]}>{sig.code}</Text>
+                    <Text style={[dimStyles.signalLabel, { color: sig.color }]}>{sig.label}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Rapports DIM dépliables */}
+            {dimExpanded && (
+              <View style={{ marginTop: 10, gap: 8 }}>
+                {healthSnapshot.reportSamples.map((rep) => (
+                  <View key={rep.id} style={[dimStyles.report, { borderLeftColor: rep.color }]}>
+                    <View style={dimStyles.reportHeader}>
+                      <Text style={[dimStyles.reportTitle, { color: rep.color }]}>{rep.title.toUpperCase()}</Text>
+                      <View style={[dimStyles.reportBadge, { backgroundColor: rep.color + "22" }]}>
+                        <Text style={[dimStyles.reportBadgeText, { color: rep.color }]}>{rep.status.toUpperCase()}</Text>
+                      </View>
+                    </View>
+                    <Text style={dimStyles.reportPeriod}>{rep.period}</Text>
+                    <Text style={dimStyles.reportSummary}>{rep.summary}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
 
           {/* ── Codage hospitalier ────────────────────────────────────────── */}
           <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: codingInfo.color + "33" }]}>
@@ -1113,4 +1200,20 @@ const tabStyles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: PALETTE.danger,
   },
+});
+
+const dimStyles = StyleSheet.create({
+  row:         { flexDirection: "row", alignItems: "center", gap: 6 },
+  label:       { fontFamily: FONT.reg, fontSize: 10, color: PALETTE.textLow, flex: 1 },
+  value:       { fontFamily: FONT.bold, fontSize: 10 },
+  signalRow:   { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  signalCode:  { fontFamily: FONT.bold, fontSize: 9, width: 30 },
+  signalLabel: { fontFamily: FONT.reg, fontSize: 9, flex: 1 },
+  report:      { borderLeftWidth: 2, paddingLeft: 8, gap: 3 },
+  reportHeader:{ flexDirection: "row", alignItems: "center", gap: 6 },
+  reportTitle: { fontFamily: FONT.bold, fontSize: 9, flex: 1 },
+  reportBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
+  reportBadgeText: { fontFamily: FONT.bold, fontSize: 8 },
+  reportPeriod:{ fontFamily: FONT.reg, fontSize: 8, color: PALETTE.textLow },
+  reportSummary: { fontFamily: FONT.reg, fontSize: 9, color: PALETTE.textMid, lineHeight: 14 },
 });
