@@ -865,4 +865,6 @@ export interface StrategyGameState {
   healthDataTrust?: number;
   // Dernier audit DIM lancé — actionCount (optional pour backward compat)
   lastDimAuditAt?: number;
+  // Pression de sous-détection sanitaire cachée — 0-100 (optional pour backward compat)
+  underDetectionPressure?: number;
 }

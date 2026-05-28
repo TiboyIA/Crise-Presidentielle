@@ -45,6 +45,7 @@ import { getHealthReportingBandInfo, DEFAULT_HEALTH_REPORTING_DELAY } from "@/lo
 import { getHospitalPressureBandInfo, DEFAULT_HOSPITAL_PRESSURE } from "@/logic/hospitalPressureEngine";
 import { getHealthDataTrustBandInfo, DEFAULT_HEALTH_DATA_TRUST } from "@/logic/healthDataTrustEngine";
 import { canLaunchDimAudit, DIM_AUDIT_COST_MONEY, DIM_AUDIT_COST_INFLUENCE } from "@/logic/dimAuditEngine";
+import { DEFAULT_UNDER_DETECTION_PRESSURE } from "@/logic/healthUnderDetectionEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -160,7 +161,8 @@ export default function JournalDeCriseScreen() {
   const hospPressureInfo = getHospitalPressureBandInfo(hospPressure);
   const healthTrust      = state.healthDataTrust ?? DEFAULT_HEALTH_DATA_TRUST;
   const healthTrustInfo  = getHealthDataTrustBandInfo(healthTrust);
-  const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20;
+  const underDetection   = state.underDetectionPressure ?? DEFAULT_UNDER_DETECTION_PRESSURE;
+  const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85;
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -583,6 +585,43 @@ export default function JournalDeCriseScreen() {
                   </View>
                 </View>
                 <Text style={styles.stormDesc}>{storm.description}</Text>
+              </View>
+            );
+          })()}
+
+          {/* ── Sous-détection sanitaire cachée ──────────────────────────── */}
+          {underDetection >= 35 && (() => {
+            const color =
+              underDetection >= 85 ? "#e54848" :
+              underDetection >= 60 ? "#e8864f" : "#e8c44f";
+            const label =
+              underDetection >= 85 ? "CRITIQUE" :
+              underDetection >= 60 ? "ALERTE" : "SIGNAL FAIBLE";
+            const msg =
+              underDetection >= 85
+                ? "Des données sanitaires incohérentes masquent probablement une crise plus grave. Un événement critique est imminent si aucune correction n'est apportée."
+                : underDetection >= 60
+                ? "Des anomalies statistiques persistantes suggèrent une sous-déclaration significative. Le système d'information sanitaire nécessite une investigation urgente."
+                : "Un signal anormal a été détecté dans les données hospitalières. La situation reste sous contrôle mais mérite attention.";
+            return (
+              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: color + "33" }]}>
+                <View style={styles.waveHeader}>
+                  <MaterialCommunityIcons name="eye-off-outline" size={12} color={color} />
+                  <Text style={[styles.waveTitle, { color }]}>SOUS-DÉTECTION SANITAIRE</Text>
+                  <View style={[styles.waveBadge, { backgroundColor: color + "22" }]}>
+                    <Text style={[styles.waveBadgeText, { color }]}>{label}</Text>
+                  </View>
+                  <Text style={[styles.waveBadgeText, { color, marginLeft: 4 }]}>
+                    {Math.round(underDetection)}
+                  </Text>
+                </View>
+                <View style={hospStyles.bar}>
+                  <View style={[hospStyles.fill, { width: `${underDetection}%` as `${number}%`, backgroundColor: color }]} />
+                  {([35, 60, 85] as const).map((t) => (
+                    <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
+                  ))}
+                </View>
+                <Text style={styles.stormDesc}>{msg}</Text>
               </View>
             );
           })()}

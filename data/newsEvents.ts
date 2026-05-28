@@ -11,6 +11,7 @@ import { MEDICAL_EVENTS } from "@/data/medicalIndicators";
 import { HOSPITAL_CODING_EVENTS } from "@/data/hospitalCodingEvents";
 import { HEALTH_REPORTING_EVENTS } from "@/data/healthReportingEvents";
 import { HOSPITAL_PRESSURE_EVENTS } from "@/data/hospitalPressureEvents";
+import { HEALTH_UNDERDETECTION_EVENTS } from "@/data/healthUnderDetectionEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3674,6 +3675,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...HEALTH_REPORTING_EVENTS,
   // ── SATURATION HOSPITALIÈRE ───────────────────────────────────────────────────
   ...HOSPITAL_PRESSURE_EVENTS,
+  // ── SOUS-DÉTECTION SANITAIRE CACHÉE ──────────────────────────────────────────
+  ...HEALTH_UNDERDETECTION_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

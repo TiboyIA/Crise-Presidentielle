@@ -220,6 +220,7 @@ import { tickHospitalCodingQuality } from "@/logic/hospitalCodingQualityEngine";
 import { tickHealthReportingDelay } from "@/logic/healthReportingDelayEngine";
 import { tickHospitalPressure } from "@/logic/hospitalPressureEngine";
 import { tickHealthDataTrust } from "@/logic/healthDataTrustEngine";
+import { tickHealthUnderDetection } from "@/logic/healthUnderDetectionEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2484,6 +2485,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickHospitalCodingQuality(s);
       s = tickHealthReportingDelay(s);
       s = tickHealthDataTrust(s);
+      s = tickHealthUnderDetection(s);
     }
   }
 

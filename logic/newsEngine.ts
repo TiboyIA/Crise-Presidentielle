@@ -264,6 +264,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     health_trust_critical: (state.healthDataTrust ?? 65) < 20 && state.mandateDay >= 15,
     health_trust_low:      (state.healthDataTrust ?? 65) >= 20 && (state.healthDataTrust ?? 65) < 40 && state.mandateDay >= 10,
     health_trust_high:     (state.healthDataTrust ?? 65) >= 80 && state.mandateDay >= 25,
+    // ── Sous-détection sanitaire cachée ──────────────────────────────────────
+    underdetection_signal:     (state.underDetectionPressure ?? 15) >= 35 && state.mandateDay >= 15,
+    underdetection_incoherent: (state.underDetectionPressure ?? 15) >= 60 && state.mandateDay >= 20,
+    underdetection_crisis:     (state.underDetectionPressure ?? 15) >= 85 && state.mandateDay >= 25,
   };
 }
 
