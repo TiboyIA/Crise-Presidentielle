@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { typeIcon, urgencyColor } from "@/logic/newsEngine";
+import { typeMaterialIcon, urgencyColor } from "@/logic/newsEngine";
 import { NEWS_IMG } from "@/constants/assets";
 import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
@@ -91,7 +91,9 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
               <View style={styles.bannerHeader}>
                 <View style={styles.bannerSourceWrap}>
                   <Text style={styles.bannerKicker}>BREAKING · {event.source.toUpperCase()}</Text>
-                  <Text style={styles.bannerType}>{typeIcon(event.type)} {event.type.replace("_", " ").toUpperCase()}</Text>
+                  <Text style={styles.bannerType}>
+                    <MaterialCommunityIcons name={typeMaterialIcon(event.type) as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={11} color={PALETTE.textMid} /> {event.type.replace("_", " ").toUpperCase()}
+                  </Text>
                 </View>
                 <Pressable onPress={onDismiss} hitSlop={12} style={styles.closeBtn}>
                   <MaterialCommunityIcons name="close" size={18} color="rgba(255,255,255,0.65)" />

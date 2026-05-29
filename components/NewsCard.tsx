@@ -1,11 +1,14 @@
 import React from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { typeIcon, urgencyColor } from "@/logic/newsEngine";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { typeMaterialIcon, urgencyColor } from "@/logic/newsEngine";
 import { NEWS_IMG } from "@/constants/assets";
 import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS, URGENCY_COLORS } from "@/constants/uiTokens";
-import { RESOURCE_ICONS } from "@/types/strategy";
+import { RESOURCE_MCI } from "@/constants/iconMap";
+
+type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 import type { MisinterpretationType, NewsLogEntry, ResourceKey } from "@/types/strategy";
 import { GAFFE_LABELS } from "@/logic/ministerSpeechEngine";
 import { WORDING_COLORS, WORDING_LABELS } from "@/logic/diplomaticWordingEngine";
@@ -24,7 +27,7 @@ interface Props {
 
 export function NewsCard({ entry, onPress }: Props) {
   const urg = urgencyColor(entry.urgency) || URGENCY_COLORS.routine;
-  const icon = typeIcon(entry.type);
+  const iconName = typeMaterialIcon(entry.type) as McIconName;
   const bannerImg = NEWS_IMG[entry.type];
   const { enabled: comfort, fs, pad } = useComfort();
 
@@ -53,8 +56,9 @@ export function NewsCard({ entry, onPress }: Props) {
               <Text style={styles.bannerSource}>{entry.source.toUpperCase()}</Text>
               <Badge label={entry.urgency} tone={mapUrgency(entry.urgency)} size="xs" />
             </View>
-            <View style={styles.bannerBottom}>
-              <Text style={styles.bannerType}>{icon} {entry.type.replace("_", " ").toUpperCase()}</Text>
+            <View style={[styles.bannerBottom, styles.bannerTypeRow]}>
+              <MaterialCommunityIcons name={iconName} size={11} color={PALETTE.textMid} />
+              <Text style={styles.bannerType}>{entry.type.replace("_", " ").toUpperCase()}</Text>
             </View>
           </View>
         )}
@@ -63,7 +67,7 @@ export function NewsCard({ entry, onPress }: Props) {
         <View style={[styles.body, comfort && { padding: pad(12), gap: pad(6) }]}>
           {!bannerImg && (
             <View style={styles.headerNoImg}>
-              <Text style={styles.headerIcon}>{icon}</Text>
+              <MaterialCommunityIcons name={iconName} size={15} color={PALETTE.gold} />
               <Text style={styles.source}>{entry.source}</Text>
               <Badge label={entry.urgency} tone={mapUrgency(entry.urgency)} size="xs" />
             </View>
@@ -84,7 +88,7 @@ export function NewsCard({ entry, onPress }: Props) {
             <View style={styles.effectsRow}>
               {effectEntries.map(([key, val]) => (
                 <View key={key} style={styles.effectChip}>
-                  <Text style={styles.effectIcon}>{RESOURCE_ICONS[key] ?? "•"}</Text>
+                  <MaterialCommunityIcons name={(RESOURCE_MCI[key] ?? "circle-small") as McIconName} size={11} color={PALETTE.textMid} />
                   <Text style={[styles.effectText, { color: val > 0 ? PALETTE.success : PALETTE.danger }]}>
                     {val > 0 ? "+" : ""}{val}
                   </Text>
@@ -109,7 +113,9 @@ export function NewsCard({ entry, onPress }: Props) {
 
           {entry.diplomaticWording && (
             <View style={[styles.wordingChip, { borderColor: WORDING_COLORS[entry.diplomaticWording] + "55", backgroundColor: WORDING_COLORS[entry.diplomaticWording] + "0d" }]}>
-              <Text style={[styles.wordingChipText, { color: WORDING_COLORS[entry.diplomaticWording] }]}>🌐 {WORDING_LABELS[entry.diplomaticWording]}</Text>
+              <Text style={[styles.wordingChipText, { color: WORDING_COLORS[entry.diplomaticWording] }]}>
+                <MaterialCommunityIcons name="web" size={10} color={WORDING_COLORS[entry.diplomaticWording]} /> {WORDING_LABELS[entry.diplomaticWording]}
+              </Text>
             </View>
           )}
 
@@ -139,14 +145,16 @@ export function NewsCard({ entry, onPress }: Props) {
 
           {entry.resiliencePayout != null && entry.resiliencePayout > 0 && (
             <View style={styles.resilienceChip}>
-              <Text style={styles.resilienceChipText}>🛡 Réserve absorbée : {entry.resiliencePayout} M€</Text>
+              <Text style={styles.resilienceChipText}>
+                <MaterialCommunityIcons name="shield-outline" size={10} color="#3fbe7a" /> Réserve absorbée : {entry.resiliencePayout} M€
+              </Text>
             </View>
           )}
 
           {entry.createdLiabilityId && (
             <View style={[styles.liabilityChip, { borderColor: LIABILITY_DEFS[entry.createdLiabilityId].color + "55", backgroundColor: LIABILITY_DEFS[entry.createdLiabilityId].color + "0d" }]}>
               <Text style={[styles.liabilityChipText, { color: LIABILITY_DEFS[entry.createdLiabilityId].color }]}>
-                ⚠ Passif créé : {LIABILITY_DEFS[entry.createdLiabilityId].label}
+                <MaterialCommunityIcons name="alert-outline" size={10} color={LIABILITY_DEFS[entry.createdLiabilityId].color} /> Passif créé : {LIABILITY_DEFS[entry.createdLiabilityId].label}
               </Text>
             </View>
           )}
@@ -154,7 +162,7 @@ export function NewsCard({ entry, onPress }: Props) {
           {entry.reinsurancePayout != null && entry.reinsurancePayout.absorbed > 0 && (
             <View style={styles.reinsuranceChip}>
               <Text style={styles.reinsuranceChipText}>
-                🤝 Réassurance alliée : {entry.reinsurancePayout.absorbed} M€
+                <MaterialCommunityIcons name="handshake-outline" size={10} color="#4a9fff" /> Réassurance alliée : {entry.reinsurancePayout.absorbed} M€
                 {entry.reinsurancePayout.membersCount > 0
                   ? ` (${entry.reinsurancePayout.membersCount} allié${entry.reinsurancePayout.membersCount > 1 ? "s" : ""})`
                   : ""}
@@ -180,7 +188,7 @@ export function NewsCard({ entry, onPress }: Props) {
           {entry.leakagePayout != null && (
             <View style={[styles.leakageChip, { borderColor: LEAKAGE_BAND_COLORS[entry.leakagePayout.band] + "55", backgroundColor: LEAKAGE_BAND_COLORS[entry.leakagePayout.band] + "0d" }]}>
               <Text style={[styles.leakageChipText, { color: LEAKAGE_BAND_COLORS[entry.leakagePayout.band] }]}>
-                ⚠ {LEAKAGE_BAND_LABELS[entry.leakagePayout.band]} : {entry.leakagePayout.leaked} M€
+                <MaterialCommunityIcons name="alert-outline" size={10} color={LEAKAGE_BAND_COLORS[entry.leakagePayout.band]} /> {LEAKAGE_BAND_LABELS[entry.leakagePayout.band]} : {entry.leakagePayout.leaked} M€
                 {" "}({Math.round(entry.leakagePayout.rate * 100)}%)
                 {entry.leakagePayout.controlApplied ? " · contrôle actif" : ""}
               </Text>
@@ -239,6 +247,7 @@ const styles = StyleSheet.create({
   bannerTop: { position: "absolute", top: 8, left: 12, right: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   bannerSource: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.gold, letterSpacing: 2.5 },
   bannerBottom: { position: "absolute", bottom: 6, left: 12, right: 12 },
+  bannerTypeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   bannerType: { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textMid, letterSpacing: 1.8 },
 
   body: { padding: 12, gap: 6 },

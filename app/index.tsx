@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Alert, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
@@ -25,14 +26,14 @@ interface DoctrineOption {
 }
 
 const DOCTRINE_OPTIONS: DoctrineOption[] = [
-  { label: "Réformateur",  subtitle: "Dialogue, transparence, libertés civiles",               doctrine: "democratique",    icon: "⚖️", color: "#4a9fff" },
-  { label: "Protecteur",   subtitle: "Sécurité nationale, ordre public, frontières",           doctrine: "securitaire",     icon: "🛡️", color: "#e54848" },
-  { label: "Bâtisseur",   subtitle: "Infrastructures, industrie, long terme",                 doctrine: "technocratique",  icon: "🏗️", color: "#3fbe7a" },
-  { label: "Technocrate",  subtitle: "Expertise, données, modernisation de l'État",            doctrine: "technocratique",  icon: "🤖", color: "#a78bfa" },
-  { label: "Populaire",   subtitle: "Proximité, aides sociales, écoute du peuple",            doctrine: "populiste",       icon: "🗣️", color: "#e8a93a" },
-  { label: "Souverainiste", subtitle: "Primauté nationale, méfiance envers le multilatéralisme", doctrine: "souverainiste", icon: "🗺️", color: "#6b8cce", locked: true },
-  { label: "Écologiste",   subtitle: "Transition verte, sobriété, énergies renouvelables",    doctrine: "ecologiste",      icon: "🌿", color: "#4caf50", locked: true },
-  { label: "Libéral",      subtitle: "Marché libre, compétitivité, attractivité étrangère",   doctrine: "liberal",         icon: "📈", color: "#26c6da", locked: true },
+  { label: "Réformateur",  subtitle: "Dialogue, transparence, libertés civiles",               doctrine: "democratique",    icon: "scale-balance",          color: "#4a9fff" },
+  { label: "Protecteur",   subtitle: "Sécurité nationale, ordre public, frontières",           doctrine: "securitaire",     icon: "shield-check-outline",   color: "#e54848" },
+  { label: "Bâtisseur",   subtitle: "Infrastructures, industrie, long terme",                 doctrine: "technocratique",  icon: "office-building-outline", color: "#3fbe7a" },
+  { label: "Technocrate",  subtitle: "Expertise, données, modernisation de l'État",            doctrine: "technocratique",  icon: "chip",                   color: "#a78bfa" },
+  { label: "Populaire",   subtitle: "Proximité, aides sociales, écoute du peuple",            doctrine: "populiste",       icon: "bullhorn-outline",       color: "#e8a93a" },
+  { label: "Souverainiste", subtitle: "Primauté nationale, méfiance envers le multilatéralisme", doctrine: "souverainiste", icon: "flag-variant-outline",  color: "#6b8cce", locked: true },
+  { label: "Écologiste",   subtitle: "Transition verte, sobriété, énergies renouvelables",    doctrine: "ecologiste",      icon: "leaf",                   color: "#4caf50", locked: true },
+  { label: "Libéral",      subtitle: "Marché libre, compétitivité, attractivité étrangère",   doctrine: "liberal",         icon: "trending-up",            color: "#26c6da", locked: true },
 ];
 
 function HeaderContent({ compact }: { compact?: boolean }) {
@@ -43,7 +44,7 @@ function HeaderContent({ compact }: { compact?: boolean }) {
         <View style={styles.crestCorner2} />
         <View style={styles.crestCorner3} />
         <View style={styles.crestCorner4} />
-        <Text style={[styles.emblem, compact && styles.emblemCompact]}>⚜</Text>
+        <MaterialCommunityIcons name="fleur-de-lis" size={compact ? 26 : 38} color={PALETTE.gold} />
       </View>
       <Text style={styles.republic}>RÉPUBLIQUE · COMMANDEMENT</Text>
       <View style={[styles.titleBlock, compact && styles.titleBlockCompact]}>
@@ -297,27 +298,31 @@ function HomeBody({
 
         <Pressable
           onPress={onTutorial}
-          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+          style={({ pressed }) => [styles.cancelBtn, styles.menuRow, { opacity: pressed ? 0.55 : 1 }]}
         >
-          <Text style={styles.cancelText}>📖  Revoir le tutoriel</Text>
+          <MaterialCommunityIcons name="book-open-variant" size={15} color={PALETTE.textMid} />
+          <Text style={styles.cancelText}>Revoir le tutoriel</Text>
         </Pressable>
         <Pressable
           onPress={onSettings}
-          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+          style={({ pressed }) => [styles.cancelBtn, styles.menuRow, { opacity: pressed ? 0.55 : 1 }]}
         >
-          <Text style={styles.cancelText}>⚙️  Paramètres</Text>
+          <MaterialCommunityIcons name="cog-outline" size={15} color={PALETTE.textMid} />
+          <Text style={styles.cancelText}>Paramètres</Text>
         </Pressable>
         <Pressable
           onPress={onSaves}
-          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+          style={({ pressed }) => [styles.cancelBtn, styles.menuRow, { opacity: pressed ? 0.55 : 1 }]}
         >
-          <Text style={styles.cancelText}>💾  Sauvegardes</Text>
+          <MaterialCommunityIcons name="content-save-outline" size={15} color={PALETTE.textMid} />
+          <Text style={styles.cancelText}>Sauvegardes</Text>
         </Pressable>
         <Pressable
           onPress={onShop}
-          style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.55 : 1 }]}
+          style={({ pressed }) => [styles.cancelBtn, styles.menuRow, { opacity: pressed ? 0.55 : 1 }]}
         >
-          <Text style={[styles.cancelText, styles.shopText]}>⚔️  Boutique — Packs d'extension</Text>
+          <MaterialCommunityIcons name="shopping-outline" size={15} color={PALETTE.gold} />
+          <Text style={[styles.cancelText, styles.shopText]}>Boutique — Packs d'extension</Text>
         </Pressable>
       </View>
     </View>
@@ -443,7 +448,7 @@ function CountryBody({
                   <Text style={styles.countryTagFreeText}>GRATUIT</Text>
                 </View>
               ) : (
-                <Text style={styles.countryLock}>🔒</Text>
+                <MaterialCommunityIcons name="lock-outline" size={14} color={PALETTE.textLow} style={styles.countryLock} />
               )}
               {active && free && <View style={[styles.doctrineCheck, { backgroundColor: PALETTE.gold }]} />}
             </Pressable>
@@ -514,7 +519,7 @@ function DoctrineBody({
               onPress={() => {
                 if (locked) {
                   Alert.alert(
-                    `${opt.icon} ${opt.label}`,
+                    opt.label,
                     `Disponible dans le « ${DOCTRINE_PACK.title} » — BIENTÔT\n${DOCTRINE_PACK.price}`,
                     [{ text: "OK" }],
                   );
@@ -529,7 +534,7 @@ function DoctrineBody({
                 pressed && { opacity: locked ? 0.35 : 0.8 },
               ]}
             >
-              <Text style={styles.doctrineIcon}>{opt.icon}</Text>
+              <MaterialCommunityIcons name={opt.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={22} color={active && !locked ? opt.color : PALETTE.textMid} style={styles.doctrineIcon} />
               <View style={styles.doctrineText}>
                 <Text style={[styles.doctrineName, active && !locked && { color: opt.color }]}>{opt.label}</Text>
                 <Text style={styles.doctrineDesc}>{opt.subtitle}</Text>
@@ -549,9 +554,11 @@ function DoctrineBody({
               <Text style={[styles.rankedLabel, rankedMode && { color: PALETTE.gold }]}>MODE CLASSÉ</Text>
               <Text style={styles.rankedDesc}>Vos décisions sont enregistrées localement puis soumises au serveur en fin de mandat pour entrer dans le classement mondial.</Text>
             </View>
-            <Text style={{ fontSize: 14, color: rankedMode ? PALETTE.gold : PALETTE.textLow }}>
-              {rankedMode ? "✓" : "○"}
-            </Text>
+            <MaterialCommunityIcons
+              name={rankedMode ? "check-circle" : "circle-outline"}
+              size={16}
+              color={rankedMode ? PALETTE.gold : PALETTE.textLow}
+            />
           </Pressable>
         )}
       </ScrollView>
@@ -684,6 +691,7 @@ const styles = StyleSheet.create({
   mainBtnText: { color: "#fff", fontSize: 13, fontFamily: FONT.bold, letterSpacing: 3.5 },
   btnRule: { width: 16, height: 1, backgroundColor: "rgba(255,255,255,0.5)" },
   cancelBtn: { paddingVertical: 6, alignItems: "center" },
+  menuRow: { flexDirection: "row", justifyContent: "center", gap: 8 },
   cancelText: { fontSize: 12, fontFamily: FONT.med, color: PALETTE.textMid, letterSpacing: 0.5 },
   shopText: { color: PALETTE.gold, opacity: 0.85 },
 

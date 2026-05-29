@@ -726,3 +726,17 @@ export function typeIcon(type: NewsEvent["type"]): string {
     case "national":      return "🏛️";
   }
 }
+
+/** Icône MaterialCommunityIcons par type d'actualité (remplace typeIcon/emoji). */
+export function typeMaterialIcon(type: NewsEvent["type"]): string {
+  switch (type) {
+    case "cyber":          return "shield-lock-outline";
+    case "economie":       return "chart-line-variant";
+    case "social":         return "account-group-outline";
+    case "diplomatie":     return "earth";
+    case "guerre_hybride": return "radar";
+    case "monde":          return "map-outline";
+    case "classement":     return "trophy-outline";
+    case "national":       return "bank-outline";
+  }
+}

@@ -9,7 +9,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { useStrategy } from "@/context/StrategyContext";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
-import { typeIcon } from "@/logic/newsEngine";
+import { typeMaterialIcon } from "@/logic/newsEngine";
 import { FEATURES } from "@/config/features";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -80,7 +80,7 @@ export function CrisisAlertOverlay() {
 
   if (!event) return null;
 
-  const typeEmoji = typeIcon(event.type);
+  const typeIconName = typeMaterialIcon(event.type) as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   const typeLabel = TYPE_LABELS[event.type] ?? event.type.toUpperCase();
 
   return (
@@ -104,7 +104,9 @@ export function CrisisAlertOverlay() {
           </View>
 
           {/* Type */}
-          <Text style={styles.typeLabel}>{typeEmoji}  CRISE {typeLabel}</Text>
+          <Text style={styles.typeLabel}>
+            <MaterialCommunityIcons name={typeIconName} size={13} color={PALETTE.danger} />  CRISE {typeLabel}
+          </Text>
 
           {/* Title */}
           <Text style={styles.crisisTitle}>{event.title}</Text>

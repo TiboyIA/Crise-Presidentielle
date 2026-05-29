@@ -9,7 +9,7 @@ import { InteractiveNewsModal } from "@/components/InteractiveNewsModal";
 import { Badge, Panel, ScreenHeader, SectionHeader } from "@/components/ui";
 import { SectionBackdrop } from "@/components/ui/SectionBackdrop";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
-import { typeIcon, urgencyColor } from "@/logic/newsEngine";
+import { typeMaterialIcon, urgencyColor } from "@/logic/newsEngine";
 import { computeNationalTension } from "@/logic/tensionEngine";
 import {
   generateForecast,
@@ -439,7 +439,7 @@ export default function JournalDeCriseScreen() {
                   ]}
                 >
                   <View style={styles.urgentChipHeader}>
-                    <Text style={styles.urgentChipIcon}>{typeIcon(event.type)}</Text>
+                    <MaterialCommunityIcons name={typeMaterialIcon(event.type) as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={13} color={urg} style={styles.urgentChipIcon} />
                     <Text style={[styles.urgentChipUrg, { color: urg }, comfort && { fontSize: fs(9) }]}>{(URGENCY_SHAPES[event.urgency] ?? "") + " " + event.urgency.toUpperCase()}</Text>
                   </View>
                   <Text style={[styles.urgentChipTitle, { color: PALETTE.textHigh }, comfort && { fontSize: fs(12), lineHeight: fs(16) }]} numberOfLines={2}>{event.title}</Text>

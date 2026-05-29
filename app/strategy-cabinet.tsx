@@ -49,6 +49,8 @@ import type { GovernmentCultureId } from "@/types/strategy";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 
+type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function delta(a: number, b: number) {
@@ -318,7 +320,7 @@ function MinisterFullCard({
     const prog = TRAINING_PROGRAMS[programId];
     if (!prog) return;
     const costLabel = prog.costMoney
-      ? `${prog.costMoney}💰`
+      ? `${prog.costMoney} M€`
       : prog.costInfluence
       ? `${prog.costInfluence} influence`
       : "Gratuit";
@@ -505,7 +507,7 @@ function MinisterFullCard({
                     const highRisk = profile.overallRisk >= 60;
                     Alert.alert(
                       "Défendre publiquement",
-                      `Coût : ${DEFEND_COST_INFLUENCE} Influence\n\n${highRisk ? "⚠️ Risque élevé — une défense publique peut se retourner si des preuves émergent." : "Défense présidentielle claire. Réduit les pressions médiatiques à court terme."}`,
+                      `Coût : ${DEFEND_COST_INFLUENCE} Influence\n\n${highRisk ? "Risque élevé — une défense publique peut se retourner si des preuves émergent." : "Défense présidentielle claire. Réduit les pressions médiatiques à court terme."}`,
                       [
                         { text: "Annuler", style: "cancel" },
                         { text: "Défendre", onPress: () => {
@@ -581,10 +583,15 @@ function MinisterFullCard({
         <View style={styles.trainingPanel}>
           <Text style={styles.trainingPanelTitle}>PROGRAMMES DE FORMATION</Text>
           {TRAINING_LIST.map((prog) => {
-            const costLabel = prog.costMoney
-              ? `💰 ${prog.costMoney}`
+            const costIconName: McIconName | null = prog.costMoney
+              ? "cash-multiple"
               : prog.costInfluence
-              ? `🎭 ${prog.costInfluence}`
+              ? "bullhorn-outline"
+              : null;
+            const costLabel = prog.costMoney
+              ? `${prog.costMoney}`
+              : prog.costInfluence
+              ? `${prog.costInfluence}`
               : "Gratuit";
             const effectBits = [
               prog.effect.competenceDelta  ? `Compétence +${prog.effect.competenceDelta}` : null,
@@ -606,7 +613,10 @@ function MinisterFullCard({
                   </Pressable>
                 </View>
                 <View style={styles.trainingCardMeta}>
-                  <Text style={styles.trainingMetaChip}>{costLabel}</Text>
+                  <Text style={styles.trainingMetaChip}>
+                    {costIconName ? <MaterialCommunityIcons name={costIconName} size={10} color={PALETTE.gold} /> : null}
+                    {costIconName ? " " : ""}{costLabel}
+                  </Text>
                   <Text style={styles.trainingMetaChip}>{prog.durationActions} actions</Text>
                   {effectBits.map((e, i) => (
                     <Text key={i} style={[styles.trainingMetaChip, { color: PALETTE.success }]}>{e}</Text>
@@ -775,7 +785,7 @@ export default function StrategyCabinetScreen() {
             }
             Alert.alert(
               "Activer la cellule de crise",
-              `${criticalPending.length} crise${criticalPending.length > 1 ? "s" : ""} critique${criticalPending.length > 1 ? "s" : ""} en cours.\n\nLes ministres les plus compétents disponibles seront mobilisés immédiatement.\n\nCoût : ${STAFFING_COST_INFLUENCE} influence\n${useCount >= 2 ? "⚠️ Usages répétés — risque de saturation accru." : ""}`,
+              `${criticalPending.length} crise${criticalPending.length > 1 ? "s" : ""} critique${criticalPending.length > 1 ? "s" : ""} en cours.\n\nLes ministres les plus compétents disponibles seront mobilisés immédiatement.\n\nCoût : ${STAFFING_COST_INFLUENCE} influence\n${useCount >= 2 ? "Usages répétés — risque de saturation accru." : ""}`,
               [
                 { text: "Annuler", style: "cancel" },
                 {
@@ -819,7 +829,7 @@ export default function StrategyCabinetScreen() {
               </View>
               <Text style={styles.staffingDesc} numberOfLines={2}>
                 {check.ok
-                  ? `Mobiliser les ministres disponibles pour absorber partiellement l'impact. Coût : ${STAFFING_COST_INFLUENCE}🎭`
+                  ? `Mobiliser les ministres disponibles pour absorber partiellement l'impact. Coût : ${STAFFING_COST_INFLUENCE} influence`
                   : check.reason}
               </Text>
               <Pressable
@@ -876,7 +886,7 @@ export default function StrategyCabinetScreen() {
                           if (!isActive) {
                             Alert.alert(
                               `Adopter : ${def.name}`,
-                              `${def.tagline}\n\n✅ ${def.benefits[0]}\n✅ ${def.benefits[1]}\n⚠️ ${def.drawbacks[0]}\n⚠️ ${def.drawbacks[1]}`,
+                              `${def.tagline}\n\nAVANTAGES\n+ ${def.benefits[0]}\n+ ${def.benefits[1]}\n\nINCONVÉNIENTS\n− ${def.drawbacks[0]}\n− ${def.drawbacks[1]}`,
                               [
                                 { text: "Annuler", style: "cancel" },
                                 { text: "Confirmer", onPress: () => { setGovernmentCulture(def.id); setCultureExpanded(false); } },
@@ -950,7 +960,9 @@ export default function StrategyCabinetScreen() {
                   }}
                 >
                   <Text style={styles.drainBtnText}>Plan RH</Text>
-                  <Text style={styles.drainBtnCost}>200M€ + 30🎭</Text>
+                  <Text style={styles.drainBtnCost}>
+                    200 M€ + 30 <MaterialCommunityIcons name="bullhorn-outline" size={10} color={PALETTE.textMid} />
+                  </Text>
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.drainBtn, { opacity: pressed ? 0.7 : 1 }]}
@@ -972,7 +984,9 @@ export default function StrategyCabinetScreen() {
                   }}
                 >
                   <Text style={styles.drainBtnText}>Reconnaissance</Text>
-                  <Text style={styles.drainBtnCost}>40🎭</Text>
+                  <Text style={styles.drainBtnCost}>
+                    40 <MaterialCommunityIcons name="bullhorn-outline" size={10} color={PALETTE.textMid} />
+                  </Text>
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.drainBtn, { opacity: pressed ? 0.7 : 1 }]}
