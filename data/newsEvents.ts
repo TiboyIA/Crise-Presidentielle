@@ -33,6 +33,7 @@ import { DEROGATION_EVENTS } from "@/data/derogationEvents";
 import { PROCUREMENT_EVENTS } from "@/data/procurementEvents";
 import { WHISTLEBLOWER_EVENTS } from "@/data/whistleblowerEvents";
 import { MINISTER_CONFLICT_EVENTS } from "@/data/ministerConflictEvents";
+import { OVERSIGHT_EVENTS } from "@/data/oversightEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3740,6 +3741,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...WHISTLEBLOWER_EVENTS,
   // ── CONFLITS D'INTÉRÊTS MINISTÉRIELS ─────────────────────────────────────────
   ...MINISTER_CONFLICT_EVENTS,
+  // ── AUTORITÉS INDÉPENDANTES ───────────────────────────────────────────────────
+  ...OVERSIGHT_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

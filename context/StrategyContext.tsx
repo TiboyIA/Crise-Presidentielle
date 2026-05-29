@@ -258,6 +258,9 @@ import {
   tickConflictOfInterest,
 } from "@/logic/conflictOfInterestEngine";
 import {
+  cooperateWithInvestigation, justifyToAuthority, contestAuthority, tickOversight,
+} from "@/logic/oversightEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -460,6 +463,9 @@ interface StrategyContextValue {
   launchMinisterEthicsAudit: (ministerId: string) => { success: boolean; reason?: string };
   suspendMinisterForConflict: (ministerId: string) => { success: boolean; reason?: string };
   defendMinisterPublicly: (ministerId: string) => { success: boolean; reason?: string };
+  oversightCooperate: (investigationId: string) => { success: boolean; reason?: string };
+  oversightJustify:   (investigationId: string) => { success: boolean; reason?: string };
+  oversightContest:   (investigationId: string) => { success: boolean; reason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -2234,6 +2240,48 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const oversightCooperateCb = useCallback(
+    (investigationId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = cooperateWithInvestigation(prev, investigationId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const oversightJustifyCb = useCallback(
+    (investigationId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = justifyToAuthority(prev, investigationId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const oversightContestCb = useCallback(
+    (investigationId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = contestAuthority(prev, investigationId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const launchDimAuditCb = useCallback(
     (): { result: DimAuditResult | null; failReason?: string } => {
       if (!state) return { result: null, failReason: "Jeu non initialisé." };
@@ -2487,6 +2535,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       launchMinisterEthicsAudit:   launchMinisterEthicsAuditCb,
       suspendMinisterForConflict:  suspendMinisterForConflictCb,
       defendMinisterPublicly:      defendMinisterPubliclyCb,
+      oversightCooperate: oversightCooperateCb,
+      oversightJustify:   oversightJustifyCb,
+      oversightContest:   oversightContestCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2513,6 +2564,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       justifyDerogationCb, auditDerogationCb, ignoreDerogationCb,
       protectWhistleblowerCb, launchWhistleblowerAuditCb, correctWhistleblowerQuietlyCb,
       requestMinisterDeclarationCb, launchMinisterEthicsAuditCb, suspendMinisterForConflictCb, defendMinisterPubliclyCb,
+      oversightCooperateCb, oversightJustifyCb, oversightContestCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2803,6 +2855,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickDerogations(s);
       s = tickWhistleblower(s);
       s = tickConflictOfInterest(s);
+      s = tickOversight(s);
       s = tickInvestorConfidence(s);
     }
   }

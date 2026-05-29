@@ -85,6 +85,12 @@ import {
   getAlertSeverityLabel, getAlertSeverityColor, getAlertTriggerLabel,
   PROTECT_COST_INFLUENCE, AUDIT_COST_INFLUENCE, CORRECT_COST_MONEY,
 } from "@/logic/whistleblowerEngine";
+import {
+  getActiveInvestigations, getAuthorityTrustLabel, getAuthorityTrustColor,
+  getPressureLabel, getPressureColor, getOversightRiskLevel,
+  COOPERATE_COST_INFLUENCE, JUSTIFY_COST_INFLUENCE, CONTEST_COST_INFLUENCE,
+} from "@/logic/oversightEngine";
+import { OVERSIGHT_AUTHORITY_DEFS, AUTHORITY_IDS } from "@/data/oversightAuthorities";
 import { CYCLE_META, DEFAULT_BUSINESS_CYCLE_PHASE, DEFAULT_CYCLE_MOMENTUM } from "@/logic/businessCycleEngine";
 import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
 import {
@@ -141,7 +147,7 @@ const hospStyles = StyleSheet.create({
 
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly } = useStrategy();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly, oversightCooperate, oversightJustify, oversightContest } = useStrategy();
   const { hPad, width } = useResponsive();
 
   const { prepareForecast, issuePublicAlert } = useStrategy();
@@ -305,6 +311,21 @@ export default function JournalDeCriseScreen() {
   };
   const WB_RISK_LABEL: Record<string, string> = {
     safe: "AUCUNE ALERTE", watch: "SOUS SURVEILLANCE", alert: "RISQUE ÉLEVÉ", critical: "CRISE",
+  };
+
+  const activeOversightInvs = getActiveInvestigations(state);
+  const oversightMaxPressure = activeOversightInvs.length > 0
+    ? Math.max(...activeOversightInvs.map((i) => i.pressure))
+    : 0;
+  const oversightRiskLevel  = getOversightRiskLevel(activeOversightInvs.length, oversightMaxPressure);
+  const oversightTrustMap   = (state.oversightState?.authorityTrust ?? {}) as Record<string, number>;
+  const anyTrustLow         = AUTHORITY_IDS.some((id) => (oversightTrustMap[id] ?? 60) < 40);
+  const showOversightPanel  = activeOversightInvs.length > 0 || anyTrustLow;
+  const OVERSIGHT_RISK_COLOR: Record<string, string> = {
+    safe: "#4caf82", watch: "#e8c44f", alert: "#e8864f", critical: "#e54848",
+  };
+  const OVERSIGHT_RISK_LABEL: Record<string, string> = {
+    safe: "CONFIANCE", watch: "SOUS SURVEILLANCE", alert: "PRESSION ÉLEVÉE", critical: "CRISE",
   };
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
@@ -967,6 +988,149 @@ export default function JournalDeCriseScreen() {
               );
             })}
           </View>
+        </View>
+      )}
+
+      {/* ── Autorités de contrôle indépendantes ───────────────────────────────── */}
+      {showOversightPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: OVERSIGHT_RISK_COLOR[oversightRiskLevel] + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="gavel" size={12} color={OVERSIGHT_RISK_COLOR[oversightRiskLevel]} />
+            <Text style={[styles.waveTitle, { color: OVERSIGHT_RISK_COLOR[oversightRiskLevel] }]}>AUTORITÉS DE CONTRÔLE</Text>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <View style={[styles.waveBadge, { backgroundColor: OVERSIGHT_RISK_COLOR[oversightRiskLevel] + "22" }]}>
+                <Text style={[styles.waveBadgeText, { color: OVERSIGHT_RISK_COLOR[oversightRiskLevel] }]}>
+                  {OVERSIGHT_RISK_LABEL[oversightRiskLevel]}
+                </Text>
+              </View>
+              {activeOversightInvs.length > 0 && (
+                <View style={[styles.waveBadge, { backgroundColor: "#e8864f22" }]}>
+                  <Text style={[styles.waveBadgeText, { color: "#e8864f" }]}>
+                    {activeOversightInvs.length} ENQUÊTE{activeOversightInvs.length > 1 ? "S" : ""}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Grille de confiance des 6 autorités */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            {AUTHORITY_IDS.map((id) => {
+              const def   = OVERSIGHT_AUTHORITY_DEFS[id];
+              const trust = oversightTrustMap[id] ?? 60;
+              const color = getAuthorityTrustColor(trust);
+              const hasInv = activeOversightInvs.some((i) => i.authorityId === id);
+              return (
+                <View key={id} style={{ width: "48%", gap: 3, padding: 6, backgroundColor: PALETTE.panelEdge + "33", borderRadius: 4, borderWidth: hasInv ? 1 : 0, borderColor: color + "66" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <MaterialCommunityIcons name={def.icon as never} size={10} color={color} />
+                    <Text style={[styles.waveBadgeText, { color, flex: 1 }]} numberOfLines={1}>{def.abbreviation}</Text>
+                    {hasInv && <View style={[styles.waveBadge, { backgroundColor: "#e8864f22", paddingHorizontal: 4 }]}>
+                      <Text style={[styles.waveBadgeText, { color: "#e8864f", fontSize: 8 }]}>ENQUÊTE</Text>
+                    </View>}
+                  </View>
+                  <View style={{ height: 3, backgroundColor: PALETTE.panelEdge, borderRadius: 2, overflow: "hidden" }}>
+                    <View style={{ width: `${trust}%` as `${number}%`, height: "100%", backgroundColor: color, borderRadius: 2 }} />
+                  </View>
+                  <Text style={[styles.waveBadgeText, { color: PALETTE.textLow, fontSize: 9 }]} numberOfLines={1}>
+                    {getAuthorityTrustLabel(trust)} — {trust}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Investigations actives */}
+          {activeOversightInvs.length > 0 && (
+            <View style={{ gap: 8, marginTop: 10 }}>
+              {activeOversightInvs.map((inv) => {
+                const def       = OVERSIGHT_AUTHORITY_DEFS[inv.authorityId];
+                const pColor    = getPressureColor(inv.pressure);
+                const pLabel    = getPressureLabel(inv.pressure);
+                const remaining = inv.expiresAfterActions - state.news.actionCount;
+                const isOld     = state.news.actionCount - inv.startedAtAction >= 10;
+                const trust     = oversightTrustMap[inv.authorityId] ?? 60;
+
+                return (
+                  <View key={inv.id} style={{ gap: 4, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: PALETTE.panelEdge }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <MaterialCommunityIcons name={def.icon as never} size={11} color={pColor} />
+                      <Text style={[styles.waveBadgeText, { color: pColor, flex: 1 }]}>{def.abbreviation}</Text>
+                      <View style={[styles.waveBadge, { backgroundColor: pColor + "22" }]}>
+                        <Text style={[styles.waveBadgeText, { color: pColor }]}>PRESSION {pLabel}</Text>
+                      </View>
+                      {isOld && (
+                        <View style={[styles.waveBadge, { backgroundColor: "#e5484822" }]}>
+                          <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>URGENT</Text>
+                        </View>
+                      )}
+                      <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>{remaining}a</Text>
+                    </View>
+                    <Text style={[styles.stormDesc, { marginBottom: 2 }]} numberOfLines={2}>{inv.trigger}</Text>
+                    <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>
+                      Confiance : <Text style={{ color: getAuthorityTrustColor(trust) }}>{getAuthorityTrustLabel(trust)}</Text>
+                      {trust < 45 && <Text style={{ color: "#e54848" }}>  — Contestation risquée</Text>}
+                    </Text>
+
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
+                      <Pressable
+                        onPress={() => Alert.alert(
+                          "Coopérer avec l'autorité",
+                          `Coût : ${COOPERATE_COST_INFLUENCE} Influence\n\nRésout l'investigation. Confiance +8, stability +5, scandalRisk -5.`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: "Coopérer", onPress: () => {
+                              const r = oversightCooperate(inv.id);
+                              if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                            }},
+                          ],
+                        )}
+                        style={[styles.waveBadge, { backgroundColor: "#4caf8222", borderWidth: 1, borderColor: "#4caf8244", paddingVertical: 4, paddingHorizontal: 8 }]}
+                      >
+                        <Text style={[styles.waveBadgeText, { color: "#4caf82" }]}>Coopérer — {COOPERATE_COST_INFLUENCE} INF</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => Alert.alert(
+                          "Fournir une justification",
+                          `Coût : ${JUSTIFY_COST_INFLUENCE} Influence\n\nRéduit la pression sans clore l'enquête. legalRisk -5.`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: "Justifier", onPress: () => {
+                              const r = oversightJustify(inv.id);
+                              if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                            }},
+                          ],
+                        )}
+                        style={[styles.waveBadge, { backgroundColor: "#4a9fff22", borderWidth: 1, borderColor: "#4a9fff44", paddingVertical: 4, paddingHorizontal: 8 }]}
+                      >
+                        <Text style={[styles.waveBadgeText, { color: "#4a9fff" }]}>Justifier — {JUSTIFY_COST_INFLUENCE} INF</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => Alert.alert(
+                          trust < 45 ? "⚠️ Contester — RISQUÉ" : "Contester l'autorité",
+                          trust < 45
+                            ? `Coût : ${CONTEST_COST_INFLUENCE} Influence\n\nLa confiance est basse (${trust}). Contester augmentera la pression et aggravera la situation.`
+                            : `Coût : ${CONTEST_COST_INFLUENCE} Influence\n\nChallenge la procédure. Pression -10, mediaMood +2, mais confiance -3.`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: trust < 45 ? "Contester quand même" : "Contester", onPress: () => {
+                              const r = oversightContest(inv.id);
+                              if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                            }},
+                          ],
+                        )}
+                        style={[styles.waveBadge, { backgroundColor: "#e8c44f22", borderWidth: 1, borderColor: "#e8c44f44", paddingVertical: 4, paddingHorizontal: 8 }]}
+                      >
+                        <Text style={[styles.waveBadgeText, { color: "#e8c44f" }]}>Contester — {CONTEST_COST_INFLUENCE} INF</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
 

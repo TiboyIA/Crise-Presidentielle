@@ -558,6 +558,45 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       );
       return !hasActive && (state.complianceState?.whistleblowerRisk ?? 15) < 25 && state.mandateDay >= 25;
     })(),
+    // ── Autorités indépendantes ────────────────────────────────────────────────
+    oversight_haip_active: (() => {
+      const now = state.news.actionCount;
+      return (state.oversightState?.investigations ?? []).some(
+        (i) => i.authorityId === "haip" && !i.resolved && i.expiresAfterActions > now,
+      ) && state.mandateDay >= 20;
+    })(),
+    oversight_cms_active: (() => {
+      const now = state.news.actionCount;
+      return (state.oversightState?.investigations ?? []).some(
+        (i) => i.authorityId === "cms" && !i.resolved && i.expiresAfterActions > now,
+      ) && state.mandateDay >= 15;
+    })(),
+    oversight_clp_active: (() => {
+      const now = state.news.actionCount;
+      return (state.oversightState?.investigations ?? []).some(
+        (i) => i.authorityId === "clp" && !i.resolved && i.expiresAfterActions > now,
+      ) && state.mandateDay >= 15;
+    })(),
+    oversight_ccn_active: (() => {
+      const now = state.news.actionCount;
+      return (state.oversightState?.investigations ?? []).some(
+        (i) => i.authorityId === "ccn" && !i.resolved && i.expiresAfterActions > now,
+      ) && state.mandateDay >= 20;
+    })(),
+    oversight_ccpu_active: (() => {
+      const now = state.news.actionCount;
+      return (state.oversightState?.investigations ?? []).some(
+        (i) => i.authorityId === "ccpu" && !i.resolved && i.expiresAfterActions > now,
+      ) && state.mandateDay >= 20;
+    })(),
+    oversight_all_clear: (() => {
+      const os  = state.oversightState;
+      if (!os) return false;
+      const now = state.news.actionCount;
+      const hasActive = os.investigations.some((i) => !i.resolved && i.expiresAfterActions > now);
+      const allTrust  = Object.values(os.authorityTrust).every((t) => t >= 65);
+      return !hasActive && allTrust && state.mandateDay >= 30;
+    })(),
   };
 }
 

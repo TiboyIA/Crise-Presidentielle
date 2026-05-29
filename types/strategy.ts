@@ -988,4 +988,6 @@ export interface StrategyGameState {
   whistleblowerAlerts?: import("@/logic/whistleblowerEngine").WhistleblowerAlert[];
   // Conflits d'intérêts ministériels — profils par ministre (optional pour backward compat)
   ministerConflicts?: Record<string, import("@/logic/conflictOfInterestEngine").MinisterConflictProfile>;
+  // Autorités indépendantes fictives — état du système de contrôle (optional pour backward compat)
+  oversightState?: import("@/logic/oversightEngine").OversightState;
 }
