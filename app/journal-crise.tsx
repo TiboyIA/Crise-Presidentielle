@@ -68,6 +68,7 @@ import { getProductivityBandInfo, DEFAULT_PRODUCTIVITY } from "@/logic/productiv
 import { getSupplyRiskBandInfo, computeOverallSupplyRisk, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
 import { SECTOR_IDS, STRATEGIC_SECTORS } from "@/data/strategicSectors";
 import { getInvestorConfidenceBandInfo, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
+import { getFiscalConsentBandInfo, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -205,6 +206,12 @@ export default function JournalDeCriseScreen() {
   const investorConfValue = state.investorConfidence ?? DEFAULT_INVESTOR_CONFIDENCE;
   const investorConfInfo  = getInvestorConfidenceBandInfo(investorConfValue);
   const showInvestorPanel = investorConfValue < 46 || investorConfValue >= 75;
+
+  const fiscalConsentValue  = state.fiscalConsent  ?? DEFAULT_FISCAL_CONSENT;
+  const fiscalConsentInfo   = getFiscalConsentBandInfo(fiscalConsentValue);
+  const taxPressureValue    = state.taxPressure    ?? DEFAULT_TAX_PRESSURE;
+  const taxEfficiencyValue  = state.taxEfficiency  ?? DEFAULT_TAX_EFFICIENCY;
+  const showFiscalPanel     = fiscalConsentValue < 46 || fiscalConsentValue >= 71;
 
   const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
   const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
@@ -427,6 +434,35 @@ export default function JournalDeCriseScreen() {
               </>
             )}
           </Text>
+        </View>
+      )}
+
+      {/* ── Consentement fiscal ──────────────────────────────────────────────── */}
+      {showFiscalPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: fiscalConsentInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="bank-outline" size={12} color={fiscalConsentInfo.color} />
+            <Text style={[styles.waveTitle, { color: fiscalConsentInfo.color }]}>CONSENTEMENT FISCAL</Text>
+            <View style={[styles.waveBadge, { backgroundColor: fiscalConsentInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: fiscalConsentInfo.color }]}>
+                {fiscalConsentInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: fiscalConsentInfo.color, marginLeft: 4 }]}>
+              {Math.round(fiscalConsentValue)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{fiscalConsentInfo.message}</Text>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+            <Text style={[styles.stormDesc, { flex: 1 }]}>
+              <Text style={{ color: "#94a3b8" }}>Pression fiscale </Text>
+              <Text style={{ color: taxPressureValue >= 68 ? "#e8864f" : "#94a3b8" }}>{Math.round(taxPressureValue)}</Text>
+            </Text>
+            <Text style={[styles.stormDesc, { flex: 1 }]}>
+              <Text style={{ color: "#94a3b8" }}>Efficacité </Text>
+              <Text style={{ color: taxEfficiencyValue >= 65 ? "#4caf82" : "#94a3b8" }}>{Math.round(taxEfficiencyValue)}</Text>
+            </Text>
+          </View>
         </View>
       )}
 

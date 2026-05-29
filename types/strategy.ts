@@ -625,6 +625,12 @@ export interface NewsChoice {
   supplyChainEffects?: Partial<Record<import("@/data/strategicSectors").SectorId, Partial<import("@/logic/supplyChainEngine").SectorState>>>;
   /** Delta direct sur la confiance des investisseurs — appliqué immédiatement lors de la résolution du choix. */
   investorConfidenceDelta?: number;
+  /** Delta direct sur la pression fiscale — appliqué immédiatement lors de la résolution du choix. */
+  taxPressureDelta?: number;
+  /** Delta direct sur l'efficacité fiscale — appliqué immédiatement lors de la résolution du choix. */
+  taxEfficiencyDelta?: number;
+  /** Delta direct sur le consentement fiscal — appliqué immédiatement lors de la résolution du choix. */
+  fiscalConsentDelta?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -895,4 +901,10 @@ export interface StrategyGameState {
   supplyChain?: import("@/logic/supplyChainEngine").SupplyChainState;
   // Confiance des investisseurs — 0-100 (optional pour backward compat)
   investorConfidence?: number;
+  // Pression fiscale nationale — 0-100 (optional pour backward compat)
+  taxPressure?: number;
+  // Efficacité du recouvrement fiscal — 0-100 (optional pour backward compat)
+  taxEfficiency?: number;
+  // Consentement fiscal de la population — 0-100 (optional pour backward compat)
+  fiscalConsent?: number;
 }

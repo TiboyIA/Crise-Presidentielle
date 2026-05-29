@@ -235,6 +235,7 @@ import { tickLaborMarket } from "@/logic/laborMarketEngine";
 import { tickProductivity } from "@/logic/productivityEngine";
 import { tickSupplyChain, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
 import { tickInvestorConfidence, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
+import { tickTaxPolicy, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1652,7 +1653,15 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           investorConfidence = Math.max(0, Math.min(100, investorConfidence + choice.investorConfidenceDelta));
         }
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence };
+        // Fiscalité dynamique — deltas directs issus du choix de crise
+        let taxPressure   = prev.taxPressure   ?? DEFAULT_TAX_PRESSURE;
+        let taxEfficiency = prev.taxEfficiency ?? DEFAULT_TAX_EFFICIENCY;
+        let fiscalConsent = prev.fiscalConsent ?? DEFAULT_FISCAL_CONSENT;
+        if (choice?.taxPressureDelta)   taxPressure   = Math.max(0, Math.min(100, taxPressure   + choice.taxPressureDelta));
+        if (choice?.taxEfficiencyDelta) taxEfficiency = Math.max(0, Math.min(100, taxEfficiency + choice.taxEfficiencyDelta));
+        if (choice?.fiscalConsentDelta) fiscalConsent = Math.max(0, Math.min(100, fiscalConsent + choice.fiscalConsentDelta));
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2550,6 +2559,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickSupplyChain(s);
       s = tickInflation(s);
       s = tickPurchasingPower(s);
+      s = tickTaxPolicy(s);
       s = tickInvestorConfidence(s);
     }
   }

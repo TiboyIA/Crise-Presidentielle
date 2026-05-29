@@ -324,6 +324,13 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     investor_capital_flight:   (state.investorConfidence ?? 55) <= 20 && state.mandateDay >= 20,
     investor_confidence_boom:  (state.investorConfidence ?? 55) >= 75 && state.mandateDay >= 25,
     investor_reform_signal:    (state.reforms ?? []).some((r) => r.applied) && (state.investorConfidence ?? 55) >= 40 && (state.investorConfidence ?? 55) < 65 && state.mandateDay >= 20,
+    // ── Fiscalité dynamique ──────────────────────────────────────────────────
+    tax_pressure_alert:    (state.taxPressure ?? 42) >= 68 && state.mandateDay >= 12,
+    tax_evasion_crisis:    (state.fiscalConsent ?? 62) <= 35 && state.mandateDay >= 18,
+    tax_reform_window:     (state.fiscalConsent ?? 62) >= 52 && (state.taxEfficiency ?? 50) <= 52 && state.mandateDay >= 15,
+    fiscal_compact:        (state.nationalDebt ?? 0) > 180 && (state.taxPressure ?? 42) < 48 && state.mandateDay >= 20,
+    tax_cut_pressure:      (state.taxPressure ?? 42) >= 55 && (state.nationalIndicators?.popularity ?? 60) < 45 && state.mandateDay >= 15,
+    informal_economy_surge: (state.fiscalConsent ?? 62) <= 22 && state.mandateDay >= 25,
   };
 }
 
