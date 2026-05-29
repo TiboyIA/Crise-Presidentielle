@@ -55,6 +55,8 @@ import {
 import { DEFAULT_STATISTICS_SCANDAL_PRESSURE } from "@/logic/healthStatisticsScandalEngine";
 import { getInteroperabilityBandInfo, DEFAULT_HEALTH_INTEROPERABILITY } from "@/logic/healthInteroperabilityEngine";
 import { generateHealthSnapshot } from "@/logic/anonymizedHealthRecordsEngine";
+import { getInflationBandInfo, DEFAULT_INFLATION } from "@/logic/inflationEngine";
+import { getPurchasingPowerBandInfo, DEFAULT_PURCHASING_POWER } from "@/logic/purchasingPowerEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -176,6 +178,10 @@ export default function JournalDeCriseScreen() {
   const interopValue      = state.healthInteroperability     ?? DEFAULT_HEALTH_INTEROPERABILITY;
   const interopInfo       = getInteroperabilityBandInfo(interopValue);
   const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85 || scandalPressure >= 85 || interopValue < 20;
+  const inflationValue       = state.inflation       ?? DEFAULT_INFLATION;
+  const inflationInfo        = getInflationBandInfo(inflationValue);
+  const purchasingPowerValue = state.purchasingPower ?? DEFAULT_PURCHASING_POWER;
+  const purchasingPowerInfo  = getPurchasingPowerBandInfo(purchasingPowerValue);
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
@@ -355,6 +361,21 @@ export default function JournalDeCriseScreen() {
         </View>
       )}
 
+
+      {/* ── Baromètre économique — Inflation & Pouvoir d'achat ─────────────── */}
+      {(inflationValue >= 35 || purchasingPowerValue < 45) && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: inflationValue >= 61 ? inflationInfo.color + "33" : purchasingPowerInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="chart-line" size={12} color={inflationValue >= 61 ? inflationInfo.color : purchasingPowerInfo.color} />
+            <Text style={[styles.waveTitle, { color: inflationValue >= 61 ? inflationInfo.color : purchasingPowerInfo.color }]}>BAROMÈTRE ÉCONOMIQUE</Text>
+          </View>
+          <Text style={styles.stormDesc}>
+            <Text style={{ color: inflationInfo.color }}>{"Inflation : " + inflationInfo.label}</Text>
+            {"   ·   "}
+            <Text style={{ color: purchasingPowerInfo.color }}>{"Pouvoir d'achat : " + purchasingPowerInfo.label}</Text>
+          </Text>
+        </View>
+      )}
 
       {/* Filtres */}
       <ScrollView

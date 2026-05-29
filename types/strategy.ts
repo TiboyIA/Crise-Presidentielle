@@ -873,4 +873,8 @@ export interface StrategyGameState {
   statisticsScandalPressure?: number;
   // Interopérabilité des systèmes de santé — 0-100 (optional pour backward compat)
   healthInteroperability?: number;
+  // Pression inflationniste nationale — 0-100 (optional pour backward compat)
+  inflation?: number;
+  // Pouvoir d'achat réel des ménages — 0-100 (optional pour backward compat)
+  purchasingPower?: number;
 }

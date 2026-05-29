@@ -278,6 +278,12 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     interop_opportunity: (state.healthInteroperability ?? 52) >= 70 && state.mandateDay >= 30,
     // ── Bilan sanitaire intermédiaire ────────────────────────────────────────
     health_bilan_eligible: state.mandateDay >= 50,
+    // ── Inflation et pouvoir d'achat ─────────────────────────────────────────
+    inflation_signal:      (state.inflation ?? 25) >= 35 && (state.inflation ?? 25) < 60 && state.mandateDay >= 10,
+    inflation_alert:       (state.inflation ?? 25) >= 60 && (state.inflation ?? 25) < 80 && state.mandateDay >= 15,
+    inflation_crisis:      (state.inflation ?? 25) >= 80 && state.mandateDay >= 20,
+    purchasing_power_low:  (state.purchasingPower ?? 60) < 35 && state.mandateDay >= 15,
+    economic_stagnation:   (state.inflation ?? 25) < 20 && (state.nationalIndicators?.economy ?? 55) < 35 && state.mandateDay >= 20,
   };
 }
 
