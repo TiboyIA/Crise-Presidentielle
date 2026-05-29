@@ -431,6 +431,33 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     cycle_ralentissement_signal:  state.businessCyclePhase === "ralentissement" && state.mandateDay >= 15,
     cycle_recession_crisis:       state.businessCyclePhase === "recession"      && state.mandateDay >= 15,
     cycle_reprise_window:         state.businessCyclePhase === "reprise"        && state.mandateDay >= 20,
+    // ── Système Économique National V2 ────────────────────────────────────────
+    eco_purchasing_power_crisis:  (state.purchasingPower ?? 60) < 35 && (state.inflation ?? 25) >= 55 && state.mandateDay >= 20,
+    eco_inflation_persistent:     (state.inflation ?? 25) >= 55 && (state.stagflationIndex ?? 0) < 50 && state.mandateDay >= 25,
+    eco_unemployment_surge:       (state.unemployment ?? 25) >= 55 && state.mandateDay >= 20,
+    eco_components_shortage: (() => {
+      const sc = state.supplyChain;
+      return sc ? sc.semi_conducteurs.disruptionRisk >= 70 && state.mandateDay >= 20 : false;
+    })(),
+    eco_investment_flight:        (state.investorConfidence ?? 55) <= 18 && state.mandateDay >= 20,
+    eco_fiscal_anger:             (state.taxPressure ?? 42) >= 70 && (state.fiscalConsent ?? 62) <= 30 && state.mandateDay >= 20,
+    eco_fragile_recovery:         state.businessCyclePhase === "reprise" && (state.cycleMomentum ?? 60) < 48 && state.mandateDay >= 20,
+    eco_stagflation_risk:         (state.stagflationIndex ?? 0) >= 35 && (state.stagflationIndex ?? 0) < 50 && state.mandateDay >= 20,
+    eco_energy_supply_rupture: (() => {
+      const sc = state.supplyChain;
+      return sc ? sc.energie.stockLevel < 25 && sc.energie.disruptionRisk >= 70 && state.mandateDay >= 15 : false;
+    })(),
+    eco_social_fracture:          (state.inequalityIndex ?? 35) >= 70 && (state.socialMobility ?? 55) <= 30 && state.mandateDay >= 20,
+    eco_sme_pressure:             (state.productiveFabric?.smeHealth ?? 55) <= 30 && (state.productiveFabric?.localCommerce ?? 58) <= 30 && state.mandateDay >= 20,
+    eco_trade_deficit:            (state.tradeBalance ?? -5) <= -50 && state.mandateDay >= 20,
+    eco_overheating:              state.businessCyclePhase === "surchauffe" && (state.inflation ?? 25) >= 55 && state.mandateDay >= 15,
+    eco_recession_deep:           state.businessCyclePhase === "recession" && (state.cycleMomentum ?? 60) < 20 && state.mandateDay >= 20,
+    eco_national_pact: (
+      (state.inequalityIndex ?? 35) >= 55 &&
+      (state.unemployment ?? 25) >= 45 &&
+      (state.hiddenPolitics?.popularFatigue ?? 15) >= 55 &&
+      state.mandateDay >= 30
+    ),
   };
 }
 

@@ -280,6 +280,86 @@ export default function DevSandboxScreen() {
         ))}
         <Btn label="Tout à 100" onPress={() => mutate(maxAllIndicators, "Indicateurs → 100")} color={PALETTE.success} icon="check-all" />
 
+        {/* ── Économie réelle ── */}
+        <SecHead label="ÉCONOMIE RÉELLE" />
+        {([
+          { key: "inflation"        as const, label: "Inflation",          presets: [10, 25, 55, 80] },
+          { key: "unemployment"     as const, label: "Chômage",            presets: [10, 25, 50, 75] },
+          { key: "purchasingPower"  as const, label: "Pouvoir d'achat",    presets: [20, 45, 65, 90] },
+          { key: "investorConfidence" as const, label: "Confiance marchés", presets: [10, 35, 60, 85] },
+          { key: "productivity"     as const, label: "Productivité",        presets: [20, 45, 65, 85] },
+          { key: "taxPressure"      as const, label: "Pression fiscale",    presets: [20, 42, 65, 80] },
+          { key: "fiscalConsent"    as const, label: "Consentement fiscal", presets: [15, 42, 65, 85] },
+          { key: "tradeBalance"     as const, label: "Balance commerciale", presets: [-60, -20, 0, 30] },
+          { key: "stagflationIndex" as const, label: "Stagflation index",  presets: [0, 20, 50, 80] },
+          { key: "centralBankCredibility" as const, label: "Créd. banque centrale", presets: [15, 35, 65, 90] },
+          { key: "monetaryTension"  as const, label: "Tension monétaire",   presets: [5, 20, 55, 80] },
+          { key: "inequalityIndex"  as const, label: "Inégalités",          presets: [10, 35, 60, 85] },
+          { key: "shadowEconomy"    as const, label: "Économie informelle", presets: [10, 30, 55, 75] },
+        ] as { key: keyof StrategyGameState; label: string; presets: number[] }[]).map(({ key, label, presets }) => {
+          const currentVal = (ctx.state as unknown as Record<string, number | undefined>)[key] ?? 0;
+          return (
+            <View key={key} style={sec.indRow}>
+              <Text style={sec.indLabel}>
+                {label}
+                <Text style={sec.indVal}> — {Math.round(currentVal)}</Text>
+              </Text>
+              <View style={sec.indBtns}>
+                {presets.map((v) => (
+                  <Btn
+                    key={v}
+                    label={String(v)}
+                    small
+                    onPress={() => mutate(
+                      (s) => ({ ...s, [key]: Math.max(-100, Math.min(100, v)) }),
+                      `${label} → ${v}`,
+                    )}
+                    color={v <= 0 ? PALETTE.danger : v >= 70 ? PALETTE.success : PALETTE.textMid}
+                  />
+                ))}
+              </View>
+            </View>
+          );
+        })}
+        <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+          <Btn
+            label="Cycle: récession"
+            small
+            onPress={() => mutate(
+              (s) => ({ ...s, businessCyclePhase: "recession" as const, cycleMomentum: 15 }),
+              "Cycle → récession",
+            )}
+            color={PALETTE.danger}
+          />
+          <Btn
+            label="Cycle: expansion"
+            small
+            onPress={() => mutate(
+              (s) => ({ ...s, businessCyclePhase: "expansion" as const, cycleMomentum: 72 }),
+              "Cycle → expansion",
+            )}
+            color={PALETTE.success}
+          />
+          <Btn
+            label="Cycle: surchauffe"
+            small
+            onPress={() => mutate(
+              (s) => ({ ...s, businessCyclePhase: "surchauffe" as const, cycleMomentum: 78, inflation: 65 }),
+              "Cycle → surchauffe",
+            )}
+            color={PALETTE.warning}
+          />
+          <Btn
+            label="Stagflation max"
+            small
+            onPress={() => mutate(
+              (s) => ({ ...s, stagflationIndex: 75, inflation: 68, unemployment: 58 }),
+              "Stagflation → 75",
+            )}
+            color="#e8864f"
+          />
+        </View>
+
         {/* ── Déblocage ── */}
         <SecHead label="DÉBLOCAGE" />
         <BtnRow>

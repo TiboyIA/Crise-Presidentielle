@@ -28,6 +28,7 @@ import { getRiskAppetiteDef } from "@/logic/riskAppetiteEngine";
 import { DEFAULT_COSMIC_STATE, COSMIC_STAGE_LABELS } from "@/types/cosmic";
 import { getMoralBalanceLabel, getMoralBalanceColor, getCosmicCredibilityLabel } from "@/logic/cosmicEngine";
 import { computeHealthMandateBilan } from "@/logic/healthMandateReviewEngine";
+import { computeEconomicOverview } from "@/logic/economyEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -108,7 +109,8 @@ export default function MandateReviewScreen() {
     state.campaignPromises ?? { selected: [], progress: {}, status: {} },
     5,
   );
-  const healthBilan = computeHealthMandateBilan(state);
+  const healthBilan    = computeHealthMandateBilan(state);
+  const economyBilan   = computeEconomicOverview(state);
 
   const handleNewMandate = async () => {
     // Submit ranked run if active
@@ -628,6 +630,61 @@ export default function MandateReviewScreen() {
             </View>
           </Panel>
         )}
+
+        {/* BILAN ÉCONOMIQUE DE MANDAT */}
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="chart-line" size={14} color={economyBilan.globalColor} />
+            <Text style={[styles.sectionTitle, { color: economyBilan.globalColor }]}>BILAN ÉCONOMIQUE DE MANDAT</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: economyBilan.globalColor }}>{economyBilan.globalScore}/100</Text>
+          </View>
+
+          {/* Barre de score global */}
+          <View style={{ height: 4, backgroundColor: "#ffffff14", borderRadius: 2, overflow: "hidden", marginBottom: 8 }}>
+            <View style={{ height: "100%", width: `${economyBilan.globalScore}%`, backgroundColor: economyBilan.globalColor, borderRadius: 2 }} />
+          </View>
+
+          {/* Verdict global + cycle */}
+          <View style={{ paddingVertical: 8, paddingHorizontal: 10, borderRadius: RADIUS.sm, backgroundColor: economyBilan.globalColor + "15", borderWidth: 1, borderColor: economyBilan.globalColor + "33", marginBottom: 10 }}>
+            <Text style={{ fontSize: 11, fontFamily: FONT.bold, color: economyBilan.globalColor, marginBottom: 2 }}>{economyBilan.globalLabel}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 }}>
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: economyBilan.cycleColor + "22" }}>
+                <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: economyBilan.cycleColor }}>{economyBilan.cycleLabel.toUpperCase()}</Text>
+              </View>
+              {economyBilan.stagflationRisk !== "none" && (
+                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: "#e8864f22" }}>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: "#e8864f" }}>
+                    {economyBilan.stagflationRisk === "severe" ? "STAGFLATION SÉVÈRE" : economyBilan.stagflationRisk === "confirmed" ? "STAGFLATION AVÉRÉE" : "PRESSIONS STAGFL."}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Alertes actives */}
+          {economyBilan.activeAlerts.length > 0 && (
+            <View style={{ gap: 3, marginBottom: 8 }}>
+              {economyBilan.activeAlerts.map((alert) => (
+                <View key={alert} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: "#e54848" }} />
+                  <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: "#e54848" }}>{alert}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Indicateurs clés */}
+          <View style={{ gap: 5 }}>
+            {economyBilan.indicators.map((ind) => (
+              <View key={ind.key} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: ind.color }} />
+                <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, flex: 1 }}>{ind.label}</Text>
+                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: ind.color }}>{ind.bandLabel}</Text>
+              </View>
+            ))}
+          </View>
+        </Panel>
 
         {/* BILAN SANITAIRE DE MANDAT */}
         <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>

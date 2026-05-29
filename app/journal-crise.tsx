@@ -74,6 +74,13 @@ import { getTradeBalanceBandInfo, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBal
 import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 import { getFabricBandInfo, DEFAULT_PRODUCTIVE_FABRIC, shouldShowFabricPanel } from "@/logic/productiveFabricEngine";
 import { SHOCK_META } from "@/logic/economicShockEngine";
+import { CYCLE_META, DEFAULT_BUSINESS_CYCLE_PHASE, DEFAULT_CYCLE_MOMENTUM } from "@/logic/businessCycleEngine";
+import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
+import {
+  getInterestRateBandInfo, getCredibilityBandInfo,
+  DEFAULT_INTEREST_RATE, DEFAULT_CB_CREDIBILITY, DEFAULT_MONETARY_TENSION,
+} from "@/logic/centralBankEngine";
+import type { SpendingType } from "@/logic/fiscalMultiplierEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -232,6 +239,33 @@ export default function JournalDeCriseScreen() {
   const showInequalityPanel = inequalityValue >= 46 || socialMobilityValue <= 35;
 
   const activeEconomicShocks = (state.economicShocks ?? []).filter((s) => s.intensity > 0 && s.remainingDays > 0);
+
+  const businessCyclePhase  = state.businessCyclePhase ?? DEFAULT_BUSINESS_CYCLE_PHASE;
+  const cycleMomentumValue  = state.cycleMomentum ?? DEFAULT_CYCLE_MOMENTUM;
+  const cycleMeta           = CYCLE_META[businessCyclePhase];
+  const showCyclePanel      = businessCyclePhase !== "expansion" || state.mandateDay >= 10;
+
+  const stagflationValue   = state.stagflationIndex ?? DEFAULT_STAGFLATION_INDEX;
+  const stagflationInfo    = getStagflationBandInfo(stagflationValue);
+  const showStagflPanel    = stagflationValue >= 26;
+
+  const interestRateValue   = state.interestRate ?? DEFAULT_INTEREST_RATE;
+  const interestRateInfo    = getInterestRateBandInfo(interestRateValue);
+  const cbCredValue         = state.centralBankCredibility ?? DEFAULT_CB_CREDIBILITY;
+  const cbCredInfo          = getCredibilityBandInfo(cbCredValue);
+  const monetaryTensionValue = state.monetaryTension ?? DEFAULT_MONETARY_TENSION;
+  const cbProfile           = state.centralBankProfile ?? "balanced";
+  const showCbPanel         = interestRateValue >= 50 || cbCredValue <= 35 || monetaryTensionValue >= 55 || cbProfile !== "balanced";
+
+  const SPENDING_LABELS: Record<SpendingType, string> = {
+    emergency_aid: "Aide d'urgence", infrastructure: "Infrastructure",
+    research: "R&D", security: "Sécurité", health: "Santé publique",
+    energy: "Énergie", training: "Formation", industry: "Plan industriel",
+  };
+  const activeFiscalPrograms = (state.fiscalPrograms ?? []).filter(
+    (p) => p.shortDaysRemaining > 0 || p.longDaysRemaining > 0,
+  );
+  const showFiscalProgramsPanel = activeFiscalPrograms.length > 0;
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
   const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
@@ -664,6 +698,119 @@ export default function JournalDeCriseScreen() {
               <Text style={{ color: "#e8864f" }}>{"◆ " + STRATEGIC_SECTORS[id].name + " — vulnérable"}</Text>
             </Text>
           ))}
+        </View>
+      )}
+
+      {/* ── Cycle économique national ─────────────────────────────────────────── */}
+      {showCyclePanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: cycleMeta.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="chart-bell-curve-cumulative" size={12} color={cycleMeta.color} />
+            <Text style={[styles.waveTitle, { color: cycleMeta.color }]}>CYCLE ÉCONOMIQUE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: cycleMeta.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: cycleMeta.color }]}>
+                {cycleMeta.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: cycleMeta.color, marginLeft: 4 }]}>
+              Momentum {Math.round(cycleMomentumValue)}
+            </Text>
+          </View>
+          <View style={{ height: 4, backgroundColor: PALETTE.panelEdge, borderRadius: 2, overflow: "hidden", marginTop: 6, marginBottom: 4 }}>
+            <View style={{ height: "100%", width: `${Math.round(cycleMomentumValue)}%` as `${number}%`, backgroundColor: cycleMeta.color, borderRadius: 2 }} />
+          </View>
+          <Text style={styles.stormDesc}>{cycleMeta.description}</Text>
+        </View>
+      )}
+
+      {/* ── Stagflation ───────────────────────────────────────────────────────── */}
+      {showStagflPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: stagflationInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="alert-rhombus-outline" size={12} color={stagflationInfo.color} />
+            <Text style={[styles.waveTitle, { color: stagflationInfo.color }]}>RISQUE STAGFLATION</Text>
+            <View style={[styles.waveBadge, { backgroundColor: stagflationInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: stagflationInfo.color }]}>
+                {stagflationInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: stagflationInfo.color, marginLeft: 4 }]}>
+              {Math.round(stagflationValue)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{stagflationInfo.message}</Text>
+        </View>
+      )}
+
+      {/* ── Banque centrale fictive ────────────────────────────────────────────── */}
+      {showCbPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: cbCredInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="bank" size={12} color={cbCredInfo.color} />
+            <Text style={[styles.waveTitle, { color: cbCredInfo.color }]}>BANQUE CENTRALE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: interestRateInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: interestRateInfo.color }]}>
+                {interestRateInfo.label.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+            <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>
+              Taux{" "}<Text style={{ color: interestRateInfo.color }}>{Math.round(interestRateValue)}</Text>
+            </Text>
+            <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>
+              Crédibilité{" "}<Text style={{ color: cbCredInfo.color }}>{Math.round(cbCredValue)}</Text>
+            </Text>
+            <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>
+              Tension{" "}<Text style={{ color: monetaryTensionValue >= 55 ? "#e54848" : monetaryTensionValue >= 35 ? "#e8864f" : "#4caf82" }}>{Math.round(monetaryTensionValue)}</Text>
+            </Text>
+          </View>
+          <Text style={[styles.stormDesc, { marginTop: 3 }]}>
+            <Text style={{ color: "#94a3b8" }}>Profil gouverneur : </Text>
+            <Text style={{ color: cbProfile === "hawkish" ? "#e8864f" : cbProfile === "dovish" ? "#4caf82" : "#e8c44f" }}>
+              {cbProfile === "hawkish" ? "Restrictif" : cbProfile === "dovish" ? "Accommodant" : "Équilibré"}
+            </Text>
+          </Text>
+          <Text style={styles.stormDesc}>{cbCredInfo.message}</Text>
+        </View>
+      )}
+
+      {/* ── Programmes budgétaires actifs ─────────────────────────────────────── */}
+      {showFiscalProgramsPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#a78bfa33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="cash-multiple" size={12} color="#a78bfa" />
+            <Text style={[styles.waveTitle, { color: "#a78bfa" }]}>PROGRAMMES BUDGÉTAIRES</Text>
+            <View style={[styles.waveBadge, { backgroundColor: "#a78bfa22" }]}>
+              <Text style={[styles.waveBadgeText, { color: "#a78bfa" }]}>
+                {activeFiscalPrograms.length} ACTIF{activeFiscalPrograms.length > 1 ? "S" : ""}
+              </Text>
+            </View>
+          </View>
+          <View style={{ gap: 4, marginTop: 4 }}>
+            {activeFiscalPrograms.map((p) => {
+              const isShort = p.shortDaysRemaining > 0;
+              const days    = isShort ? p.shortDaysRemaining : p.longDaysRemaining;
+              const phase   = isShort ? "Court terme" : "Long terme";
+              const phaseColor = isShort ? "#4caf82" : "#4c9bbf";
+              return (
+                <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={[styles.waveBadge, { backgroundColor: phaseColor + "22" }]}>
+                    <Text style={[styles.waveBadgeText, { color: phaseColor }]}>{phase.toUpperCase()}</Text>
+                  </View>
+                  <Text style={[styles.waveBadgeText, { color: "#94a3b8", flex: 1 }]}>
+                    {SPENDING_LABELS[p.type as SpendingType] ?? p.type}
+                  </Text>
+                  <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>
+                    Intensité <Text style={{ color: "#a78bfa" }}>{Math.round(p.intensity)}</Text>
+                  </Text>
+                  <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>
+                    {days}j
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
       )}
 
