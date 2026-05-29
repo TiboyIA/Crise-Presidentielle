@@ -674,6 +674,14 @@ export interface NewsChoice {
     relatedNewsEventId?: string;
     payload?: Partial<NationalIndicators> | Partial<HiddenPolitics>;
   };
+  /** Crée une dérogation d'urgence lors de la résolution de ce choix. */
+  createsDerogation?: {
+    type: import("@/logic/emergencyDerogationEngine").DerogationType;
+    reason: string;
+    benefit: string;
+    legalRisk?: number;
+    durationActions?: number;
+  };
 }
 
 export interface NewsEvent {
@@ -967,4 +975,6 @@ export interface StrategyGameState {
   cycleMomentum?: number;
   // Conformité de l'État — Bureau de conformité (optional pour backward compat)
   complianceState?: import("@/types/compliance").ComplianceState;
+  // Registre des dérogations d'urgence (optional pour backward compat)
+  derogations?: import("@/logic/emergencyDerogationEngine").DerogationEntry[];
 }

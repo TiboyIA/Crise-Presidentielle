@@ -100,10 +100,16 @@ function computeTargets(state: StrategyGameState, prev: ComplianceState): Omit<C
   const doctrine        = state.governanceDoctrine ?? "democratique";
   const isAutocratic    = doctrine === "autoritaire" || doctrine === "securitaire";
 
+  const now = state.news.actionCount;
+  const unreviewedDerog = (state.derogations ?? []).filter(
+    (d) => !d.reviewed && !d.ignored && d.expiresAfterActions > now,
+  ).length;
+
   const legalRisk = clamp(
     scandalRisk * 0.45 +
     (debt > 300 ? 18 : debt > 200 ? 8 : 0) +
-    (prev.emergencyPowersAbuse >= 60 ? 12 : 0),
+    (prev.emergencyPowersAbuse >= 60 ? 12 : 0) +
+    Math.min(25, unreviewedDerog * 8),
   );
 
   const corruptionExposure = clamp(
@@ -116,7 +122,8 @@ function computeTargets(state: StrategyGameState, prev: ComplianceState): Omit<C
   const auditPressure = clamp(
     riskSignal * 0.55 +
     (prev.complianceScore < 40 ? 20 : 0) +
-    (prev.whistleblowerRisk >= 60 ? 10 : 0),
+    (prev.whistleblowerRisk >= 60 ? 10 : 0) +
+    Math.min(30, unreviewedDerog * 10),
   );
 
   const procurementIntegrity = clamp(

@@ -458,6 +458,26 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       (state.hiddenPolitics?.popularFatigue ?? 15) >= 55 &&
       state.mandateDay >= 30
     ),
+    // ── Dérogations d'urgence ─────────────────────────────────────────────────
+    derogation_option_supply: (() => {
+      const sc = state.supplyChain;
+      return sc
+        ? Object.values(sc).some((sec) => sec.disruptionRisk >= 70 && sec.stockLevel < 35) && state.mandateDay >= 12
+        : false;
+    })(),
+    derogation_option_security:  (state.nationalIndicators?.security ?? 50) < 30 && (state.hiddenPolitics?.regionalTension ?? 30) >= 55 && state.mandateDay >= 15,
+    derogation_active: (() => {
+      const now = state.news.actionCount;
+      return (state.derogations ?? []).some((d) => !d.reviewed && !d.ignored && d.expiresAfterActions > now) && state.mandateDay >= 10;
+    })(),
+    derogation_abuse_risk: (() => {
+      const now = state.news.actionCount;
+      return (state.derogations ?? []).filter((d) => !d.reviewed && !d.ignored && d.expiresAfterActions > now).length >= 3;
+    })(),
+    derogation_scandal_eruption: (() => {
+      const now = state.news.actionCount;
+      return (state.derogations ?? []).filter((d) => !d.reviewed && !d.ignored && d.expiresAfterActions > now && d.legalRisk >= 60).length >= 2 && state.mandateDay >= 20;
+    })(),
     // ── Conformité de l'État ───────────────────────────────────────────────────
     compliance_audit_pressure:     (state.complianceState?.auditPressure     ?? 15) >= 65 && state.mandateDay >= 15,
     compliance_legal_risk:         (state.complianceState?.legalRisk         ?? 20) >= 60 && state.mandateDay >= 20,

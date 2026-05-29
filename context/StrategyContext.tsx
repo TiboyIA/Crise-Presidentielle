@@ -247,6 +247,9 @@ import { tickStagflation } from "@/logic/stagflationEngine";
 import { tickBusinessCycle } from "@/logic/businessCycleEngine";
 import { tickCompliance } from "@/logic/complianceEngine";
 import {
+  addDerogation, justifyDerogation, auditDerogation, ignoreDerogation, tickDerogations,
+} from "@/logic/emergencyDerogationEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -439,6 +442,9 @@ interface StrategyContextValue {
   activateCrisisStaffing: () => { result: StaffingActivationResult | null; failReason?: string };
   launchDimAudit: () => { result: DimAuditResult | null; failReason?: string };
   setHealthSurveillanceLevel: (level: SurveillanceLevelId) => { success: boolean; reason?: string };
+  justifyDerogation: (id: string) => { success: boolean; reason?: string };
+  auditDerogation:   (id: string) => { success: boolean; reason?: string };
+  ignoreDerogation:  (id: string) => void;
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -1702,9 +1708,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         if (choice?.strategicIndustryDelta)    productiveFabric = { ...productiveFabric, strategicIndustry:   clampFabric(productiveFabric.strategicIndustry   + choice.strategicIndustryDelta) };
 
         const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility, productiveFabric, centralBankCredibility, monetaryTension, centralBankProfile };
-        const withInertia = choice?.inertiaEffects
-          ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
+        // Dérogation d'urgence — créée si le choix le déclare
+        const withDerogation = choice?.createsDerogation
+          ? addDerogation(assembled, { crisisId: eventId, ...choice.createsDerogation })
           : assembled;
+        const withInertia = choice?.inertiaEffects
+          ? queueInertiaChoiceEffects(withDerogation, choice.inertiaEffects, event.id)
+          : withDerogation;
         // Ondes de crise — création depuis l'événement, puis amortissement du choix, puis tick
         const withWave     = createWaveFromEvent(withInertia, event);
         const withDamping  = choice?.waveDamping ? dampWavesByChoice(withWave, choice.waveDamping) : withWave;
@@ -2068,6 +2078,41 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const justifyDerogationCb = useCallback(
+    (id: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = justifyDerogation(prev, id);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const auditDerogationCb = useCallback(
+    (id: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = auditDerogation(prev, id);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const ignoreDerogationCb = useCallback(
+    (id: string): void => {
+      update((prev) => ignoreDerogation(prev, id));
+    },
+    [update],
+  );
+
   const launchDimAuditCb = useCallback(
     (): { result: DimAuditResult | null; failReason?: string } => {
       if (!state) return { result: null, failReason: "Jeu non initialisé." };
@@ -2311,6 +2356,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       activateCrisisStaffing, launchDimAudit: launchDimAuditCb,
       setHealthSurveillanceLevel: setHealthSurveillanceLevelCb,
+      justifyDerogation: justifyDerogationCb,
+      auditDerogation:   auditDerogationCb,
+      ignoreDerogation:  ignoreDerogationCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2333,7 +2381,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
-      activateCrisisStaffing, launchDimAuditCb, setHealthSurveillanceLevelCb, prepareForecast, issuePublicAlert,
+      activateCrisisStaffing, launchDimAuditCb, setHealthSurveillanceLevelCb,
+      justifyDerogationCb, auditDerogationCb, ignoreDerogationCb,
+      prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
       deleteEnemyReport, clearAllEnemyReports,
@@ -2619,6 +2669,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickStagflation(s);
       s = tickBusinessCycle(s);
       s = tickCompliance(s);
+      s = tickDerogations(s);
       s = tickInvestorConfidence(s);
     }
   }

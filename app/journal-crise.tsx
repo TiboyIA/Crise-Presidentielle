@@ -75,6 +75,10 @@ import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILIT
 import { getFabricBandInfo, DEFAULT_PRODUCTIVE_FABRIC, shouldShowFabricPanel } from "@/logic/productiveFabricEngine";
 import { SHOCK_META } from "@/logic/economicShockEngine";
 import { getComplianceBandInfo, DEFAULT_COMPLIANCE_STATE } from "@/logic/complianceEngine";
+import {
+  DEROGATION_DEFS, getActiveDerogations, getActiveUnreviewed, getDerogationRiskLevel,
+  DEROGATION_JUSTIFY_COST_INFLUENCE, DEROGATION_AUDIT_COST_MONEY, DEROGATION_AUDIT_COST_INFLUENCE,
+} from "@/logic/emergencyDerogationEngine";
 import { CYCLE_META, DEFAULT_BUSINESS_CYCLE_PHASE, DEFAULT_CYCLE_MOMENTUM } from "@/logic/businessCycleEngine";
 import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
 import {
@@ -131,7 +135,7 @@ const hospStyles = StyleSheet.create({
 
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel } = useStrategy();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel, justifyDerogation, auditDerogation, ignoreDerogation } = useStrategy();
   const { hPad, width } = useResponsive();
 
   const { prepareForecast, issuePublicAlert } = useStrategy();
@@ -271,6 +275,17 @@ export default function JournalDeCriseScreen() {
   const compliance          = state.complianceState ?? DEFAULT_COMPLIANCE_STATE;
   const complianceInfo      = getComplianceBandInfo(compliance.complianceScore);
   const showCompliancePanel = compliance.complianceScore < 60 || compliance.auditPressure >= 50 || compliance.legalRisk >= 50;
+
+  const activeDerogations   = getActiveDerogations(state);
+  const unreviewedDerogs    = getActiveUnreviewed(state);
+  const derogRiskLevel      = getDerogationRiskLevel(unreviewedDerogs.length);
+  const showDerogPanel      = activeDerogations.length > 0;
+  const DEROG_RISK_COLOR: Record<string, string> = {
+    safe: "#4caf82", watch: "#e8c44f", alert: "#e8864f", critical: "#e54848",
+  };
+  const DEROG_RISK_LABEL: Record<string, string> = {
+    safe: "MAÎTRISÉ", watch: "À SURVEILLER", alert: "RISQUE ÉLEVÉ", critical: "CRISE",
+  };
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
   const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
@@ -880,6 +895,115 @@ export default function JournalDeCriseScreen() {
                 <Text style={[styles.waveBadgeText, { color: compliance.procurementIntegrity < 35 ? "#e54848" : "#e8864f" }]}>{compliance.procurementIntegrity}</Text>
               </View>
             )}
+          </View>
+        </View>
+      )}
+
+      {/* ── Registre des Dérogations d'Urgence ────────────────────────────────── */}
+      {showDerogPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: DEROG_RISK_COLOR[derogRiskLevel] + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="file-document-alert-outline" size={12} color={DEROG_RISK_COLOR[derogRiskLevel]} />
+            <Text style={[styles.waveTitle, { color: DEROG_RISK_COLOR[derogRiskLevel] }]}>DÉROGATIONS D'URGENCE</Text>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <View style={[styles.waveBadge, { backgroundColor: DEROG_RISK_COLOR[derogRiskLevel] + "22" }]}>
+                <Text style={[styles.waveBadgeText, { color: DEROG_RISK_COLOR[derogRiskLevel] }]}>
+                  {DEROG_RISK_LABEL[derogRiskLevel]}
+                </Text>
+              </View>
+              {unreviewedDerogs.length > 0 && (
+                <View style={[styles.waveBadge, { backgroundColor: "#e8864f22" }]}>
+                  <Text style={[styles.waveBadgeText, { color: "#e8864f" }]}>
+                    {unreviewedDerogs.length} NON TRAITÉE{unreviewedDerogs.length > 1 ? "S" : ""}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={{ gap: 8, marginTop: 8 }}>
+            {activeDerogations.map((d) => {
+              const def = DEROGATION_DEFS[d.type];
+              const statusColor = d.reviewed ? "#4caf82" : d.ignored ? "#94a3b8" : def.color;
+              const statusLabel = d.reviewed ? "AUDITÉ" : d.ignored ? "IGNORÉ" : "EN ATTENTE";
+              const remaining  = d.expiresAfterActions - state.news.actionCount;
+
+              return (
+                <View key={d.id} style={{ gap: 4, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: PALETTE.panelEdge }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <MaterialCommunityIcons name={def.icon as any} size={11} color={statusColor} />
+                    <Text style={[styles.waveBadgeText, { color: statusColor, flex: 1 }]}>{def.label.toUpperCase()}</Text>
+                    <View style={[styles.waveBadge, { backgroundColor: statusColor + "22" }]}>
+                      <Text style={[styles.waveBadgeText, { color: statusColor }]}>{statusLabel}</Text>
+                    </View>
+                    <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>{remaining}a</Text>
+                  </View>
+                  <Text style={[styles.stormDesc, { marginBottom: 2 }]} numberOfLines={2}>{d.reason}</Text>
+                  <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>
+                    Risque juridique : <Text style={{ color: d.legalRisk >= 60 ? "#e54848" : d.legalRisk >= 40 ? "#e8864f" : "#e8c44f" }}>{d.legalRisk}</Text>
+                    {"  ·  "}Avantage : <Text style={{ color: "#4caf82" }}>{d.benefit.split(".")[0]}</Text>
+                  </Text>
+
+                  {!d.reviewed && !d.ignored && (
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
+                      <Pressable
+                        onPress={() => {
+                          Alert.alert(
+                            "Justifier la dérogation",
+                            `Coût : ${DEROGATION_JUSTIFY_COST_INFLUENCE} Influence\n\nRéduit le risque juridique de cette dérogation.`,
+                            [
+                              { text: "Annuler", style: "cancel" },
+                              { text: "Justifier", onPress: () => {
+                                const r = justifyDerogation(d.id);
+                                if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                              }},
+                            ],
+                          );
+                        }}
+                        style={[styles.waveBadge, { backgroundColor: "#4a9fff22", borderWidth: 1, borderColor: "#4a9fff44", paddingVertical: 4, paddingHorizontal: 8 }]}
+                      >
+                        <Text style={[styles.waveBadgeText, { color: "#4a9fff" }]}>Justifier — {DEROGATION_JUSTIFY_COST_INFLUENCE} INF</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => {
+                          Alert.alert(
+                            "Auditer la dérogation",
+                            `Coût : ${DEROGATION_AUDIT_COST_MONEY} M€ · ${DEROGATION_AUDIT_COST_INFLUENCE} Influence\n\nAudit complet — marque la dérogation comme conforme, réduit fortement le risque.`,
+                            [
+                              { text: "Annuler", style: "cancel" },
+                              { text: "Auditer", onPress: () => {
+                                const r = auditDerogation(d.id);
+                                if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                              }},
+                            ],
+                          );
+                        }}
+                        style={[styles.waveBadge, { backgroundColor: "#4caf8222", borderWidth: 1, borderColor: "#4caf8244", paddingVertical: 4, paddingHorizontal: 8 }]}
+                      >
+                        <Text style={[styles.waveBadgeText, { color: "#4caf82" }]}>Auditer — {DEROGATION_AUDIT_COST_MONEY} M€</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => {
+                          Alert.alert(
+                            "Ignorer la dérogation ?",
+                            "La dérogation reste active mais disparaît de la liste d'action. Le risque juridique persiste jusqu'à expiration.",
+                            [
+                              { text: "Annuler", style: "cancel" },
+                              { text: "Ignorer", style: "destructive", onPress: () => ignoreDerogation(d.id) },
+                            ],
+                          );
+                        }}
+                        style={[styles.waveBadge, { backgroundColor: "#94a3b822", borderWidth: 1, borderColor: "#94a3b844", paddingVertical: 4, paddingHorizontal: 8 }]}
+                      >
+                        <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>Ignorer</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       )}
