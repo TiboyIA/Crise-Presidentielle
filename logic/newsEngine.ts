@@ -291,6 +291,33 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     inflation_crisis:      (state.inflation ?? 25) >= 80 && state.mandateDay >= 20,
     purchasing_power_low:  (state.purchasingPower ?? 60) < 35 && state.mandateDay >= 15,
     economic_stagnation:   (state.inflation ?? 25) < 20 && (state.nationalIndicators?.economy ?? 55) < 35 && state.mandateDay >= 20,
+    // ── Chaînes d'approvisionnement ──────────────────────────────────────────
+    supply_chain_watch: (() => {
+      const sc = state.supplyChain;
+      if (!sc) return false;
+      const avg = Object.values(sc).reduce((s, sec) => s + sec.disruptionRisk, 0) / 8;
+      return avg >= 30 && state.mandateDay >= 10;
+    })(),
+    supply_sector_alert: (() => {
+      const sc = state.supplyChain;
+      if (!sc) return false;
+      return Object.values(sc).some((sec) => sec.disruptionRisk >= 65) && state.mandateDay >= 15;
+    })(),
+    supply_rupture_crisis: (() => {
+      const sc = state.supplyChain;
+      if (!sc) return false;
+      return Object.values(sc).some((sec) => sec.disruptionRisk >= 80 && sec.stockLevel < 30) && state.mandateDay >= 20;
+    })(),
+    supply_critical_dependency: (() => {
+      const sc = state.supplyChain;
+      if (!sc) return false;
+      return (sc.semi_conducteurs.dependencyLevel >= 70 || sc.materiaux_critiques.dependencyLevel >= 60) && state.mandateDay >= 20;
+    })(),
+    supply_sovereignty_window: (() => {
+      const completed = state.strategyResearch?.completed ?? [];
+      const hasTech   = completed.includes("research_digital_twin") || completed.includes("research_energy_sovereign");
+      return hasTech && (state.productivity ?? 50) >= 60 && state.mandateDay >= 25;
+    })(),
   };
 }
 

@@ -45,6 +45,7 @@ import { ThermalStressBadge } from "@/components/ThermalStressBadge";
 import { OrbitalWindowBadge } from "@/components/OrbitalWindowBadge";
 import { HealthInfoCard } from "@/components/HealthInfoCard";
 import { EmploymentCard } from "@/components/EmploymentCard";
+import { SupplyChainCard } from "@/components/SupplyChainCard";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -383,6 +384,9 @@ export default function NationScreen() {
 
         {/* EMPLOI NATIONAL — marché du travail et chômage */}
         <EmploymentCard state={state} />
+
+        {/* DÉPENDANCES STRATÉGIQUES — chaînes d'approvisionnement */}
+        <SupplyChainCard state={state} />
 
         {/* BAROMÈTRE NATIONAL */}
         <SectionHeader label="Baromètre national" trailing={

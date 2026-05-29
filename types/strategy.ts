@@ -621,6 +621,8 @@ export interface NewsChoice {
   cosmicEffects?: import("@/types/cosmic").CosmicStateEffects;
   /** Effets inertiels — fractionnés en immédiat + différé par inertiaEngine. */
   inertiaEffects?: Partial<Record<import("@/logic/inertiaEngine").InertiaDomain, number>>;
+  /** Effets sur les chaînes d'approvisionnement — deltas appliqués aux secteurs stratégiques. */
+  supplyChainEffects?: Partial<Record<import("@/data/strategicSectors").SectorId, Partial<import("@/logic/supplyChainEngine").SectorState>>>;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -887,4 +889,6 @@ export interface StrategyGameState {
   laborShortage?: number;
   // Productivité nationale — 0-100 (optional pour backward compat)
   productivity?: number;
+  // Chaînes d'approvisionnement stratégiques — MODE DELTA (optional pour backward compat)
+  supplyChain?: import("@/logic/supplyChainEngine").SupplyChainState;
 }

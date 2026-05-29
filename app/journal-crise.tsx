@@ -65,6 +65,8 @@ import {
   DEFAULT_YOUTH_UNEMPLOYMENT,
 } from "@/logic/laborMarketEngine";
 import { getProductivityBandInfo, DEFAULT_PRODUCTIVITY } from "@/logic/productivityEngine";
+import { getSupplyRiskBandInfo, computeOverallSupplyRisk, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
+import { SECTOR_IDS, STRATEGIC_SECTORS } from "@/data/strategicSectors";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -198,6 +200,13 @@ export default function JournalDeCriseScreen() {
   const productivityValue    = state.productivity    ?? DEFAULT_PRODUCTIVITY;
   const productivityInfo     = getProductivityBandInfo(productivityValue);
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
+
+  const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
+  const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
+  const supplyOverallInfo = getSupplyRiskBandInfo(supplyAvgRisk);
+  const supplyRuptured   = SECTOR_IDS.filter((id) => supplyChainSt[id].disruptionRisk >= 80 && supplyChainSt[id].stockLevel < 30);
+  const supplyVulnerable = SECTOR_IDS.filter((id) => supplyChainSt[id].disruptionRisk >= 56 && !supplyRuptured.includes(id));
+  const showSupplyPanel  = supplyAvgRisk >= 35 || supplyRuptured.length >= 1;
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
 
@@ -413,6 +422,33 @@ export default function JournalDeCriseScreen() {
               </>
             )}
           </Text>
+        </View>
+      )}
+
+      {/* ── Chaînes d'approvisionnement stratégiques ─────────────────────────── */}
+      {showSupplyPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: supplyOverallInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="package-variant-closed" size={12} color={supplyOverallInfo.color} />
+            <Text style={[styles.waveTitle, { color: supplyOverallInfo.color }]}>APPROVISIONNEMENTS</Text>
+            {supplyRuptured.length > 0 && (
+              <View style={[styles.waveBadge, { backgroundColor: "#e5484822" }]}>
+                <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>
+                  {supplyRuptured.length} rupture{supplyRuptured.length > 1 ? "s" : ""}
+                </Text>
+              </View>
+            )}
+          </View>
+          {supplyRuptured.map((id) => (
+            <Text key={id} style={styles.stormDesc}>
+              <Text style={{ color: "#e54848" }}>{"▲ " + STRATEGIC_SECTORS[id].name + " — rupture critique"}</Text>
+            </Text>
+          ))}
+          {supplyVulnerable.slice(0, 3).map((id) => (
+            <Text key={id} style={styles.stormDesc}>
+              <Text style={{ color: "#e8864f" }}>{"◆ " + STRATEGIC_SECTORS[id].name + " — vulnérable"}</Text>
+            </Text>
+          ))}
         </View>
       )}
 

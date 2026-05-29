@@ -233,6 +233,7 @@ import { tickInflation } from "@/logic/inflationEngine";
 import { tickPurchasingPower } from "@/logic/purchasingPowerEngine";
 import { tickLaborMarket } from "@/logic/laborMarketEngine";
 import { tickProductivity } from "@/logic/productivityEngine";
+import { tickSupplyChain, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1625,7 +1626,26 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState };
+        // Chaînes d'approvisionnement — effets directs des choix de crise (deltas sur SectorState)
+        let supplyChain = prev.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
+        if (choice?.supplyChainEffects) {
+          const effects = choice.supplyChainEffects;
+          const updated = { ...supplyChain };
+          (Object.keys(effects) as Array<keyof typeof supplyChain>).forEach((sectorId) => {
+            const delta = effects[sectorId];
+            if (!delta) return;
+            const sec = updated[sectorId];
+            updated[sectorId] = {
+              dependencyLevel:  Math.max(0, Math.min(100, sec.dependencyLevel  + (delta.dependencyLevel  ?? 0))),
+              stockLevel:       Math.max(0, Math.min(100, sec.stockLevel       + (delta.stockLevel       ?? 0))),
+              domesticCapacity: Math.max(0, Math.min(100, sec.domesticCapacity + (delta.domesticCapacity ?? 0))),
+              disruptionRisk:   Math.max(0, Math.min(100, sec.disruptionRisk   + (delta.disruptionRisk   ?? 0))),
+            };
+          });
+          supplyChain = updated;
+        }
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2520,6 +2540,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickStatisticsScandalPressure(s);
       s = tickProductivity(s);
       s = tickLaborMarket(s);
+      s = tickSupplyChain(s);
       s = tickInflation(s);
       s = tickPurchasingPower(s);
     }

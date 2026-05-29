@@ -156,6 +156,25 @@ export function computeInflationTarget(state: StrategyGameState): number {
   else if (productivity <= 25) target += 5;
   else if (productivity <= 40) target += 3;
 
+  // Chaînes d'approvisionnement — ruptures énergétiques et logistiques
+  const sc = state.supplyChain;
+  if (sc) {
+    const energieSec    = sc.energie;
+    const transportSec  = sc.transport;
+    // Rupture énergétique : choc de coûts de production majeur
+    if (energieSec.disruptionRisk >= 80 && energieSec.stockLevel < 30) target += 9;
+    else if (energieSec.disruptionRisk >= 60) target += 4;
+    else if (energieSec.disruptionRisk >= 40) target += 2;
+    // Rupture transport : flambée des coûts logistiques
+    if (transportSec.disruptionRisk >= 70 && transportSec.stockLevel < 30) target += 4;
+    else if (transportSec.disruptionRisk >= 55) target += 2;
+    // Multi-ruptures : chocs généralisés sur l'offre
+    const broadRuptures = (["energie", "alimentation", "transport", "materiaux_critiques"] as const)
+      .filter((id) => sc[id].disruptionRisk >= 75 && sc[id].stockLevel < 30).length;
+    if (broadRuptures >= 3) target += 6;
+    else if (broadRuptures >= 1) target += 3;
+  }
+
   return Math.max(0, Math.min(100, target));
 }
 
