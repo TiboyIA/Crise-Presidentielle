@@ -80,6 +80,11 @@ import {
   DEROGATION_DEFS, getActiveDerogations, getActiveUnreviewed, getDerogationRiskLevel,
   DEROGATION_JUSTIFY_COST_INFLUENCE, DEROGATION_AUDIT_COST_MONEY, DEROGATION_AUDIT_COST_INFLUENCE,
 } from "@/logic/emergencyDerogationEngine";
+import {
+  getActiveWhistleblowerAlerts, getWhistleblowerRiskLevel,
+  getAlertSeverityLabel, getAlertSeverityColor, getAlertTriggerLabel,
+  PROTECT_COST_INFLUENCE, AUDIT_COST_INFLUENCE, CORRECT_COST_MONEY,
+} from "@/logic/whistleblowerEngine";
 import { CYCLE_META, DEFAULT_BUSINESS_CYCLE_PHASE, DEFAULT_CYCLE_MOMENTUM } from "@/logic/businessCycleEngine";
 import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
 import {
@@ -136,7 +141,7 @@ const hospStyles = StyleSheet.create({
 
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel, justifyDerogation, auditDerogation, ignoreDerogation } = useStrategy();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly } = useStrategy();
   const { hPad, width } = useResponsive();
 
   const { prepareForecast, issuePublicAlert } = useStrategy();
@@ -291,6 +296,16 @@ export default function JournalDeCriseScreen() {
   const procurement      = state.procurementState ?? DEFAULT_PROCUREMENT_STATE;
   const procurementInfo  = getProcurementBandInfo(procurement.procurementIntegrity);
   const showProcurPanel  = procurement.procurementIntegrity < 65 || procurement.conflictOfInterestRisk >= 40 || procurement.vendorConcentration >= 50;
+
+  const activeWbAlerts   = getActiveWhistleblowerAlerts(state);
+  const wbRiskLevel      = getWhistleblowerRiskLevel(activeWbAlerts.length);
+  const showWbPanel      = activeWbAlerts.length > 0;
+  const WB_RISK_COLOR: Record<string, string> = {
+    safe: "#4caf82", watch: "#e8c44f", alert: "#e8864f", critical: "#e54848",
+  };
+  const WB_RISK_LABEL: Record<string, string> = {
+    safe: "AUCUNE ALERTE", watch: "SOUS SURVEILLANCE", alert: "RISQUE ÉLEVÉ", critical: "CRISE",
+  };
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
   const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
@@ -832,6 +847,122 @@ export default function JournalDeCriseScreen() {
                   <Text style={[styles.waveBadgeText, { color: "#94a3b8" }]}>
                     {days}j
                   </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* ── Lanceurs d'alerte ──────────────────────────────────────────────────── */}
+      {showWbPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: WB_RISK_COLOR[wbRiskLevel] + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="account-alert-outline" size={12} color={WB_RISK_COLOR[wbRiskLevel]} />
+            <Text style={[styles.waveTitle, { color: WB_RISK_COLOR[wbRiskLevel] }]}>LANCEURS D'ALERTE</Text>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <View style={[styles.waveBadge, { backgroundColor: WB_RISK_COLOR[wbRiskLevel] + "22" }]}>
+                <Text style={[styles.waveBadgeText, { color: WB_RISK_COLOR[wbRiskLevel] }]}>
+                  {WB_RISK_LABEL[wbRiskLevel]}
+                </Text>
+              </View>
+              {activeWbAlerts.length > 0 && (
+                <View style={[styles.waveBadge, { backgroundColor: "#e8864f22" }]}>
+                  <Text style={[styles.waveBadgeText, { color: "#e8864f" }]}>
+                    {activeWbAlerts.length} ALERTE{activeWbAlerts.length > 1 ? "S" : ""}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={{ gap: 8, marginTop: 8 }}>
+            {activeWbAlerts.map((wb) => {
+              const sevColor = getAlertSeverityColor(wb.severity);
+              const sevLabel = getAlertSeverityLabel(wb.severity);
+              const remaining = wb.expiresAfterActions - state.news.actionCount;
+              const isOld = state.news.actionCount - wb.createdAtAction >= 8;
+
+              return (
+                <View key={wb.id} style={{ gap: 4, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: PALETTE.panelEdge }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={11} color={sevColor} />
+                    <Text style={[styles.waveBadgeText, { color: sevColor, flex: 1 }]}>
+                      {getAlertTriggerLabel(wb.triggerType).toUpperCase()}
+                    </Text>
+                    <View style={[styles.waveBadge, { backgroundColor: sevColor + "22" }]}>
+                      <Text style={[styles.waveBadgeText, { color: sevColor }]}>{sevLabel}</Text>
+                    </View>
+                    {isOld && (
+                      <View style={[styles.waveBadge, { backgroundColor: "#e5484822" }]}>
+                        <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>URGENT</Text>
+                      </View>
+                    )}
+                    <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>{remaining}a</Text>
+                  </View>
+                  <Text style={[styles.stormDesc, { marginBottom: 2 }]} numberOfLines={2}>{wb.description}</Text>
+                  <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>
+                    Pression politique : <Text style={{ color: wb.politicalPressure >= 70 ? "#e54848" : wb.politicalPressure >= 50 ? "#e8864f" : "#e8c44f" }}>{wb.politicalPressure}</Text>
+                  </Text>
+
+                  <View style={{ flexDirection: "row", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
+                    <Pressable
+                      onPress={() => {
+                        Alert.alert(
+                          "Protéger la source",
+                          `Coût : ${PROTECT_COST_INFLUENCE} Influence\n\nRéduit whistleblowerRisk. ScandalRisk légèrement en hausse à court terme.`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: "Protéger", onPress: () => {
+                              const r = protectWhistleblower(wb.id);
+                              if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                            }},
+                          ],
+                        );
+                      }}
+                      style={[styles.waveBadge, { backgroundColor: "#4caf8222", borderWidth: 1, borderColor: "#4caf8244", paddingVertical: 4, paddingHorizontal: 8 }]}
+                    >
+                      <Text style={[styles.waveBadgeText, { color: "#4caf82" }]}>Protéger — {PROTECT_COST_INFLUENCE} INF</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => {
+                        Alert.alert(
+                          "Ouvrir un audit interne",
+                          `Coût : ${AUDIT_COST_INFLUENCE} Influence\n\nAudit formel — réduit legalRisk et auditPressure, renforce la stabilité institutionnelle.`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: "Lancer l'audit", onPress: () => {
+                              const r = launchWhistleblowerAudit(wb.id);
+                              if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                            }},
+                          ],
+                        );
+                      }}
+                      style={[styles.waveBadge, { backgroundColor: "#4a9fff22", borderWidth: 1, borderColor: "#4a9fff44", paddingVertical: 4, paddingHorizontal: 8 }]}
+                    >
+                      <Text style={[styles.waveBadgeText, { color: "#4a9fff" }]}>Audit — {AUDIT_COST_INFLUENCE} INF</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => {
+                        Alert.alert(
+                          "Corriger discrètement",
+                          `Coût : ${CORRECT_COST_MONEY} M€\n\nCorrection silencieuse — réduit corruptionExposure et whistleblowerRisk sans exposition publique.`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: "Corriger", onPress: () => {
+                              const r = correctWhistleblowerQuietly(wb.id);
+                              if (!r.success) Alert.alert("Impossible", r.reason ?? "Ressources insuffisantes.", [{ text: "OK" }]);
+                            }},
+                          ],
+                        );
+                      }}
+                      style={[styles.waveBadge, { backgroundColor: "#e8c44f22", borderWidth: 1, borderColor: "#e8c44f44", paddingVertical: 4, paddingHorizontal: 8 }]}
+                    >
+                      <Text style={[styles.waveBadgeText, { color: "#e8c44f" }]}>Corriger — {CORRECT_COST_MONEY} M€</Text>
+                    </Pressable>
+                  </View>
                 </View>
               );
             })}

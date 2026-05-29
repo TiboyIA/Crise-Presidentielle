@@ -251,6 +251,9 @@ import {
   addDerogation, justifyDerogation, auditDerogation, ignoreDerogation, tickDerogations,
 } from "@/logic/emergencyDerogationEngine";
 import {
+  protectWhistleblower, launchInternalAudit, correctQuietly, tickWhistleblower,
+} from "@/logic/whistleblowerEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -446,6 +449,9 @@ interface StrategyContextValue {
   justifyDerogation: (id: string) => { success: boolean; reason?: string };
   auditDerogation:   (id: string) => { success: boolean; reason?: string };
   ignoreDerogation:  (id: string) => void;
+  protectWhistleblower: (id: string) => { success: boolean; reason?: string };
+  launchWhistleblowerAudit: (id: string) => { success: boolean; reason?: string };
+  correctWhistleblowerQuietly: (id: string) => { success: boolean; reason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -2122,6 +2128,48 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [update],
   );
 
+  const protectWhistleblowerCb = useCallback(
+    (id: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = protectWhistleblower(prev, id);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const launchWhistleblowerAuditCb = useCallback(
+    (id: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = launchInternalAudit(prev, id);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const correctWhistleblowerQuietlyCb = useCallback(
+    (id: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = correctQuietly(prev, id);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const launchDimAuditCb = useCallback(
     (): { result: DimAuditResult | null; failReason?: string } => {
       if (!state) return { result: null, failReason: "Jeu non initialisé." };
@@ -2368,6 +2416,9 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       justifyDerogation: justifyDerogationCb,
       auditDerogation:   auditDerogationCb,
       ignoreDerogation:  ignoreDerogationCb,
+      protectWhistleblower:        protectWhistleblowerCb,
+      launchWhistleblowerAudit:    launchWhistleblowerAuditCb,
+      correctWhistleblowerQuietly: correctWhistleblowerQuietlyCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2392,6 +2443,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       activateCrisisStaffing, launchDimAuditCb, setHealthSurveillanceLevelCb,
       justifyDerogationCb, auditDerogationCb, ignoreDerogationCb,
+      protectWhistleblowerCb, launchWhistleblowerAuditCb, correctWhistleblowerQuietlyCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2680,6 +2732,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickCompliance(s);
       s = tickProcurement(s);
       s = tickDerogations(s);
+      s = tickWhistleblower(s);
       s = tickInvestorConfidence(s);
     }
   }

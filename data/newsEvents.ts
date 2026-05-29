@@ -31,6 +31,7 @@ import { BUSINESS_CYCLE_EVENTS } from "@/data/businessCycleEvents";
 import { ECONOMIC_NATIONAL_EVENTS } from "@/data/economicEvents";
 import { DEROGATION_EVENTS } from "@/data/derogationEvents";
 import { PROCUREMENT_EVENTS } from "@/data/procurementEvents";
+import { WHISTLEBLOWER_EVENTS } from "@/data/whistleblowerEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3734,6 +3735,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...DEROGATION_EVENTS,
   // ── MARCHÉS PUBLICS & CONFORMITÉ ─────────────────────────────────────────────
   ...PROCUREMENT_EVENTS,
+  // ── LANCEURS D'ALERTE ─────────────────────────────────────────────────────────
+  ...WHISTLEBLOWER_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

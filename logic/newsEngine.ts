@@ -491,6 +491,39 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     compliance_whistleblower:      (state.complianceState?.whistleblowerRisk  ?? 15) >= 70 && state.mandateDay >= 20,
     compliance_crisis:             (state.complianceState?.complianceScore    ?? 70) < 25  && state.mandateDay >= 25,
     compliance_emergency_powers:   (state.complianceState?.emergencyPowersAbuse ?? 10) >= 60 && state.mandateDay >= 15,
+    // ── Lanceurs d'alerte ──────────────────────────────────────────────────────
+    whistleblower_alert_pending: (() => {
+      const now = state.news.actionCount;
+      return (state.whistleblowerAlerts ?? []).some(
+        (a) => !a.resolved && !a.ignored && a.expiresAfterActions > now,
+      ) && state.mandateDay >= 10;
+    })(),
+    whistleblower_media_leak: (() => {
+      const now = state.news.actionCount;
+      return (state.whistleblowerAlerts ?? []).some(
+        (a) => !a.resolved && !a.ignored && a.expiresAfterActions > now && (a.severity === "grave" || a.severity === "critique"),
+      ) && state.mandateDay >= 15;
+    })(),
+    whistleblower_escalation_risk: (() => {
+      const now = state.news.actionCount;
+      return (state.whistleblowerAlerts ?? []).some(
+        (a) => !a.resolved && !a.ignored && a.expiresAfterActions > now && now - a.createdAtAction >= 8,
+      ) && state.mandateDay >= 18;
+    })(),
+    whistleblower_national_scandal: (() => {
+      const now = state.news.actionCount;
+      const count = (state.whistleblowerAlerts ?? []).filter(
+        (a) => !a.resolved && !a.ignored && a.expiresAfterActions > now,
+      ).length;
+      return count >= 2 && (state.complianceState?.legalRisk ?? 20) >= 55 && state.mandateDay >= 20;
+    })(),
+    whistleblower_exemplary_handling: (() => {
+      const now = state.news.actionCount;
+      const hasActive = (state.whistleblowerAlerts ?? []).some(
+        (a) => !a.resolved && !a.ignored && a.expiresAfterActions > now,
+      );
+      return !hasActive && (state.complianceState?.whistleblowerRisk ?? 15) < 25 && state.mandateDay >= 25;
+    })(),
   };
 }
 

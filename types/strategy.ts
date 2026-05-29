@@ -984,4 +984,6 @@ export interface StrategyGameState {
   derogations?: import("@/logic/emergencyDerogationEngine").DerogationEntry[];
   // Marchés publics & conformité — indicateurs détaillés (optional pour backward compat)
   procurementState?: import("@/logic/procurementComplianceEngine").ProcurementState;
+  // Lanceurs d'alerte — alertes internes actives (optional pour backward compat)
+  whistleblowerAlerts?: import("@/logic/whistleblowerEngine").WhistleblowerAlert[];
 }
