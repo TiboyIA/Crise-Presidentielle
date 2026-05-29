@@ -148,6 +148,12 @@ export function computeHealthReportingDelayTarget(state: StrategyGameState): num
   if (completed.includes("research_datacenter_cooling")) delay -= 2;
   if (completed.includes("research_quantum_sensors"))    delay -= 1;
 
+  // Cellule de veille sanitaire — détection et remontée accélérées
+  const surveillance = state.healthSurveillanceLevel ?? "faible";
+  if      (surveillance === "crise")     delay -= 10;
+  else if (surveillance === "renforcee") delay -= 6;
+  else if (surveillance === "standard")  delay -= 3;
+
   return Math.max(0, Math.min(30, delay));
 }
 

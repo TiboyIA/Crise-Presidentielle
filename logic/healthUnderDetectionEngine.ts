@@ -121,6 +121,12 @@ export function computeUnderDetectionTarget(state: StrategyGameState): number {
   else if (stability >= 55) pressure -= 3;
   else if (stability < 35)  pressure += 5;
 
+  // Cellule de veille sanitaire — détection précoce des crises cachées
+  const surveillance = state.healthSurveillanceLevel ?? "faible";
+  if      (surveillance === "crise")     pressure -= 20;
+  else if (surveillance === "renforcee") pressure -= 12;
+  else if (surveillance === "standard")  pressure -= 5;
+
   return Math.max(0, Math.min(100, pressure));
 }
 

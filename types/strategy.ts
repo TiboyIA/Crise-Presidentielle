@@ -867,4 +867,6 @@ export interface StrategyGameState {
   lastDimAuditAt?: number;
   // Pression de sous-détection sanitaire cachée — 0-100 (optional pour backward compat)
   underDetectionPressure?: number;
+  // Niveau de la cellule de veille sanitaire stratégique (optional pour backward compat)
+  healthSurveillanceLevel?: import("@/logic/healthSurveillanceEngine").SurveillanceLevelId;
 }

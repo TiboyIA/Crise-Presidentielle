@@ -145,6 +145,12 @@ export function computeMedicalQualityTarget(state: StrategyGameState): number {
   else if (coding < 30) score -= 6;
   else if (coding < 15) score -= 12;
 
+  // Cellule de veille sanitaire — capacité d'analyse et de consolidation renforcée
+  const surveillance = state.healthSurveillanceLevel ?? "faible";
+  if      (surveillance === "crise")     score += 18;
+  else if (surveillance === "renforcee") score += 12;
+  else if (surveillance === "standard")  score += 6;
+
   return Math.max(0, Math.min(100, score));
 }
 

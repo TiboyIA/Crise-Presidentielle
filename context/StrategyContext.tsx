@@ -222,6 +222,12 @@ import { tickHospitalPressure } from "@/logic/hospitalPressureEngine";
 import { tickHealthDataTrust } from "@/logic/healthDataTrustEngine";
 import { tickHealthUnderDetection } from "@/logic/healthUnderDetectionEngine";
 import {
+  canSetSurveillanceLevel,
+  setHealthSurveillanceLevel as applySurveillanceLevel,
+  tickHealthSurveillance,
+  type SurveillanceLevelId,
+} from "@/logic/healthSurveillanceEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -413,6 +419,7 @@ interface StrategyContextValue {
   stabilisationCabinet: () => void;
   activateCrisisStaffing: () => { result: StaffingActivationResult | null; failReason?: string };
   launchDimAudit: () => { result: DimAuditResult | null; failReason?: string };
+  setHealthSurveillanceLevel: (level: SurveillanceLevelId) => { success: boolean; reason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -1987,6 +1994,21 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const setHealthSurveillanceLevelCb = useCallback(
+    (level: SurveillanceLevelId): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      const check = canSetSurveillanceLevel(state, level);
+      if (!check.ok) return { success: false, reason: check.reason };
+      update((prev) => {
+        const r = applySurveillanceLevel(prev, level);
+        if (r.failReason) return prev;
+        return withNews(r.newState);
+      });
+      return { success: true };
+    },
+    [state, update],
+  );
+
   const prepareForecast = useCallback(
     (): ForecastActionResult => {
       if (!state) return { success: false, reason: "Jeu non initialisé." };
@@ -2197,6 +2219,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
       activateCrisisStaffing, launchDimAudit: launchDimAuditCb,
+      setHealthSurveillanceLevel: setHealthSurveillanceLevelCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2219,7 +2242,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       restMinister, delegateMinister, appointMinister, arbitrateConflict,
       startMinisterTraining, setGovernmentCulture,
       planModernisationRH, reconnaissancePublique, stabilisationCabinet,
-      activateCrisisStaffing, launchDimAuditCb, prepareForecast, issuePublicAlert,
+      activateCrisisStaffing, launchDimAuditCb, setHealthSurveillanceLevelCb, prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
       deleteEnemyReport, clearAllEnemyReports,
@@ -2485,6 +2508,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickHospitalCodingQuality(s);
       s = tickHealthReportingDelay(s);
       s = tickHealthDataTrust(s);
+      s = tickHealthSurveillance(s);
       s = tickHealthUnderDetection(s);
     }
   }

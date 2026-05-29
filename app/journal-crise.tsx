@@ -46,6 +46,12 @@ import { getHospitalPressureBandInfo, DEFAULT_HOSPITAL_PRESSURE } from "@/logic/
 import { getHealthDataTrustBandInfo, DEFAULT_HEALTH_DATA_TRUST } from "@/logic/healthDataTrustEngine";
 import { canLaunchDimAudit, DIM_AUDIT_COST_MONEY, DIM_AUDIT_COST_INFLUENCE } from "@/logic/dimAuditEngine";
 import { DEFAULT_UNDER_DETECTION_PRESSURE } from "@/logic/healthUnderDetectionEngine";
+import {
+  SURVEILLANCE_LEVELS,
+  SURVEILLANCE_ORDER,
+  DEFAULT_SURVEILLANCE_LEVEL,
+  canSetSurveillanceLevel,
+} from "@/logic/healthSurveillanceEngine";
 import { generateHealthSnapshot } from "@/logic/anonymizedHealthRecordsEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
@@ -96,7 +102,7 @@ const hospStyles = StyleSheet.create({
 
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit } = useStrategy();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel } = useStrategy();
   const { hPad, width } = useResponsive();
 
   const { prepareForecast, issuePublicAlert } = useStrategy();
@@ -442,6 +448,66 @@ export default function JournalDeCriseScreen() {
             </View>
             <Text style={styles.stormDesc}>{hospPressureInfo.message}</Text>
           </View>
+
+          {/* ── Cellule de Veille Sanitaire ──────────────────────────────── */}
+          {(() => {
+            const currentLevel = state.healthSurveillanceLevel ?? DEFAULT_SURVEILLANCE_LEVEL;
+            const currentDef   = SURVEILLANCE_LEVELS[currentLevel];
+            return (
+              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: currentDef.color + "33" }]}>
+                <View style={styles.waveHeader}>
+                  <MaterialCommunityIcons name="radar" size={12} color={currentDef.color} />
+                  <Text style={[styles.waveTitle, { color: currentDef.color }]}>VEILLE SANITAIRE</Text>
+                  <View style={[styles.waveBadge, { backgroundColor: currentDef.color + "22" }]}>
+                    <Text style={[styles.waveBadgeText, { color: currentDef.color }]}>{currentDef.label.toUpperCase()}</Text>
+                  </View>
+                  {currentDef.dailyCostMoney > 0 && (
+                    <Text style={[styles.waveBadgeText, { color: PALETTE.textLow, marginLeft: 4 }]}>
+                      {`−${currentDef.dailyCostMoney} M€/j`}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.stormDesc, { marginBottom: 8 }]}>{currentDef.description}</Text>
+                <View style={survStyles.grid}>
+                  {SURVEILLANCE_ORDER.map((levelId) => {
+                    const def      = SURVEILLANCE_LEVELS[levelId];
+                    const isActive = levelId === currentLevel;
+                    const check    = isActive ? { ok: false } : canSetSurveillanceLevel(state, levelId);
+                    return (
+                      <Pressable
+                        key={levelId}
+                        disabled={isActive}
+                        style={({ pressed }) => [
+                          survStyles.btn,
+                          isActive && { borderColor: def.color, backgroundColor: def.color + "22" },
+                          !isActive && !check.ok && survStyles.btnDim,
+                          { opacity: pressed ? 0.75 : 1 },
+                        ]}
+                        onPress={() => {
+                          const r = setHealthSurveillanceLevel(levelId);
+                          if (!r.success) Alert.alert("Indisponible", r.reason ?? "Conditions non remplies.", [{ text: "OK" }]);
+                        }}
+                      >
+                        <Text style={[survStyles.btnLabel, { color: isActive ? def.color : check.ok ? PALETTE.textHigh : PALETTE.textLow }]}>
+                          {def.label}
+                        </Text>
+                        {def.dailyCostMoney > 0 && (
+                          <Text style={[survStyles.btnCost, { color: isActive ? def.color : PALETTE.textLow }]}>
+                            {`${def.dailyCostMoney} M€/j`}
+                          </Text>
+                        )}
+                        {!isActive && def.upgradeCostMoney > 0 && check.ok && (
+                          <Text style={survStyles.btnUpgrade}>
+                            {`${def.upgradeCostMoney} M€ · ${def.upgradeCostInfluence} INF`}
+                          </Text>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })()}
 
           {/* ── Cellule DIM Nationale ─────────────────────────────────────── */}
           <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: medicalInfo.color + "33" }]}>
@@ -1200,6 +1266,15 @@ const tabStyles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: PALETTE.danger,
   },
+});
+
+const survStyles = StyleSheet.create({
+  grid:      { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  btn:       { flex: 1, minWidth: "44%", borderWidth: 1, borderColor: PALETTE.panelEdge, borderRadius: RADIUS.sm, paddingVertical: 6, paddingHorizontal: 8, gap: 2 },
+  btnDim:    { opacity: 0.5 },
+  btnLabel:  { fontFamily: FONT.bold, fontSize: 11 },
+  btnCost:   { fontFamily: FONT.reg, fontSize: 9 },
+  btnUpgrade:{ fontFamily: FONT.reg, fontSize: 8, color: PALETTE.textLow },
 });
 
 const dimStyles = StyleSheet.create({
