@@ -239,6 +239,7 @@ import { tickTaxPolicy, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FI
 import { tickShadowEconomy, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
 import { tickTradeBalance, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
 import { tickInequality, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
+import { tickProductiveFabric, DEFAULT_PRODUCTIVE_FABRIC } from "@/logic/productiveFabricEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1678,7 +1679,16 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         if (choice?.inequalityIndexDelta) inequalityIndex = Math.max(0, Math.min(100, inequalityIndex + choice.inequalityIndexDelta));
         if (choice?.socialMobilityDelta)  socialMobility  = Math.max(0, Math.min(100, socialMobility  + choice.socialMobilityDelta));
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility };
+        // Tissu productif national — deltas directs issus du choix de crise
+        const clampFabric = (v: number) => Math.max(0, Math.min(100, v));
+        let productiveFabric = prev.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
+        if (choice?.smeHealthDelta)            productiveFabric = { ...productiveFabric, smeHealth:           clampFabric(productiveFabric.smeHealth           + choice.smeHealthDelta) };
+        if (choice?.industrialChampionsDelta)  productiveFabric = { ...productiveFabric, industrialChampions: clampFabric(productiveFabric.industrialChampions + choice.industrialChampionsDelta) };
+        if (choice?.startupEcosystemDelta)     productiveFabric = { ...productiveFabric, startupEcosystem:    clampFabric(productiveFabric.startupEcosystem    + choice.startupEcosystemDelta) };
+        if (choice?.localCommerceDelta)        productiveFabric = { ...productiveFabric, localCommerce:       clampFabric(productiveFabric.localCommerce       + choice.localCommerceDelta) };
+        if (choice?.strategicIndustryDelta)    productiveFabric = { ...productiveFabric, strategicIndustry:   clampFabric(productiveFabric.strategicIndustry   + choice.strategicIndustryDelta) };
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility, productiveFabric };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2580,6 +2590,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickShadowEconomy(s);
       s = tickTradeBalance(s);
       s = tickInequality(s);
+      s = tickProductiveFabric(s);
       s = tickInvestorConfidence(s);
     }
   }

@@ -72,6 +72,7 @@ import { getFiscalConsentBandInfo, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY,
 import { getShadowEconomyBandInfo, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
 import { getTradeBalanceBandInfo, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
 import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
+import { getFabricBandInfo, DEFAULT_PRODUCTIVE_FABRIC, shouldShowFabricPanel } from "@/logic/productiveFabricEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -228,6 +229,18 @@ export default function JournalDeCriseScreen() {
   const inequalityInfo      = getInequalityBandInfo(inequalityValue);
   const socialMobilityValue = state.socialMobility  ?? DEFAULT_SOCIAL_MOBILITY;
   const showInequalityPanel = inequalityValue >= 46 || socialMobilityValue <= 35;
+
+  const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
+  const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
+  const fabricEntries: { key: string; label: string; value: number }[] = [
+    { key: "sme",       label: "PME",                    value: productiveFabric.smeHealth },
+    { key: "champions", label: "Champions industriels",  value: productiveFabric.industrialChampions },
+    { key: "startups",  label: "Startups",               value: productiveFabric.startupEcosystem },
+    { key: "local",     label: "Commerce local",         value: productiveFabric.localCommerce },
+    { key: "strategic", label: "Industrie stratégique",  value: productiveFabric.strategicIndustry },
+  ];
+  const worstFabricValue = Math.min(...fabricEntries.map((e) => e.value));
+  const worstFabricInfo  = getFabricBandInfo(worstFabricValue);
 
   const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
   const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
@@ -495,6 +508,32 @@ export default function JournalDeCriseScreen() {
             <Text style={[styles.waveBadgeText, { color: "#aaa" }]}>
               Mobilité sociale <Text style={{ color: socialMobilityValue >= 55 ? "#4caf82" : socialMobilityValue >= 35 ? "#e8c44f" : "#e54848" }}>{Math.round(socialMobilityValue)}</Text>
             </Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Tissu productif national ─────────────────────────────────────────── */}
+      {showFabricPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: worstFabricInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="factory" size={12} color={worstFabricInfo.color} />
+            <Text style={[styles.waveTitle, { color: worstFabricInfo.color }]}>TISSU PRODUCTIF</Text>
+            <View style={[styles.waveBadge, { backgroundColor: worstFabricInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: worstFabricInfo.color }]}>
+                {worstFabricInfo.label.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+            {fabricEntries.map((entry) => {
+              const info = getFabricBandInfo(entry.value);
+              return (
+                <Text key={entry.key} style={[styles.waveBadgeText, { color: "#aaa" }]}>
+                  {entry.label}{" "}
+                  <Text style={{ color: info.color }}>{Math.round(entry.value)}</Text>
+                </Text>
+              );
+            })}
           </View>
         </View>
       )}

@@ -639,6 +639,16 @@ export interface NewsChoice {
   inequalityIndexDelta?: number;
   /** Delta direct sur la mobilité sociale — appliqué immédiatement lors de la résolution du choix. */
   socialMobilityDelta?: number;
+  /** Delta direct sur la santé des PME — appliqué immédiatement lors de la résolution du choix. */
+  smeHealthDelta?: number;
+  /** Delta direct sur les champions industriels — appliqué immédiatement lors de la résolution du choix. */
+  industrialChampionsDelta?: number;
+  /** Delta direct sur l'écosystème startup — appliqué immédiatement lors de la résolution du choix. */
+  startupEcosystemDelta?: number;
+  /** Delta direct sur le commerce local — appliqué immédiatement lors de la résolution du choix. */
+  localCommerceDelta?: number;
+  /** Delta direct sur l'industrie stratégique — appliqué immédiatement lors de la résolution du choix. */
+  strategicIndustryDelta?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -923,4 +933,6 @@ export interface StrategyGameState {
   inequalityIndex?: number;
   // Mobilité sociale — 0-100 (optional pour backward compat)
   socialMobility?: number;
+  // Tissu productif national — structure économique (optional pour backward compat)
+  productiveFabric?: import("@/logic/productiveFabricEngine").ProductiveFabricState;
 }

@@ -362,6 +362,21 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
         && (state.inequalityIndex ?? 35) <= 45
         && state.mandateDay >= 25;
     })(),
+    // ── Tissu productif national ─────────────────────────────────────────────────
+    fabric_overview: (() => {
+      const pf = state.productiveFabric;
+      if (!pf) return state.mandateDay >= 10;
+      return Math.min(pf.smeHealth, pf.industrialChampions, pf.startupEcosystem, pf.localCommerce, pf.strategicIndustry) < 45
+        && state.mandateDay >= 10;
+    })(),
+    sme_crisis:              (state.productiveFabric?.smeHealth           ?? 55) <= 30 && state.mandateDay >= 15,
+    local_commerce_desert:   (state.productiveFabric?.localCommerce       ?? 58) <= 35 && state.mandateDay >= 12,
+    startup_momentum:        (state.productiveFabric?.startupEcosystem    ?? 42) >= 65 && state.mandateDay >= 20,
+    strategic_industry_alert:(state.productiveFabric?.strategicIndustry   ?? 48) <= 25 && state.mandateDay >= 18,
+    champions_industrial_plan:
+      (state.productiveFabric?.industrialChampions ?? 50) <= 40
+      && (state.tradeBalance ?? -5) <= -20
+      && state.mandateDay >= 20,
   };
 }
 
