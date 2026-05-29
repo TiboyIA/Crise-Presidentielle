@@ -414,9 +414,15 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
         && state.mandateDay >= 25;
     })(),
     // ── Multiplicateur budgétaire ──────────────────────────────────────────────
-    fiscal_relance_budgetaire:  (state.nationalIndicators?.economy ?? 55) < 50 && state.mandateDay >= 20,
-    fiscal_relance_industrielle: (state.tradeBalance ?? -5) <= -20 && state.mandateDay >= 25,
+    fiscal_relance_budgetaire:    (state.nationalIndicators?.economy ?? 55) < 50 && state.mandateDay >= 20,
+    fiscal_relance_industrielle:  (state.tradeBalance ?? -5) <= -20 && state.mandateDay >= 25,
     fiscal_investissement_social: (state.hiddenPolitics?.popularFatigue ?? 15) >= 55 && state.mandateDay >= 15,
+    // ── Banque centrale fictive ────────────────────────────────────────────────
+    cb_rate_hike:               (state.interestRate ?? 30) >= 50 && (state.inflation ?? 25) >= 50 && state.mandateDay >= 15,
+    cb_rate_cut:                (state.interestRate ?? 30) <= 20 && ((state.nationalIndicators?.economy ?? 55) < 40 || (state.unemployment ?? 25) >= 45) && state.mandateDay >= 15,
+    cb_credibility_warning:     (state.centralBankCredibility ?? 65) <= 35 && state.mandateDay >= 20,
+    cb_governor_nomination:     (state.hiddenPolitics?.institutionalStability ?? 70) >= 65 && state.mandateDay >= 40,
+    cb_monetary_tension_crisis: (state.monetaryTension ?? 20) >= 65 && state.mandateDay >= 20,
   };
 }
 

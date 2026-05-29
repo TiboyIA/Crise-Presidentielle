@@ -655,6 +655,12 @@ export interface NewsChoice {
   fiscalSpendingType?: import("@/logic/fiscalMultiplierEngine").SpendingType;
   /** Intensité du programme budgétaire (0-100). Par défaut 60 si non précisé. */
   fiscalSpendingIntensity?: number;
+  /** Delta direct sur la crédibilité de la banque centrale fictive. */
+  centralBankCredibilityDelta?: number;
+  /** Delta direct sur la tension monétaire. */
+  monetaryTensionDelta?: number;
+  /** Change le profil du gouverneur — influe sur le comportement futur des taux directeurs. */
+  centralBankProfileChange?: import("@/logic/centralBankEngine").CentralBankProfile;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -945,4 +951,12 @@ export interface StrategyGameState {
   economicShocks?: import("@/logic/economicShockEngine").EconomicShock[];
   // Programmes budgétaires actifs — multiplicateur fiscal (optional pour backward compat)
   fiscalPrograms?: import("@/logic/fiscalMultiplierEngine").FiscalProgram[];
+  // Banque centrale fictive — taux directeur abstrait 0-100 (optional pour backward compat)
+  interestRate?: number;
+  // Crédibilité de la banque centrale fictive 0-100 (optional pour backward compat)
+  centralBankCredibility?: number;
+  // Tension entre politique monétaire et budgétaire 0-100 (optional pour backward compat)
+  monetaryTension?: number;
+  // Profil du gouverneur de la banque centrale (optional pour backward compat)
+  centralBankProfile?: import("@/logic/centralBankEngine").CentralBankProfile;
 }

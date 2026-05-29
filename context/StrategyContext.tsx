@@ -242,6 +242,7 @@ import { tickInequality, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } fro
 import { tickProductiveFabric, DEFAULT_PRODUCTIVE_FABRIC } from "@/logic/productiveFabricEngine";
 import { createEconomicShockFromEvent, dampenEconomicShock, tickEconomicShocks } from "@/logic/economicShockEngine";
 import { createFiscalProgram, tickFiscalMultiplier } from "@/logic/fiscalMultiplierEngine";
+import { tickCentralBank, DEFAULT_CB_CREDIBILITY, DEFAULT_MONETARY_TENSION } from "@/logic/centralBankEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1681,6 +1682,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         if (choice?.inequalityIndexDelta) inequalityIndex = Math.max(0, Math.min(100, inequalityIndex + choice.inequalityIndexDelta));
         if (choice?.socialMobilityDelta)  socialMobility  = Math.max(0, Math.min(100, socialMobility  + choice.socialMobilityDelta));
 
+        // Banque centrale fictive — deltas issus du choix de crise (actions indirectes du joueur)
+        let centralBankCredibility = prev.centralBankCredibility ?? DEFAULT_CB_CREDIBILITY;
+        let monetaryTension        = prev.monetaryTension ?? DEFAULT_MONETARY_TENSION;
+        const centralBankProfile   = choice?.centralBankProfileChange ?? prev.centralBankProfile;
+        if (choice?.centralBankCredibilityDelta) centralBankCredibility = Math.max(0, Math.min(100, centralBankCredibility + choice.centralBankCredibilityDelta));
+        if (choice?.monetaryTensionDelta)        monetaryTension        = Math.max(0, Math.min(100, monetaryTension + choice.monetaryTensionDelta));
+
         // Tissu productif national — deltas directs issus du choix de crise
         const clampFabric = (v: number) => Math.max(0, Math.min(100, v));
         let productiveFabric = prev.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
@@ -1690,7 +1698,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         if (choice?.localCommerceDelta)        productiveFabric = { ...productiveFabric, localCommerce:       clampFabric(productiveFabric.localCommerce       + choice.localCommerceDelta) };
         if (choice?.strategicIndustryDelta)    productiveFabric = { ...productiveFabric, strategicIndustry:   clampFabric(productiveFabric.strategicIndustry   + choice.strategicIndustryDelta) };
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility, productiveFabric };
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility, productiveFabric, centralBankCredibility, monetaryTension, centralBankProfile };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2604,6 +2612,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickProductiveFabric(s);
       s = tickEconomicShocks(s);
       s = tickFiscalMultiplier(s);
+      s = tickCentralBank(s);
       s = tickInvestorConfidence(s);
     }
   }

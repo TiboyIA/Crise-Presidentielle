@@ -25,6 +25,7 @@ import { INEQUALITY_EVENTS } from "@/data/inequalityEvents";
 import { PRODUCTIVE_FABRIC_EVENTS } from "@/data/productiveFabricEvents";
 import { ECONOMIC_SHOCK_EVENTS } from "@/data/economicShockEvents";
 import { FISCAL_MULTIPLIER_EVENTS } from "@/data/fiscalMultiplierEvents";
+import { CENTRAL_BANK_EVENTS } from "@/data/centralBankEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3716,6 +3717,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...ECONOMIC_SHOCK_EVENTS,
   // ── MULTIPLICATEUR BUDGÉTAIRE ─────────────────────────────────────────────────
   ...FISCAL_MULTIPLIER_EVENTS,
+  // ── BANQUE CENTRALE FICTIVE ───────────────────────────────────────────────────
+  ...CENTRAL_BANK_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));
