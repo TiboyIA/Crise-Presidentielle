@@ -965,4 +965,6 @@ export interface StrategyGameState {
   businessCyclePhase?: import("@/logic/businessCycleEngine").BusinessCyclePhase;
   // Momentum du cycle économique 0-100 (optional pour backward compat)
   cycleMomentum?: number;
+  // Conformité de l'État — Bureau de conformité (optional pour backward compat)
+  complianceState?: import("@/types/compliance").ComplianceState;
 }

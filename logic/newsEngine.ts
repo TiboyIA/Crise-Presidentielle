@@ -458,6 +458,13 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       (state.hiddenPolitics?.popularFatigue ?? 15) >= 55 &&
       state.mandateDay >= 30
     ),
+    // ── Conformité de l'État ───────────────────────────────────────────────────
+    compliance_audit_pressure:     (state.complianceState?.auditPressure     ?? 15) >= 65 && state.mandateDay >= 15,
+    compliance_legal_risk:         (state.complianceState?.legalRisk         ?? 20) >= 60 && state.mandateDay >= 20,
+    compliance_corruption_exposed: (state.complianceState?.corruptionExposure ?? 10) >= 65 && state.mandateDay >= 20,
+    compliance_whistleblower:      (state.complianceState?.whistleblowerRisk  ?? 15) >= 70 && state.mandateDay >= 20,
+    compliance_crisis:             (state.complianceState?.complianceScore    ?? 70) < 25  && state.mandateDay >= 25,
+    compliance_emergency_powers:   (state.complianceState?.emergencyPowersAbuse ?? 10) >= 60 && state.mandateDay >= 15,
   };
 }
 

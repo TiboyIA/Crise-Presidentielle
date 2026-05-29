@@ -74,6 +74,7 @@ import { getTradeBalanceBandInfo, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBal
 import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 import { getFabricBandInfo, DEFAULT_PRODUCTIVE_FABRIC, shouldShowFabricPanel } from "@/logic/productiveFabricEngine";
 import { SHOCK_META } from "@/logic/economicShockEngine";
+import { getComplianceBandInfo, DEFAULT_COMPLIANCE_STATE } from "@/logic/complianceEngine";
 import { CYCLE_META, DEFAULT_BUSINESS_CYCLE_PHASE, DEFAULT_CYCLE_MOMENTUM } from "@/logic/businessCycleEngine";
 import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
 import {
@@ -266,6 +267,10 @@ export default function JournalDeCriseScreen() {
     (p) => p.shortDaysRemaining > 0 || p.longDaysRemaining > 0,
   );
   const showFiscalProgramsPanel = activeFiscalPrograms.length > 0;
+
+  const compliance          = state.complianceState ?? DEFAULT_COMPLIANCE_STATE;
+  const complianceInfo      = getComplianceBandInfo(compliance.complianceScore);
+  const showCompliancePanel = compliance.complianceScore < 60 || compliance.auditPressure >= 50 || compliance.legalRisk >= 50;
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
   const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
@@ -810,6 +815,71 @@ export default function JournalDeCriseScreen() {
                 </View>
               );
             })}
+          </View>
+        </View>
+      )}
+
+      {/* ── Conformité de l'État ───────────────────────────────────────────────── */}
+      {showCompliancePanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: complianceInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="shield-check-outline" size={12} color={complianceInfo.color} />
+            <Text style={[styles.waveTitle, { color: complianceInfo.color }]}>CONFORMITÉ DE L'ÉTAT</Text>
+            <View style={[styles.waveBadge, { backgroundColor: complianceInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: complianceInfo.color }]}>
+                {complianceInfo.label.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          {/* Barre de score global */}
+          <View style={{ marginTop: 8, marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+              <Text style={[styles.waveBadgeText, { color: PALETTE.textMid }]}>Score de conformité</Text>
+              <Text style={[styles.waveBadgeText, { color: complianceInfo.color }]}>{compliance.complianceScore} / 100</Text>
+            </View>
+            <View style={{ height: 5, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden" }}>
+              <View style={{ width: `${compliance.complianceScore}%` as `${number}%`, height: "100%", backgroundColor: complianceInfo.color, borderRadius: 3 }} />
+            </View>
+          </View>
+          <Text style={[styles.stormDesc, { marginBottom: 6 }]}>{complianceInfo.message}</Text>
+          {/* Indicateurs secondaires */}
+          <View style={{ gap: 3 }}>
+            {compliance.legalRisk >= 40 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Risque juridique</Text>
+                <Text style={[styles.waveBadgeText, { color: compliance.legalRisk >= 60 ? "#e54848" : "#e8864f" }]}>{compliance.legalRisk}</Text>
+              </View>
+            )}
+            {compliance.auditPressure >= 40 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Pression d'audit</Text>
+                <Text style={[styles.waveBadgeText, { color: compliance.auditPressure >= 65 ? "#e54848" : "#e8864f" }]}>{compliance.auditPressure}</Text>
+              </View>
+            )}
+            {compliance.corruptionExposure >= 35 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Exposition à la corruption</Text>
+                <Text style={[styles.waveBadgeText, { color: compliance.corruptionExposure >= 60 ? "#e54848" : "#e8864f" }]}>{compliance.corruptionExposure}</Text>
+              </View>
+            )}
+            {compliance.whistleblowerRisk >= 45 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Risque lanceur d'alerte</Text>
+                <Text style={[styles.waveBadgeText, { color: compliance.whistleblowerRisk >= 70 ? "#e54848" : "#e8c44f" }]}>{compliance.whistleblowerRisk}</Text>
+              </View>
+            )}
+            {compliance.emergencyPowersAbuse >= 40 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Dérive pouvoirs d'urgence</Text>
+                <Text style={[styles.waveBadgeText, { color: compliance.emergencyPowersAbuse >= 60 ? "#e8864f" : "#e8c44f" }]}>{compliance.emergencyPowersAbuse}</Text>
+              </View>
+            )}
+            {compliance.procurementIntegrity < 55 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Intégrité marchés publics</Text>
+                <Text style={[styles.waveBadgeText, { color: compliance.procurementIntegrity < 35 ? "#e54848" : "#e8864f" }]}>{compliance.procurementIntegrity}</Text>
+              </View>
+            )}
           </View>
         </View>
       )}
