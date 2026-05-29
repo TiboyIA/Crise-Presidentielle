@@ -961,4 +961,8 @@ export interface StrategyGameState {
   centralBankProfile?: import("@/logic/centralBankEngine").CentralBankProfile;
   // Indice composite de stagflation 0-100 (optional pour backward compat)
   stagflationIndex?: number;
+  // Phase du cycle économique national (optional pour backward compat)
+  businessCyclePhase?: import("@/logic/businessCycleEngine").BusinessCyclePhase;
+  // Momentum du cycle économique 0-100 (optional pour backward compat)
+  cycleMomentum?: number;
 }

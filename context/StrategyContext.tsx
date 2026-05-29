@@ -244,6 +244,7 @@ import { createEconomicShockFromEvent, dampenEconomicShock, tickEconomicShocks }
 import { createFiscalProgram, tickFiscalMultiplier } from "@/logic/fiscalMultiplierEngine";
 import { tickCentralBank, DEFAULT_CB_CREDIBILITY, DEFAULT_MONETARY_TENSION } from "@/logic/centralBankEngine";
 import { tickStagflation } from "@/logic/stagflationEngine";
+import { tickBusinessCycle } from "@/logic/businessCycleEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2615,6 +2616,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickFiscalMultiplier(s);
       s = tickCentralBank(s);
       s = tickStagflation(s);
+      s = tickBusinessCycle(s);
       s = tickInvestorConfidence(s);
     }
   }

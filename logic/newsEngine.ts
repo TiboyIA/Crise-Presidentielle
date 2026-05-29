@@ -425,6 +425,12 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     cb_monetary_tension_crisis: (state.monetaryTension ?? 20) >= 65 && state.mandateDay >= 20,
     // ── Stagflation ────────────────────────────────────────────────────────────
     stagflation_crisis: (state.stagflationIndex ?? 0) >= 50 && state.mandateDay >= 20,
+    // ── Cycle économique ───────────────────────────────────────────────────────
+    cycle_expansion_opportunity:  state.businessCyclePhase === "expansion"      && state.mandateDay >= 15,
+    cycle_surchauffe_warning:     state.businessCyclePhase === "surchauffe"     && state.mandateDay >= 15,
+    cycle_ralentissement_signal:  state.businessCyclePhase === "ralentissement" && state.mandateDay >= 15,
+    cycle_recession_crisis:       state.businessCyclePhase === "recession"      && state.mandateDay >= 15,
+    cycle_reprise_window:         state.businessCyclePhase === "reprise"        && state.mandateDay >= 20,
   };
 }
 
