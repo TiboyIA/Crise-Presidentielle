@@ -12,7 +12,7 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -66,19 +66,19 @@ interface ComingSoonPack {
 const SHOP_CATEGORIES: ShopCategoryDef[] = [
   {
     id: "scenarios",
-    icon: "⚡",
+    icon: "flash",
     title: "SCÉNARIOS DE CRISE",
     subtitle: "Nouveaux événements thématiques injectés dans vos crises",
   },
   {
     id: "pays",
-    icon: "🌍",
+    icon: "earth",
     title: "PAYS JOUABLES",
     subtitle: "Prenez les commandes d'une autre puissance mondiale",
   },
   {
     id: "politiques",
-    icon: "🏛",
+    icon: "bank-outline",
     title: "POLITIQUES & GOUVERNANCE",
     subtitle: "Nouvelles doctrines et styles de gouvernement",
   },
@@ -355,7 +355,7 @@ export default function ShopScreen() {
                       catIdx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 8, paddingTop: 24 },
                     ]}
                   >
-                    <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                    <MaterialCommunityIcons name={cat.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={22} color={colors.foreground} style={styles.categoryIcon} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.categoryTitle, { color: colors.foreground }]}>
                         {cat.title}
@@ -464,7 +464,7 @@ export default function ShopScreen() {
 
         {/* ── Cosmétiques ─────────────────────────────────────────── */}
         <View style={[styles.categoryHeader, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 8, paddingTop: 24 }]}>
-          <Text style={styles.categoryIcon}>🎨</Text>
+          <MaterialCommunityIcons name="palette-outline" size={22} color={colors.foreground} style={styles.categoryIcon} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.categoryTitle, { color: colors.foreground }]}>COSMÉTIQUES</Text>
             <Text style={[styles.categorySubtitle, { color: colors.mutedForeground }]}>
@@ -484,7 +484,7 @@ export default function ShopScreen() {
               onPress={() => {
                 if (!p.free) {
                   Alert.alert(
-                    `${p.icon} ${p.name}`,
+                    p.name,
                     `${p.flavorText}\n\nDisponible bientôt — ${p.price}`,
                     [{ text: "OK" }],
                   );
@@ -501,7 +501,7 @@ export default function ShopScreen() {
                 <Text style={styles.portraitIcon}>{p.icon}</Text>
                 {!p.free && (
                   <View style={styles.portraitLockBadge}>
-                    <Text style={{ fontSize: 9 }}>🔒</Text>
+                    <MaterialCommunityIcons name="lock-outline" size={9} color={colors.mutedForeground} />
                   </View>
                 )}
               </View>
@@ -542,7 +542,7 @@ export default function ShopScreen() {
                 <View style={[styles.themeSwatchRight, { backgroundColor: t.bgSwatch }]} />
                 {!t.free && (
                   <View style={styles.portraitLockBadge}>
-                    <Text style={{ fontSize: 9 }}>🔒</Text>
+                    <MaterialCommunityIcons name="lock-outline" size={9} color={colors.mutedForeground} />
                   </View>
                 )}
               </View>
@@ -573,7 +573,7 @@ export default function ShopScreen() {
           ]}
         >
           <View style={[styles.cardBody, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
-            <Text style={{ fontSize: 28 }}>💾</Text>
+            <MaterialCommunityIcons name="content-save-outline" size={28} color={colors.foreground} />
             <View style={{ flex: 1, gap: 4 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <Text style={[styles.cardTag, { color: colors.mutedForeground }]}>BIENTÔT</Text>
