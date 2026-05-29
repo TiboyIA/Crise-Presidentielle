@@ -240,6 +240,7 @@ import { tickShadowEconomy, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomy
 import { tickTradeBalance, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
 import { tickInequality, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 import { tickProductiveFabric, DEFAULT_PRODUCTIVE_FABRIC } from "@/logic/productiveFabricEngine";
+import { createEconomicShockFromEvent, dampenEconomicShock, tickEconomicShocks } from "@/logic/economicShockEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1704,10 +1705,15 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withThermal = choice?.thermalReduction
           ? applyThermalReduction(withWear, choice.thermalReduction)
           : withWear;
+        // Choc économique externe — création depuis l'événement, amortissement selon le choix
+        const withShock       = createEconomicShockFromEvent(withThermal, event);
+        const withShockDampen = choice?.economicShockDamping
+          ? dampenEconomicShock(withShock, event.id, choice.economicShockDamping)
+          : withShock;
         // Conservation de la pression — déplacement si choix puissant
         const { state: withPressure, note: pressureNote } = choice
-          ? applyPressureConservation(withThermal, choice)
-          : { state: withThermal, note: null };
+          ? applyPressureConservation(withShockDampen, choice)
+          : { state: withShockDampen, note: null };
         const withNote = pressureNote
           ? { ...withPressure, recentPressureNote: pressureNote }
           : withPressure;
@@ -2591,6 +2597,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickTradeBalance(s);
       s = tickInequality(s);
       s = tickProductiveFabric(s);
+      s = tickEconomicShocks(s);
       s = tickInvestorConfidence(s);
     }
   }

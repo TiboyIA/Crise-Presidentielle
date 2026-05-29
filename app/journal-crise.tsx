@@ -73,6 +73,7 @@ import { getShadowEconomyBandInfo, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadow
 import { getTradeBalanceBandInfo, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
 import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 import { getFabricBandInfo, DEFAULT_PRODUCTIVE_FABRIC, shouldShowFabricPanel } from "@/logic/productiveFabricEngine";
+import { SHOCK_META } from "@/logic/economicShockEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -229,6 +230,8 @@ export default function JournalDeCriseScreen() {
   const inequalityInfo      = getInequalityBandInfo(inequalityValue);
   const socialMobilityValue = state.socialMobility  ?? DEFAULT_SOCIAL_MOBILITY;
   const showInequalityPanel = inequalityValue >= 46 || socialMobilityValue <= 35;
+
+  const activeEconomicShocks = (state.economicShocks ?? []).filter((s) => s.intensity > 0 && s.remainingDays > 0);
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
   const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
@@ -463,6 +466,38 @@ export default function JournalDeCriseScreen() {
               </>
             )}
           </Text>
+        </View>
+      )}
+
+      {/* ── Chocs économiques actifs ─────────────────────────────────────────── */}
+      {activeEconomicShocks.length > 0 && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#e54848" + "44" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="alert-octagon-outline" size={12} color="#e54848" />
+            <Text style={[styles.waveTitle, { color: "#e54848" }]}>CHOCS ÉCONOMIQUES ACTIFS</Text>
+            <View style={[styles.waveBadge, { backgroundColor: "#e5484822" }]}>
+              <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>
+                {activeEconomicShocks.length} ACTIF{activeEconomicShocks.length > 1 ? "S" : ""}
+              </Text>
+            </View>
+          </View>
+          {activeEconomicShocks.map((shock) => {
+            const meta = SHOCK_META[shock.type];
+            const intensityColor = shock.intensity >= 60 ? "#e54848" : shock.intensity >= 35 ? "#e8864f" : "#e8c44f";
+            return (
+              <View key={shock.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 5 }}>
+                <View style={[styles.waveBadge, { backgroundColor: meta.color + "22" }]}>
+                  <Text style={[styles.waveBadgeText, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
+                </View>
+                <Text style={[styles.waveBadgeText, { color: intensityColor }]}>
+                  Intensité <Text style={{ fontWeight: "bold" }}>{Math.round(shock.intensity)}</Text>
+                </Text>
+                <Text style={[styles.waveBadgeText, { color: "#888" }]}>
+                  {shock.remainingDays}j restant{shock.remainingDays > 1 ? "s" : ""}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       )}
 

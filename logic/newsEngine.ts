@@ -377,6 +377,42 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       (state.productiveFabric?.industrialChampions ?? 50) <= 40
       && (state.tradeBalance ?? -5) <= -20
       && state.mandateDay >= 20,
+    // ── Chocs économiques externes ────────────────────────────────────────────────
+    shock_energy_price_spike: (() => {
+      const sc = state.supplyChain;
+      return sc
+        ? sc.energie.disruptionRisk >= 45 && state.mandateDay >= 15
+        : state.mandateDay >= 15;
+    })(),
+    shock_supply_rupture: (() => {
+      const sc = state.supplyChain;
+      if (!sc) return false;
+      return Object.values(sc).some((sec) => sec.dependencyLevel >= 70) && state.mandateDay >= 15;
+    })(),
+    shock_financial_crisis: state.mandateDay >= 30,
+    shock_trade_contraction: (state.tradeBalance ?? -5) <= -35 && state.mandateDay >= 20,
+    shock_investment_panic:  (state.investorConfidence ?? 55) <= 25 && state.mandateDay >= 15,
+    shock_food_crisis: (() => {
+      const sc = state.supplyChain;
+      return sc
+        ? (sc.alimentation.disruptionRisk >= 55 || sc.alimentation.dependencyLevel >= 70) && state.mandateDay >= 12
+        : false;
+    })(),
+    shock_maritime_blockade: state.mandateDay >= 20,
+    shock_trade_war: (() => {
+      const hostileCount = (state.relations ?? []).filter((r) => r.status === "hostile" || r.status === "rival").length;
+      return hostileCount >= 2 && state.mandateDay >= 20;
+    })(),
+    shock_component_shortage: (() => {
+      const sc = state.supplyChain;
+      return sc ? sc.semi_conducteurs.dependencyLevel >= 65 && state.mandateDay >= 18 : false;
+    })(),
+    shock_tech_bubble: (() => {
+      const pf = state.productiveFabric;
+      return (pf?.startupEcosystem ?? 42) >= 60
+        && (state.investorConfidence ?? 55) >= 60
+        && state.mandateDay >= 25;
+    })(),
   };
 }
 

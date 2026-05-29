@@ -649,6 +649,8 @@ export interface NewsChoice {
   localCommerceDelta?: number;
   /** Delta direct sur l'industrie stratégique — appliqué immédiatement lors de la résolution du choix. */
   strategicIndustryDelta?: number;
+  /** Amortissement du choc économique externe lié à cet événement (réduit intensity + durée). */
+  economicShockDamping?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -935,4 +937,6 @@ export interface StrategyGameState {
   socialMobility?: number;
   // Tissu productif national — structure économique (optional pour backward compat)
   productiveFabric?: import("@/logic/productiveFabricEngine").ProductiveFabricState;
+  // Chocs économiques externes actifs (optional pour backward compat)
+  economicShocks?: import("@/logic/economicShockEngine").EconomicShock[];
 }
