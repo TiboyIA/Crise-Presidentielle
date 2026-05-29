@@ -21,6 +21,7 @@ import { INVESTOR_CONFIDENCE_EVENTS } from "@/data/investorConfidenceEvents";
 import { TAX_POLICY_EVENTS } from "@/data/taxPolicyEvents";
 import { SHADOW_ECONOMY_EVENTS } from "@/data/shadowEconomyEvents";
 import { TRADE_BALANCE_EVENTS } from "@/data/tradeBalanceEvents";
+import { INEQUALITY_EVENTS } from "@/data/inequalityEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3704,6 +3705,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...SHADOW_ECONOMY_EVENTS,
   // ── COMMERCE EXTÉRIEUR ET BALANCE COMMERCIALE ─────────────────────────────────
   ...TRADE_BALANCE_EVENTS,
+  // ── INÉGALITÉS ET FRACTURE SOCIALE ────────────────────────────────────────────
+  ...INEQUALITY_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

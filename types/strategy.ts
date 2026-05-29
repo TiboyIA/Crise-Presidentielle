@@ -635,6 +635,10 @@ export interface NewsChoice {
   shadowEconomyDelta?: number;
   /** Delta direct sur la balance commerciale — appliqué immédiatement lors de la résolution du choix. */
   tradeBalanceDelta?: number;
+  /** Delta direct sur l'indice d'inégalités — appliqué immédiatement lors de la résolution du choix. */
+  inequalityIndexDelta?: number;
+  /** Delta direct sur la mobilité sociale — appliqué immédiatement lors de la résolution du choix. */
+  socialMobilityDelta?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -915,4 +919,8 @@ export interface StrategyGameState {
   shadowEconomy?: number;
   // Balance commerciale fictive — -100 à +100 (optional pour backward compat)
   tradeBalance?: number;
+  // Indice d'inégalités sociales — 0-100 (optional pour backward compat)
+  inequalityIndex?: number;
+  // Mobilité sociale — 0-100 (optional pour backward compat)
+  socialMobility?: number;
 }

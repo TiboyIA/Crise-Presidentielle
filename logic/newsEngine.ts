@@ -352,6 +352,16 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
         && (state.tradeBalance ?? -5) <= -15
         && state.mandateDay >= 15;
     })(),
+    // ── Inégalités et fracture sociale ──────────────────────────────────────────
+    inequality_signal:        (state.inequalityIndex ?? 35) >= 45 && state.mandateDay >= 10,
+    inequality_alert:         (state.inequalityIndex ?? 35) >= 65 && state.mandateDay >= 15,
+    inequality_fracture:      (state.inequalityIndex ?? 35) >= 80 && state.mandateDay >= 20,
+    social_mobility_collapse: (state.socialMobility  ?? 55) <= 30 && state.mandateDay >= 15,
+    social_cohesion_window: (() => {
+      return (state.socialMobility ?? 55) >= 65
+        && (state.inequalityIndex ?? 35) <= 45
+        && state.mandateDay >= 25;
+    })(),
   };
 }
 

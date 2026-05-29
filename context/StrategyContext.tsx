@@ -238,6 +238,7 @@ import { tickInvestorConfidence, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/inv
 import { tickTaxPolicy, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
 import { tickShadowEconomy, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
 import { tickTradeBalance, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
+import { tickInequality, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1671,7 +1672,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         let tradeBalance = prev.tradeBalance ?? DEFAULT_TRADE_BALANCE;
         if (choice?.tradeBalanceDelta) tradeBalance = Math.max(-100, Math.min(100, tradeBalance + choice.tradeBalanceDelta));
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance };
+        // Inégalités et fracture sociale — delta direct issu du choix de crise
+        let inequalityIndex = prev.inequalityIndex ?? DEFAULT_INEQUALITY_INDEX;
+        let socialMobility  = prev.socialMobility  ?? DEFAULT_SOCIAL_MOBILITY;
+        if (choice?.inequalityIndexDelta) inequalityIndex = Math.max(0, Math.min(100, inequalityIndex + choice.inequalityIndexDelta));
+        if (choice?.socialMobilityDelta)  socialMobility  = Math.max(0, Math.min(100, socialMobility  + choice.socialMobilityDelta));
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2572,6 +2579,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickTaxPolicy(s);
       s = tickShadowEconomy(s);
       s = tickTradeBalance(s);
+      s = tickInequality(s);
       s = tickInvestorConfidence(s);
     }
   }

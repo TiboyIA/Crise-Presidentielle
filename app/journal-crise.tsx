@@ -71,6 +71,7 @@ import { getInvestorConfidenceBandInfo, DEFAULT_INVESTOR_CONFIDENCE } from "@/lo
 import { getFiscalConsentBandInfo, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
 import { getShadowEconomyBandInfo, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
 import { getTradeBalanceBandInfo, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
+import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -222,6 +223,11 @@ export default function JournalDeCriseScreen() {
   const tradeBalanceValue   = state.tradeBalance ?? DEFAULT_TRADE_BALANCE;
   const tradeBalanceInfo    = getTradeBalanceBandInfo(tradeBalanceValue);
   const showTradePanel      = tradeBalanceValue <= -30 || tradeBalanceValue >= 35;
+
+  const inequalityValue     = state.inequalityIndex ?? DEFAULT_INEQUALITY_INDEX;
+  const inequalityInfo      = getInequalityBandInfo(inequalityValue);
+  const socialMobilityValue = state.socialMobility  ?? DEFAULT_SOCIAL_MOBILITY;
+  const showInequalityPanel = inequalityValue >= 46 || socialMobilityValue <= 35;
 
   const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
   const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
@@ -463,6 +469,33 @@ export default function JournalDeCriseScreen() {
             </Text>
           </View>
           <Text style={styles.stormDesc}>{tradeBalanceInfo.message}</Text>
+        </View>
+      )}
+
+      {/* ── Fracture sociale ─────────────────────────────────────────────────── */}
+      {showInequalityPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: inequalityInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="scale-unbalanced" size={12} color={inequalityInfo.color} />
+            <Text style={[styles.waveTitle, { color: inequalityInfo.color }]}>FRACTURE SOCIALE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: inequalityInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: inequalityInfo.color }]}>
+                {inequalityInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: inequalityInfo.color, marginLeft: 4 }]}>
+              {Math.round(inequalityValue)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{inequalityInfo.message}</Text>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+            <Text style={[styles.waveBadgeText, { color: "#aaa" }]}>
+              Inégalités <Text style={{ color: inequalityInfo.color }}>{Math.round(inequalityValue)}</Text>
+            </Text>
+            <Text style={[styles.waveBadgeText, { color: "#aaa" }]}>
+              Mobilité sociale <Text style={{ color: socialMobilityValue >= 55 ? "#4caf82" : socialMobilityValue >= 35 ? "#e8c44f" : "#e54848" }}>{Math.round(socialMobilityValue)}</Text>
+            </Text>
+          </View>
         </View>
       )}
 
