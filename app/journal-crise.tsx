@@ -7,6 +7,7 @@ import { useResponsive } from "@/utils/responsive";
 import { NewsCard } from "@/components/NewsCard";
 import { InteractiveNewsModal } from "@/components/InteractiveNewsModal";
 import { Badge, Panel, ScreenHeader, SectionHeader } from "@/components/ui";
+import { SectionBackdrop } from "@/components/ui/SectionBackdrop";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import { typeIcon, urgencyColor } from "@/logic/newsEngine";
 import { computeNationalTension } from "@/logic/tensionEngine";
@@ -351,6 +352,7 @@ export default function JournalDeCriseScreen() {
 
   return (
     <View style={styles.container}>
+      <SectionBackdrop section="journal" intensity={0.45} />
       <ScreenHeader title="Journal de Crise" kicker="DESK PRÉSIDENTIEL" />
 
       {/* ── Onglets ────────────────────────────────────────────────────────── */}
