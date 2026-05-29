@@ -631,6 +631,8 @@ export interface NewsChoice {
   taxEfficiencyDelta?: number;
   /** Delta direct sur le consentement fiscal — appliqué immédiatement lors de la résolution du choix. */
   fiscalConsentDelta?: number;
+  /** Delta direct sur l'économie informelle — appliqué immédiatement lors de la résolution du choix. */
+  shadowEconomyDelta?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -907,4 +909,6 @@ export interface StrategyGameState {
   taxEfficiency?: number;
   // Consentement fiscal de la population — 0-100 (optional pour backward compat)
   fiscalConsent?: number;
+  // Économie informelle nationale — 0-100 (optional pour backward compat)
+  shadowEconomy?: number;
 }

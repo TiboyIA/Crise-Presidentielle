@@ -19,6 +19,7 @@ import { LABOR_MARKET_EVENTS } from "@/data/laborMarketEvents";
 import { SUPPLY_CHAIN_EVENTS } from "@/data/supplyChainEvents";
 import { INVESTOR_CONFIDENCE_EVENTS } from "@/data/investorConfidenceEvents";
 import { TAX_POLICY_EVENTS } from "@/data/taxPolicyEvents";
+import { SHADOW_ECONOMY_EVENTS } from "@/data/shadowEconomyEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3698,6 +3699,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...INVESTOR_CONFIDENCE_EVENTS,
   // ── FISCALITÉ DYNAMIQUE ───────────────────────────────────────────────────────
   ...TAX_POLICY_EVENTS,
+  // ── ÉCONOMIE INFORMELLE ───────────────────────────────────────────────────────
+  ...SHADOW_ECONOMY_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

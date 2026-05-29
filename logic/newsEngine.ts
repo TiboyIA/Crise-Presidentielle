@@ -331,6 +331,15 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     fiscal_compact:        (state.nationalDebt ?? 0) > 180 && (state.taxPressure ?? 42) < 48 && state.mandateDay >= 20,
     tax_cut_pressure:      (state.taxPressure ?? 42) >= 55 && (state.nationalIndicators?.popularity ?? 60) < 45 && state.mandateDay >= 15,
     informal_economy_surge: (state.fiscalConsent ?? 62) <= 22 && state.mandateDay >= 25,
+    // ── Économie informelle ──────────────────────────────────────────────────
+    shadow_economy_watch:       (state.shadowEconomy ?? 30) >= 35 && state.mandateDay >= 10,
+    shadow_economy_alert:       (state.shadowEconomy ?? 30) >= 55 && state.mandateDay >= 15,
+    shadow_economy_crisis:      (state.shadowEconomy ?? 30) >= 72 && state.mandateDay >= 20,
+    shadow_economy_opportunity: (() => {
+      const completed = state.strategyResearch?.completed ?? [];
+      const hasTech = completed.includes("research_admin_ai") || completed.includes("research_digital_twin");
+      return hasTech && (state.shadowEconomy ?? 30) >= 42 && state.mandateDay >= 20;
+    })(),
   };
 }
 

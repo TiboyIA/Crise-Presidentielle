@@ -236,6 +236,7 @@ import { tickProductivity } from "@/logic/productivityEngine";
 import { tickSupplyChain, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
 import { tickInvestorConfidence, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
 import { tickTaxPolicy, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
+import { tickShadowEconomy, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1661,7 +1662,11 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         if (choice?.taxEfficiencyDelta) taxEfficiency = Math.max(0, Math.min(100, taxEfficiency + choice.taxEfficiencyDelta));
         if (choice?.fiscalConsentDelta) fiscalConsent = Math.max(0, Math.min(100, fiscalConsent + choice.fiscalConsentDelta));
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent };
+        // Économie informelle — delta direct issu du choix de crise
+        let shadowEconomy = prev.shadowEconomy ?? DEFAULT_SHADOW_ECONOMY;
+        if (choice?.shadowEconomyDelta) shadowEconomy = Math.max(0, Math.min(100, shadowEconomy + choice.shadowEconomyDelta));
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2560,6 +2565,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickInflation(s);
       s = tickPurchasingPower(s);
       s = tickTaxPolicy(s);
+      s = tickShadowEconomy(s);
       s = tickInvestorConfidence(s);
     }
   }

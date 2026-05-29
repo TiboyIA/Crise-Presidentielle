@@ -69,6 +69,7 @@ import { getSupplyRiskBandInfo, computeOverallSupplyRisk, DEFAULT_SUPPLY_CHAIN_S
 import { SECTOR_IDS, STRATEGIC_SECTORS } from "@/data/strategicSectors";
 import { getInvestorConfidenceBandInfo, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
 import { getFiscalConsentBandInfo, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
+import { getShadowEconomyBandInfo, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -212,6 +213,10 @@ export default function JournalDeCriseScreen() {
   const taxPressureValue    = state.taxPressure    ?? DEFAULT_TAX_PRESSURE;
   const taxEfficiencyValue  = state.taxEfficiency  ?? DEFAULT_TAX_EFFICIENCY;
   const showFiscalPanel     = fiscalConsentValue < 46 || fiscalConsentValue >= 71;
+
+  const shadowEconomyValue  = state.shadowEconomy ?? DEFAULT_SHADOW_ECONOMY;
+  const shadowEconomyInfo   = getShadowEconomyBandInfo(shadowEconomyValue);
+  const showShadowPanel     = shadowEconomyValue >= 41;
 
   const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
   const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
@@ -434,6 +439,25 @@ export default function JournalDeCriseScreen() {
               </>
             )}
           </Text>
+        </View>
+      )}
+
+      {/* ── Économie informelle ──────────────────────────────────────────────── */}
+      {showShadowPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: shadowEconomyInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="eye-off-outline" size={12} color={shadowEconomyInfo.color} />
+            <Text style={[styles.waveTitle, { color: shadowEconomyInfo.color }]}>ÉCONOMIE INFORMELLE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: shadowEconomyInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: shadowEconomyInfo.color }]}>
+                {shadowEconomyInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: shadowEconomyInfo.color, marginLeft: 4 }]}>
+              {Math.round(shadowEconomyValue)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{shadowEconomyInfo.message}</Text>
         </View>
       )}
 
