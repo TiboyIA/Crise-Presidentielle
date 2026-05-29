@@ -57,6 +57,13 @@ import { getInteroperabilityBandInfo, DEFAULT_HEALTH_INTEROPERABILITY } from "@/
 import { generateHealthSnapshot } from "@/logic/anonymizedHealthRecordsEngine";
 import { getInflationBandInfo, DEFAULT_INFLATION } from "@/logic/inflationEngine";
 import { getPurchasingPowerBandInfo, DEFAULT_PURCHASING_POWER } from "@/logic/purchasingPowerEngine";
+import {
+  getUnemploymentBandInfo,
+  getLaborShortageBandInfo,
+  DEFAULT_UNEMPLOYMENT,
+  DEFAULT_LABOR_SHORTAGE,
+  DEFAULT_YOUTH_UNEMPLOYMENT,
+} from "@/logic/laborMarketEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -182,6 +189,11 @@ export default function JournalDeCriseScreen() {
   const inflationInfo        = getInflationBandInfo(inflationValue);
   const purchasingPowerValue = state.purchasingPower ?? DEFAULT_PURCHASING_POWER;
   const purchasingPowerInfo  = getPurchasingPowerBandInfo(purchasingPowerValue);
+  const unemploymentValue    = state.unemployment    ?? DEFAULT_UNEMPLOYMENT;
+  const unemploymentInfo     = getUnemploymentBandInfo(unemploymentValue);
+  const laborShortageValue   = state.laborShortage   ?? DEFAULT_LABOR_SHORTAGE;
+  const laborShortageInfo    = getLaborShortageBandInfo(laborShortageValue);
+  const youthUnempValue      = state.youthUnemployment ?? DEFAULT_YOUTH_UNEMPLOYMENT;
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
@@ -373,6 +385,25 @@ export default function JournalDeCriseScreen() {
             <Text style={{ color: inflationInfo.color }}>{"Inflation : " + inflationInfo.label}</Text>
             {"   ·   "}
             <Text style={{ color: purchasingPowerInfo.color }}>{"Pouvoir d'achat : " + purchasingPowerInfo.label}</Text>
+          </Text>
+        </View>
+      )}
+
+      {/* ── Emploi national ───────────────────────────────────────────────────── */}
+      {(unemploymentValue >= 45 || laborShortageValue >= 60 || youthUnempValue >= 55) && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: unemploymentInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="briefcase-outline" size={12} color={unemploymentInfo.color} />
+            <Text style={[styles.waveTitle, { color: unemploymentInfo.color }]}>EMPLOI NATIONAL</Text>
+          </View>
+          <Text style={styles.stormDesc}>
+            <Text style={{ color: unemploymentInfo.color }}>{"Chômage : " + unemploymentInfo.label}</Text>
+            {laborShortageValue >= 40 && (
+              <>
+                {"   ·   "}
+                <Text style={{ color: laborShortageInfo.color }}>{"Pénurie : " + laborShortageInfo.label}</Text>
+              </>
+            )}
           </Text>
         </View>
       )}

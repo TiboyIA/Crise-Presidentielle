@@ -877,4 +877,12 @@ export interface StrategyGameState {
   inflation?: number;
   // Pouvoir d'achat réel des ménages — 0-100 (optional pour backward compat)
   purchasingPower?: number;
+  // Taux de chômage fictif — 0-100 (optional pour backward compat)
+  unemployment?: number;
+  // Qualité de l'emploi — 0-100 (optional pour backward compat)
+  jobQuality?: number;
+  // Chômage des jeunes — 0-100, structurellement plus élevé (optional pour backward compat)
+  youthUnemployment?: number;
+  // Pénurie de main-d'œuvre — 0-100 (optional pour backward compat)
+  laborShortage?: number;
 }

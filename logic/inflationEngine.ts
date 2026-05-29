@@ -138,6 +138,12 @@ export function computeInflationTarget(state: StrategyGameState): number {
   if (ruptures >= 2)    target += 6;
   else if (ruptures >= 1) target += 3;
 
+  // Pénurie de main-d'œuvre + plein emploi → spirale salaires-prix
+  const laborShortage = state.laborShortage ?? 20;
+  const unemployment  = state.unemployment  ?? 25;
+  if (laborShortage > 60 && unemployment < 25) target += 6;
+  else if (laborShortage > 40 && unemployment < 35) target += 3;
+
   // Recherches — souveraineté énergétique et numérique
   if (completed.includes("research_energy_sovereign"))       target -= 6;
   if (completed.includes("research_datacenter_cooling"))     target -= 3;

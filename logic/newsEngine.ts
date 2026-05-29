@@ -278,6 +278,13 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     interop_opportunity: (state.healthInteroperability ?? 52) >= 70 && state.mandateDay >= 30,
     // ── Bilan sanitaire intermédiaire ────────────────────────────────────────
     health_bilan_eligible: state.mandateDay >= 50,
+    // ── Marché du travail ────────────────────────────────────────────────────
+    unemployment_rising:    (state.unemployment ?? 25) >= 45 && state.mandateDay >= 15,
+    unemployment_crisis:    (state.unemployment ?? 25) >= 65 && state.mandateDay >= 20,
+    labor_shortage_alert:   (state.laborShortage ?? 20) >= 60 && (state.unemployment ?? 25) < 30 && state.mandateDay >= 20,
+    youth_unemployment_high:(state.youthUnemployment ?? 35) >= 55 && state.mandateDay >= 15,
+    job_quality_crisis:     (state.jobQuality ?? 55) < 25 && state.mandateDay >= 20,
+    employment_boom:        (state.unemployment ?? 25) < 15 && state.mandateDay >= 30,
     // ── Inflation et pouvoir d'achat ─────────────────────────────────────────
     inflation_signal:      (state.inflation ?? 25) >= 35 && (state.inflation ?? 25) < 60 && state.mandateDay >= 10,
     inflation_alert:       (state.inflation ?? 25) >= 60 && (state.inflation ?? 25) < 80 && state.mandateDay >= 15,

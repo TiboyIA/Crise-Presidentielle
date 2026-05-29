@@ -231,6 +231,7 @@ import { tickStatisticsScandalPressure } from "@/logic/healthStatisticsScandalEn
 import { tickHealthInteroperability } from "@/logic/healthInteroperabilityEngine";
 import { tickInflation } from "@/logic/inflationEngine";
 import { tickPurchasingPower } from "@/logic/purchasingPowerEngine";
+import { tickLaborMarket } from "@/logic/laborMarketEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2516,6 +2517,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickHealthInteroperability(s);
       s = tickHealthUnderDetection(s);
       s = tickStatisticsScandalPressure(s);
+      s = tickLaborMarket(s);
       s = tickInflation(s);
       s = tickPurchasingPower(s);
     }
