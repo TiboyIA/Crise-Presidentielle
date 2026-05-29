@@ -180,6 +180,14 @@ export function computeInflationTarget(state: StrategyGameState): number {
     else if (broadRuptures >= 1) target += 3;
   }
 
+  // Balance commerciale — inflation importée via déficit chronique des échanges
+  const tradeBalance = state.tradeBalance ?? -5;
+  if (tradeBalance <= -50)      target += 5;
+  else if (tradeBalance <= -30) target += 3;
+  else if (tradeBalance <= -15) target += 1;
+  else if (tradeBalance >= 40)  target -= 3;
+  else if (tradeBalance >= 25)  target -= 1;
+
   return Math.max(0, Math.min(100, target));
 }
 

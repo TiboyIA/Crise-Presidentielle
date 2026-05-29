@@ -70,6 +70,7 @@ import { SECTOR_IDS, STRATEGIC_SECTORS } from "@/data/strategicSectors";
 import { getInvestorConfidenceBandInfo, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
 import { getFiscalConsentBandInfo, DEFAULT_TAX_PRESSURE, DEFAULT_TAX_EFFICIENCY, DEFAULT_FISCAL_CONSENT } from "@/logic/taxPolicyEngine";
 import { getShadowEconomyBandInfo, DEFAULT_SHADOW_ECONOMY } from "@/logic/shadowEconomyEngine";
+import { getTradeBalanceBandInfo, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -217,6 +218,10 @@ export default function JournalDeCriseScreen() {
   const shadowEconomyValue  = state.shadowEconomy ?? DEFAULT_SHADOW_ECONOMY;
   const shadowEconomyInfo   = getShadowEconomyBandInfo(shadowEconomyValue);
   const showShadowPanel     = shadowEconomyValue >= 41;
+
+  const tradeBalanceValue   = state.tradeBalance ?? DEFAULT_TRADE_BALANCE;
+  const tradeBalanceInfo    = getTradeBalanceBandInfo(tradeBalanceValue);
+  const showTradePanel      = tradeBalanceValue <= -30 || tradeBalanceValue >= 35;
 
   const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
   const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
@@ -439,6 +444,25 @@ export default function JournalDeCriseScreen() {
               </>
             )}
           </Text>
+        </View>
+      )}
+
+      {/* ── Balance commerciale ──────────────────────────────────────────────── */}
+      {showTradePanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: tradeBalanceInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="swap-horizontal" size={12} color={tradeBalanceInfo.color} />
+            <Text style={[styles.waveTitle, { color: tradeBalanceInfo.color }]}>BALANCE COMMERCIALE</Text>
+            <View style={[styles.waveBadge, { backgroundColor: tradeBalanceInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: tradeBalanceInfo.color }]}>
+                {tradeBalanceInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: tradeBalanceInfo.color, marginLeft: 4 }]}>
+              {tradeBalanceValue > 0 ? "+" : ""}{Math.round(tradeBalanceValue)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{tradeBalanceInfo.message}</Text>
         </View>
       )}
 

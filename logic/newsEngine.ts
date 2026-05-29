@@ -340,6 +340,18 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       const hasTech = completed.includes("research_admin_ai") || completed.includes("research_digital_twin");
       return hasTech && (state.shadowEconomy ?? 30) >= 42 && state.mandateDay >= 20;
     })(),
+    // ── Commerce extérieur et balance commerciale ────────────────────────────
+    trade_briefing:            (state.tradeBalance ?? -5) <= -15 && state.mandateDay >= 8,
+    trade_deficit_alert:       (state.tradeBalance ?? -5) <= -30 && state.mandateDay >= 15,
+    trade_sovereignty_crisis:  (state.tradeBalance ?? -5) <= -55 && state.mandateDay >= 20,
+    trade_surplus_opportunity: (state.tradeBalance ?? -5) >= 35 && state.mandateDay >= 20,
+    trade_disruption_alert: (() => {
+      const sc = state.supplyChain;
+      if (!sc) return false;
+      return (sc.transport.disruptionRisk >= 65 || sc.energie.disruptionRisk >= 65)
+        && (state.tradeBalance ?? -5) <= -15
+        && state.mandateDay >= 15;
+    })(),
   };
 }
 

@@ -633,6 +633,8 @@ export interface NewsChoice {
   fiscalConsentDelta?: number;
   /** Delta direct sur l'économie informelle — appliqué immédiatement lors de la résolution du choix. */
   shadowEconomyDelta?: number;
+  /** Delta direct sur la balance commerciale — appliqué immédiatement lors de la résolution du choix. */
+  tradeBalanceDelta?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -911,4 +913,6 @@ export interface StrategyGameState {
   fiscalConsent?: number;
   // Économie informelle nationale — 0-100 (optional pour backward compat)
   shadowEconomy?: number;
+  // Balance commerciale fictive — -100 à +100 (optional pour backward compat)
+  tradeBalance?: number;
 }
