@@ -246,6 +246,7 @@ import { tickCentralBank, DEFAULT_CB_CREDIBILITY, DEFAULT_MONETARY_TENSION } fro
 import { tickStagflation } from "@/logic/stagflationEngine";
 import { tickBusinessCycle } from "@/logic/businessCycleEngine";
 import { tickCompliance } from "@/logic/complianceEngine";
+import { tickProcurement, DEFAULT_PROCUREMENT_STATE } from "@/logic/procurementComplianceEngine";
 import {
   addDerogation, justifyDerogation, auditDerogation, ignoreDerogation, tickDerogations,
 } from "@/logic/emergencyDerogationEngine";
@@ -1707,7 +1708,15 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         if (choice?.localCommerceDelta)        productiveFabric = { ...productiveFabric, localCommerce:       clampFabric(productiveFabric.localCommerce       + choice.localCommerceDelta) };
         if (choice?.strategicIndustryDelta)    productiveFabric = { ...productiveFabric, strategicIndustry:   clampFabric(productiveFabric.strategicIndustry   + choice.strategicIndustryDelta) };
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility, productiveFabric, centralBankCredibility, monetaryTension, centralBankProfile };
+        // Marchés publics — deltas directs issus du choix de crise
+        const clampProc = (v: number) => Math.max(0, Math.min(100, v));
+        let procurementState = prev.procurementState ?? DEFAULT_PROCUREMENT_STATE;
+        if (choice?.procurementIntegrityDelta)   procurementState = { ...procurementState, procurementIntegrity:   clampProc(procurementState.procurementIntegrity   + choice.procurementIntegrityDelta) };
+        if (choice?.vendorConcentrationDelta)    procurementState = { ...procurementState, vendorConcentration:    clampProc(procurementState.vendorConcentration    + choice.vendorConcentrationDelta) };
+        if (choice?.conflictOfInterestRiskDelta) procurementState = { ...procurementState, conflictOfInterestRisk: clampProc(procurementState.conflictOfInterestRisk + choice.conflictOfInterestRiskDelta) };
+        if (choice?.deliveryReliabilityDelta)    procurementState = { ...procurementState, deliveryReliability:    clampProc(procurementState.deliveryReliability    + choice.deliveryReliabilityDelta) };
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence, taxPressure, taxEfficiency, fiscalConsent, shadowEconomy, tradeBalance, inequalityIndex, socialMobility, productiveFabric, centralBankCredibility, monetaryTension, centralBankProfile, procurementState };
         // Dérogation d'urgence — créée si le choix le déclare
         const withDerogation = choice?.createsDerogation
           ? addDerogation(assembled, { crisisId: eventId, ...choice.createsDerogation })
@@ -2669,6 +2678,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickStagflation(s);
       s = tickBusinessCycle(s);
       s = tickCompliance(s);
+      s = tickProcurement(s);
       s = tickDerogations(s);
       s = tickInvestorConfidence(s);
     }

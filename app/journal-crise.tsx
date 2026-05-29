@@ -75,6 +75,7 @@ import { getInequalityBandInfo, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILIT
 import { getFabricBandInfo, DEFAULT_PRODUCTIVE_FABRIC, shouldShowFabricPanel } from "@/logic/productiveFabricEngine";
 import { SHOCK_META } from "@/logic/economicShockEngine";
 import { getComplianceBandInfo, DEFAULT_COMPLIANCE_STATE } from "@/logic/complianceEngine";
+import { getProcurementBandInfo, DEFAULT_PROCUREMENT_STATE } from "@/logic/procurementComplianceEngine";
 import {
   DEROGATION_DEFS, getActiveDerogations, getActiveUnreviewed, getDerogationRiskLevel,
   DEROGATION_JUSTIFY_COST_INFLUENCE, DEROGATION_AUDIT_COST_MONEY, DEROGATION_AUDIT_COST_INFLUENCE,
@@ -286,6 +287,10 @@ export default function JournalDeCriseScreen() {
   const DEROG_RISK_LABEL: Record<string, string> = {
     safe: "MAÎTRISÉ", watch: "À SURVEILLER", alert: "RISQUE ÉLEVÉ", critical: "CRISE",
   };
+
+  const procurement      = state.procurementState ?? DEFAULT_PROCUREMENT_STATE;
+  const procurementInfo  = getProcurementBandInfo(procurement.procurementIntegrity);
+  const showProcurPanel  = procurement.procurementIntegrity < 65 || procurement.conflictOfInterestRisk >= 40 || procurement.vendorConcentration >= 50;
 
   const productiveFabric    = state.productiveFabric ?? DEFAULT_PRODUCTIVE_FABRIC;
   const showFabricPanel     = shouldShowFabricPanel(productiveFabric);
@@ -830,6 +835,53 @@ export default function JournalDeCriseScreen() {
                 </View>
               );
             })}
+          </View>
+        </View>
+      )}
+
+      {/* ── Intégrité des marchés publics ──────────────────────────────────────── */}
+      {showProcurPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: procurementInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="handshake-outline" size={12} color={procurementInfo.color} />
+            <Text style={[styles.waveTitle, { color: procurementInfo.color }]}>MARCHÉS PUBLICS</Text>
+            <View style={[styles.waveBadge, { backgroundColor: procurementInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: procurementInfo.color }]}>
+                {procurementInfo.label.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          {/* Barre intégrité */}
+          <View style={{ marginTop: 8, marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+              <Text style={[styles.waveBadgeText, { color: PALETTE.textMid }]}>Intégrité des marchés</Text>
+              <Text style={[styles.waveBadgeText, { color: procurementInfo.color }]}>{procurement.procurementIntegrity} / 100</Text>
+            </View>
+            <View style={{ height: 5, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden" }}>
+              <View style={{ width: `${procurement.procurementIntegrity}%` as `${number}%`, height: "100%", backgroundColor: procurementInfo.color, borderRadius: 3 }} />
+            </View>
+          </View>
+          <Text style={[styles.stormDesc, { marginBottom: 6 }]}>{procurementInfo.message}</Text>
+          {/* Indicateurs secondaires */}
+          <View style={{ gap: 3 }}>
+            {procurement.vendorConcentration >= 45 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Concentration fournisseurs</Text>
+                <Text style={[styles.waveBadgeText, { color: procurement.vendorConcentration >= 70 ? "#e54848" : "#e8864f" }]}>{procurement.vendorConcentration}</Text>
+              </View>
+            )}
+            {procurement.conflictOfInterestRisk >= 35 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Risque conflits d'intérêts</Text>
+                <Text style={[styles.waveBadgeText, { color: procurement.conflictOfInterestRisk >= 65 ? "#e54848" : "#e8864f" }]}>{procurement.conflictOfInterestRisk}</Text>
+              </View>
+            )}
+            {procurement.deliveryReliability < 55 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Fiabilité de livraison</Text>
+                <Text style={[styles.waveBadgeText, { color: procurement.deliveryReliability < 35 ? "#e54848" : "#e8c44f" }]}>{procurement.deliveryReliability}</Text>
+              </View>
+            )}
           </View>
         </View>
       )}

@@ -674,6 +674,11 @@ export interface NewsChoice {
     relatedNewsEventId?: string;
     payload?: Partial<NationalIndicators> | Partial<HiddenPolitics>;
   };
+  /** Deltas sur les marchés publics — appliqués lors de la résolution du choix. */
+  procurementIntegrityDelta?:   number;
+  vendorConcentrationDelta?:    number;
+  conflictOfInterestRiskDelta?: number;
+  deliveryReliabilityDelta?:    number;
   /** Crée une dérogation d'urgence lors de la résolution de ce choix. */
   createsDerogation?: {
     type: import("@/logic/emergencyDerogationEngine").DerogationType;
@@ -977,4 +982,6 @@ export interface StrategyGameState {
   complianceState?: import("@/types/compliance").ComplianceState;
   // Registre des dérogations d'urgence (optional pour backward compat)
   derogations?: import("@/logic/emergencyDerogationEngine").DerogationEntry[];
+  // Marchés publics & conformité — indicateurs détaillés (optional pour backward compat)
+  procurementState?: import("@/logic/procurementComplianceEngine").ProcurementState;
 }

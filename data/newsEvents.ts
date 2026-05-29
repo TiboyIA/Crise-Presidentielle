@@ -30,6 +30,7 @@ import { STAGFLATION_EVENTS } from "@/data/stagflationEvents";
 import { BUSINESS_CYCLE_EVENTS } from "@/data/businessCycleEvents";
 import { ECONOMIC_NATIONAL_EVENTS } from "@/data/economicEvents";
 import { DEROGATION_EVENTS } from "@/data/derogationEvents";
+import { PROCUREMENT_EVENTS } from "@/data/procurementEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3731,6 +3732,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...ECONOMIC_NATIONAL_EVENTS,
   // ── DÉROGATIONS D'URGENCE ─────────────────────────────────────────────────────
   ...DEROGATION_EVENTS,
+  // ── MARCHÉS PUBLICS & CONFORMITÉ ─────────────────────────────────────────────
+  ...PROCUREMENT_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

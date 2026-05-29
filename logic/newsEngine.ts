@@ -478,6 +478,12 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       const now = state.news.actionCount;
       return (state.derogations ?? []).filter((d) => !d.reviewed && !d.ignored && d.expiresAfterActions > now && d.legalRisk >= 60).length >= 2 && state.mandateDay >= 20;
     })(),
+    // ── Marchés publics ────────────────────────────────────────────────────────
+    procurement_risk:          (state.procurementState?.conflictOfInterestRisk ?? 15) >= 55 && state.mandateDay >= 15,
+    procurement_concentration: (state.procurementState?.vendorConcentration    ?? 25) >= 65 && state.mandateDay >= 15,
+    procurement_integrity_low: (state.procurementState?.procurementIntegrity   ?? 70) < 30  && state.mandateDay >= 20,
+    procurement_scandal:       (state.procurementState?.conflictOfInterestRisk ?? 15) >= 70 && (state.procurementState?.procurementIntegrity ?? 70) < 30 && state.mandateDay >= 20,
+    procurement_exemplaire:    (state.procurementState?.procurementIntegrity   ?? 70) >= 75 && state.mandateDay >= 25,
     // ── Conformité de l'État ───────────────────────────────────────────────────
     compliance_audit_pressure:     (state.complianceState?.auditPressure     ?? 15) >= 65 && state.mandateDay >= 15,
     compliance_legal_risk:         (state.complianceState?.legalRisk         ?? 20) >= 60 && state.mandateDay >= 20,
