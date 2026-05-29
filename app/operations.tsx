@@ -8,6 +8,7 @@ import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
 import { CountryCard } from "@/components/CountryCard";
 import { Badge, Panel, PrimaryButton, ScreenHeader, SectionHeader } from "@/components/ui";
+import { SectionBackdrop } from "@/components/ui/SectionBackdrop";
 import { COUNTRY_LIST } from "@/data/countries";
 import { STRATEGY_RESEARCH_LIST } from "@/data/strategyResearch";
 import { OPERATIONS, canLaunchOperation } from "@/logic/operationEngine";
@@ -99,6 +100,7 @@ export default function OperationsScreen() {
 
   return (
     <View style={styles.container}>
+      <SectionBackdrop section="diplomatie" intensity={0.4} />
       <ScreenHeader
         title="Centre d'opérations"
         kicker="ACTIONS COVERTES"

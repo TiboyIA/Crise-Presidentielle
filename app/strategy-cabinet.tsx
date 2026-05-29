@@ -48,6 +48,7 @@ import { NEWS_EVENT_MAP } from "@/data/newsEvents";
 import type { GovernmentCultureId } from "@/types/strategy";
 import type { CabinetConflict } from "@/types/strategy";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
+import { SectionBackdrop } from "@/components/ui/SectionBackdrop";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -731,7 +732,9 @@ export default function StrategyCabinetScreen() {
   const avgCompetence = Math.round(state.strategyMinisters.reduce((s, m) => s + m.competence, 0) / state.strategyMinisters.length);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
+      <SectionBackdrop section="cabinet" intensity={0.4} />
+      <View style={{ flex: 1, paddingTop: insets.top }}>
       <LinearGradient colors={["#1c1814", "#0a0c14"]} style={styles.header}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={PALETTE.gold} />
@@ -1067,6 +1070,7 @@ export default function StrategyCabinetScreen() {
           />
         ))}
       </ScrollView>
+      </View>
     </View>
   );
 }

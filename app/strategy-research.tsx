@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
+import { SectionBackdrop } from "@/components/ui/SectionBackdrop";
 import { STRATEGY_RESEARCH, STRATEGY_RESEARCH_LIST, RESEARCH_CATEGORY_LABELS, RESEARCH_CATEGORY_COLORS } from "@/data/strategyResearch";
 import { DEFAULT_RESEARCH_STATE } from "@/types/strategyResearch";
 import type { StrategyResearchCategory, StrategyResearchId } from "@/types/strategyResearch";
@@ -77,7 +78,9 @@ export default function StrategyResearchScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
+      <SectionBackdrop section="recherche" intensity={0.45} />
+      <View style={{ flex: 1, paddingTop: insets.top }}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
@@ -211,6 +214,7 @@ export default function StrategyResearchScreen() {
           <Text style={styles.toastText}>{toast.msg}</Text>
         </View>
       )}
+      </View>
     </View>
   );
 }
