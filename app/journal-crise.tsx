@@ -52,6 +52,7 @@ import {
   DEFAULT_SURVEILLANCE_LEVEL,
   canSetSurveillanceLevel,
 } from "@/logic/healthSurveillanceEngine";
+import { DEFAULT_STATISTICS_SCANDAL_PRESSURE } from "@/logic/healthStatisticsScandalEngine";
 import { generateHealthSnapshot } from "@/logic/anonymizedHealthRecordsEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
@@ -169,8 +170,9 @@ export default function JournalDeCriseScreen() {
   const hospPressureInfo = getHospitalPressureBandInfo(hospPressure);
   const healthTrust      = state.healthDataTrust ?? DEFAULT_HEALTH_DATA_TRUST;
   const healthTrustInfo  = getHealthDataTrustBandInfo(healthTrust);
-  const underDetection   = state.underDetectionPressure ?? DEFAULT_UNDER_DETECTION_PRESSURE;
-  const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85;
+  const underDetection    = state.underDetectionPressure    ?? DEFAULT_UNDER_DETECTION_PRESSURE;
+  const scandalPressure   = state.statisticsScandalPressure ?? DEFAULT_STATISTICS_SCANDAL_PRESSURE;
+  const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85 || scandalPressure >= 85;
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
@@ -771,6 +773,43 @@ export default function JournalDeCriseScreen() {
                 <View style={hospStyles.bar}>
                   <View style={[hospStyles.fill, { width: `${underDetection}%` as `${number}%`, backgroundColor: color }]} />
                   {([35, 60, 85] as const).map((t) => (
+                    <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
+                  ))}
+                </View>
+                <Text style={styles.stormDesc}>{msg}</Text>
+              </View>
+            );
+          })()}
+
+          {/* ── Scandale des chiffres de santé ───────────────────────────── */}
+          {scandalPressure >= 35 && (() => {
+            const color =
+              scandalPressure >= 85 ? "#e54848" :
+              scandalPressure >= 65 ? "#e8864f" : "#e8c44f";
+            const label =
+              scandalPressure >= 85 ? "SCANDALE" :
+              scandalPressure >= 65 ? "CONTROVERSE" : "INCOHÉRENCES";
+            const msg =
+              scandalPressure >= 85
+                ? "Un scandale statistique majeur est en cours. La crédibilité des données officielles de santé est ouvertement contestée. Le gouvernement est en position de crise."
+                : scandalPressure >= 65
+                ? "La controverse sur les données sanitaires est entrée dans l'arène publique. L'opposition et la presse amplifient les incohérences signalées."
+                : "Des experts indépendants ont signalé des incohérences dans les données sanitaires officielles. La pression monte dans les milieux spécialisés.";
+            return (
+              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: color + "33" }]}>
+                <View style={styles.waveHeader}>
+                  <MaterialCommunityIcons name="chart-line-variant" size={12} color={color} />
+                  <Text style={[styles.waveTitle, { color }]}>SCANDALE STATISTIQUE</Text>
+                  <View style={[styles.waveBadge, { backgroundColor: color + "22" }]}>
+                    <Text style={[styles.waveBadgeText, { color }]}>{label}</Text>
+                  </View>
+                  <Text style={[styles.waveBadgeText, { color, marginLeft: 4 }]}>
+                    {Math.round(scandalPressure)}
+                  </Text>
+                </View>
+                <View style={hospStyles.bar}>
+                  <View style={[hospStyles.fill, { width: `${scandalPressure}%` as `${number}%`, backgroundColor: color }]} />
+                  {([35, 65, 85] as const).map((t) => (
                     <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
                   ))}
                 </View>

@@ -227,6 +227,7 @@ import {
   tickHealthSurveillance,
   type SurveillanceLevelId,
 } from "@/logic/healthSurveillanceEngine";
+import { tickStatisticsScandalPressure } from "@/logic/healthStatisticsScandalEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2510,6 +2511,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickHealthDataTrust(s);
       s = tickHealthSurveillance(s);
       s = tickHealthUnderDetection(s);
+      s = tickStatisticsScandalPressure(s);
     }
   }
 

@@ -869,4 +869,6 @@ export interface StrategyGameState {
   underDetectionPressure?: number;
   // Niveau de la cellule de veille sanitaire stratégique (optional pour backward compat)
   healthSurveillanceLevel?: import("@/logic/healthSurveillanceEngine").SurveillanceLevelId;
+  // Pression de scandale statistique sanitaire — 0-100 (optional pour backward compat)
+  statisticsScandalPressure?: number;
 }

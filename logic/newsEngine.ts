@@ -268,6 +268,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     underdetection_signal:     (state.underDetectionPressure ?? 15) >= 35 && state.mandateDay >= 15,
     underdetection_incoherent: (state.underDetectionPressure ?? 15) >= 60 && state.mandateDay >= 20,
     underdetection_crisis:     (state.underDetectionPressure ?? 15) >= 85 && state.mandateDay >= 25,
+    // ── Scandale des chiffres de santé ───────────────────────────────────────
+    health_scandal_emerging: (state.statisticsScandalPressure ?? 10) >= 35 && state.mandateDay >= 20,
+    health_scandal_active:   (state.statisticsScandalPressure ?? 10) >= 65 && state.mandateDay >= 25,
+    health_scandal_crisis:   (state.statisticsScandalPressure ?? 10) >= 85 && state.mandateDay >= 30,
   };
 }
 
