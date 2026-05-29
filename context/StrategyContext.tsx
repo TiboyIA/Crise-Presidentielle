@@ -241,6 +241,7 @@ import { tickTradeBalance, DEFAULT_TRADE_BALANCE } from "@/logic/tradeBalanceEng
 import { tickInequality, DEFAULT_INEQUALITY_INDEX, DEFAULT_SOCIAL_MOBILITY } from "@/logic/inequalityEngine";
 import { tickProductiveFabric, DEFAULT_PRODUCTIVE_FABRIC } from "@/logic/productiveFabricEngine";
 import { createEconomicShockFromEvent, dampenEconomicShock, tickEconomicShocks } from "@/logic/economicShockEngine";
+import { createFiscalProgram, tickFiscalMultiplier } from "@/logic/fiscalMultiplierEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1710,10 +1711,14 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withShockDampen = choice?.economicShockDamping
           ? dampenEconomicShock(withShock, event.id, choice.economicShockDamping)
           : withShock;
+        // Multiplicateur budgétaire — programme lancé si le choix déclare un type de dépense
+        const withFiscal = choice?.fiscalSpendingType
+          ? createFiscalProgram(withShockDampen, choice.fiscalSpendingType, choice.fiscalSpendingIntensity ?? 60)
+          : withShockDampen;
         // Conservation de la pression — déplacement si choix puissant
         const { state: withPressure, note: pressureNote } = choice
-          ? applyPressureConservation(withShockDampen, choice)
-          : { state: withShockDampen, note: null };
+          ? applyPressureConservation(withFiscal, choice)
+          : { state: withFiscal, note: null };
         const withNote = pressureNote
           ? { ...withPressure, recentPressureNote: pressureNote }
           : withPressure;
@@ -2598,6 +2603,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickInequality(s);
       s = tickProductiveFabric(s);
       s = tickEconomicShocks(s);
+      s = tickFiscalMultiplier(s);
       s = tickInvestorConfidence(s);
     }
   }

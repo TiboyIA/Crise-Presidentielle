@@ -413,6 +413,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
         && (state.investorConfidence ?? 55) >= 60
         && state.mandateDay >= 25;
     })(),
+    // ── Multiplicateur budgétaire ──────────────────────────────────────────────
+    fiscal_relance_budgetaire:  (state.nationalIndicators?.economy ?? 55) < 50 && state.mandateDay >= 20,
+    fiscal_relance_industrielle: (state.tradeBalance ?? -5) <= -20 && state.mandateDay >= 25,
+    fiscal_investissement_social: (state.hiddenPolitics?.popularFatigue ?? 15) >= 55 && state.mandateDay >= 15,
   };
 }
 

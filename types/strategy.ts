@@ -651,6 +651,10 @@ export interface NewsChoice {
   strategicIndustryDelta?: number;
   /** Amortissement du choc économique externe lié à cet événement (réduit intensity + durée). */
   economicShockDamping?: number;
+  /** Type de dépense budgétaire — déclenche un programme fiscalMultiplier lors de la résolution. */
+  fiscalSpendingType?: import("@/logic/fiscalMultiplierEngine").SpendingType;
+  /** Intensité du programme budgétaire (0-100). Par défaut 60 si non précisé. */
+  fiscalSpendingIntensity?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -939,4 +943,6 @@ export interface StrategyGameState {
   productiveFabric?: import("@/logic/productiveFabricEngine").ProductiveFabricState;
   // Chocs économiques externes actifs (optional pour backward compat)
   economicShocks?: import("@/logic/economicShockEngine").EconomicShock[];
+  // Programmes budgétaires actifs — multiplicateur fiscal (optional pour backward compat)
+  fiscalPrograms?: import("@/logic/fiscalMultiplierEngine").FiscalProgram[];
 }
