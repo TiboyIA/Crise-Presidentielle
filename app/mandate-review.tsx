@@ -27,6 +27,7 @@ import { LIABILITY_DEFS, LIABILITY_CATEGORY_LABELS, computeTotalExposure, getLia
 import { getRiskAppetiteDef } from "@/logic/riskAppetiteEngine";
 import { DEFAULT_COSMIC_STATE, COSMIC_STAGE_LABELS } from "@/types/cosmic";
 import { getMoralBalanceLabel, getMoralBalanceColor, getCosmicCredibilityLabel } from "@/logic/cosmicEngine";
+import { computeHealthMandateBilan } from "@/logic/healthMandateReviewEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
   securite: "Sécurité", economie: "Économie", ecologie: "Écologie",
@@ -107,6 +108,7 @@ export default function MandateReviewScreen() {
     state.campaignPromises ?? { selected: [], progress: {}, status: {} },
     5,
   );
+  const healthBilan = computeHealthMandateBilan(state);
 
   const handleNewMandate = async () => {
     // Submit ranked run if active
@@ -626,6 +628,37 @@ export default function MandateReviewScreen() {
             </View>
           </Panel>
         )}
+
+        {/* BILAN SANITAIRE DE MANDAT */}
+        <Panel style={[styles.section, isLandscape && styles.sectionLandscape]}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="hospital-box-outline" size={14} color={healthBilan.verdictColor} />
+            <Text style={[styles.sectionTitle, { color: healthBilan.verdictColor }]}>BILAN SANITAIRE DE MANDAT</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={{ fontSize: 9, fontFamily: FONT.bold, color: healthBilan.verdictColor }}>{healthBilan.score}/100</Text>
+          </View>
+
+          {/* Jauge score sanitaire */}
+          <View style={{ height: 4, backgroundColor: "#ffffff14", borderRadius: 2, overflow: "hidden", marginBottom: 8 }}>
+            <View style={{ height: "100%", width: `${healthBilan.score}%`, backgroundColor: healthBilan.verdictColor, borderRadius: 2 }} />
+          </View>
+
+          {/* Verdict */}
+          <View style={{ paddingVertical: 8, paddingHorizontal: 10, borderRadius: RADIUS.sm, backgroundColor: healthBilan.verdictColor + "15", borderWidth: 1, borderColor: healthBilan.verdictColor + "33", marginBottom: 10 }}>
+            <Text style={{ fontSize: 11, fontFamily: FONT.bold, color: healthBilan.verdictColor, marginBottom: 2 }}>{healthBilan.verdictTitle}</Text>
+            <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 13 }}>{healthBilan.verdictSubtitle}</Text>
+          </View>
+
+          {/* Métriques */}
+          <View style={{ gap: 6 }}>
+            {healthBilan.metrics.map((m) => (
+              <View key={m.label} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 9, fontFamily: FONT.reg, color: PALETTE.textLow, flex: 1 }}>{m.label}</Text>
+                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: m.color }}>{m.value}</Text>
+              </View>
+            ))}
+          </View>
+        </Panel>
 
         </View>{/* /panelGrid */}
 
