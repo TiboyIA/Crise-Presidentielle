@@ -134,7 +134,7 @@ export default function NationScreen() {
             <Text style={styles.rewardModalDesc}>{nextReward.description}</Text>
             {state.dailyLoginReward && state.dailyLoginReward.currentStreak > 1 && (
               <Text style={styles.rewardStreak}>
-                🔥 {state.dailyLoginReward.currentStreak} jours consécutifs
+                <MaterialCommunityIcons name="fire" size={12} color={PALETTE.warning} /> {state.dailyLoginReward.currentStreak} jours consécutifs
               </Text>
             )}
             <Pressable

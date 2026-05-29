@@ -1111,7 +1111,7 @@ export default function JournalDeCriseScreen() {
 
                       <Pressable
                         onPress={() => Alert.alert(
-                          trust < 45 ? "⚠️ Contester — RISQUÉ" : "Contester l'autorité",
+                          trust < 45 ? "Contester — RISQUÉ" : "Contester l'autorité",
                           trust < 45
                             ? `Coût : ${CONTEST_COST_INFLUENCE} Influence\n\nLa confiance est basse (${trust}). Contester augmentera la pression et aggravera la situation.`
                             : `Coût : ${CONTEST_COST_INFLUENCE} Influence\n\nChallenge la procédure. Pression -10, mediaMood +2, mais confiance -3.`,

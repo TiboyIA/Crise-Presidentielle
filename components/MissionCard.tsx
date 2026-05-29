@@ -6,8 +6,8 @@ import { getMissionDef } from "@/logic/missionEngine";
 import { Badge } from "@/components/ui/Badge";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import { RESOURCE_ICONS } from "@/types/strategy";
-import type { PlayerMission } from "@/types/strategy";
+import { RESOURCE_MCI } from "@/constants/iconMap";
+import type { PlayerMission, ResourceKey } from "@/types/strategy";
 
 interface Props {
   mission: PlayerMission;
@@ -60,7 +60,7 @@ export function MissionCard({ mission, onCollect }: Props) {
         <View style={styles.rewards}>
           {rewardEntries.map(([key, val]) => (
             <View key={key} style={styles.rewardChip}>
-              <Text style={styles.rewardIcon}>{RESOURCE_ICONS[key as keyof typeof RESOURCE_ICONS] ?? "•"}</Text>
+              <MaterialCommunityIcons name={(RESOURCE_MCI[key as ResourceKey] ?? "circle-small") as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={11} color={PALETTE.gold} />
               <Text style={styles.rewardVal}>+{val}</Text>
             </View>
           ))}

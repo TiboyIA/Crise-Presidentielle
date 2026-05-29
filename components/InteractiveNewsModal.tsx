@@ -6,7 +6,8 @@ import { typeMaterialIcon, urgencyColor } from "@/logic/newsEngine";
 import { NEWS_IMG } from "@/constants/assets";
 import { Badge } from "@/components/ui/Badge";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
-import { RESOURCE_ICONS, RESOURCE_LABELS } from "@/types/strategy";
+import { RESOURCE_LABELS } from "@/types/strategy";
+import { RESOURCE_MCI } from "@/constants/iconMap";
 import type { NewsChoice, NewsEvent, ResourceKey } from "@/types/strategy";
 import { getChaosWarning } from "@/logic/chaosAmplifier";
 import { analyzeChoice } from "@/logic/choiceAnalyzer";
@@ -126,7 +127,7 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                     <View style={styles.previewEffects}>
                       {effectEntries(preview).map(([key, val]) => (
                         <View key={key} style={styles.effectChip}>
-                          <Text style={styles.effectIcon}>{RESOURCE_ICONS[key] ?? "•"}</Text>
+                          <MaterialCommunityIcons name={(RESOURCE_MCI[key] ?? "circle-small") as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={12} color={PALETTE.textMid} />
                           <Text style={styles.effectLabel}>{RESOURCE_LABELS[key]}</Text>
                           <Text style={[styles.effectVal, { color: val > 0 ? PALETTE.success : PALETTE.danger }]}>
                             {val > 0 ? "+" : ""}{val}
@@ -208,7 +209,7 @@ export function InteractiveNewsModal({ event, visible, onChoose, onDismiss, tens
                       <View style={styles.inlineEffects}>
                         {effects.map(([key, val]) => (
                           <Text key={key} style={[styles.inlineEffectText, { color: val > 0 ? PALETTE.success : PALETTE.danger }]}>
-                            {RESOURCE_ICONS[key] ?? ""}{val > 0 ? "+" : ""}{val}
+                            <MaterialCommunityIcons name={(RESOURCE_MCI[key] ?? "circle-small") as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={10} color={val > 0 ? PALETTE.success : PALETTE.danger} />{" "}{val > 0 ? "+" : ""}{val}
                           </Text>
                         ))}
                       </View>
