@@ -43,6 +43,7 @@ import type { ContributionTier } from "@/logic/resilienceFundEngine";
 import { GridStabilityBadge } from "@/components/GridStabilityBadge";
 import { ThermalStressBadge } from "@/components/ThermalStressBadge";
 import { OrbitalWindowBadge } from "@/components/OrbitalWindowBadge";
+import { HealthInfoCard } from "@/components/HealthInfoCard";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -375,6 +376,9 @@ export default function NationScreen() {
         {state.orbitalWindow !== undefined && (
           <OrbitalWindowBadge orbitalWindow={state.orbitalWindow} />
         )}
+
+        {/* INFORMATION MÉDICALE NATIONALE — carte de veille sanitaire */}
+        <HealthInfoCard state={state} />
 
         {/* BAROMÈTRE NATIONAL */}
         <SectionHeader label="Baromètre national" trailing={

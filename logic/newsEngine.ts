@@ -276,6 +276,8 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     interop_degraded:    (state.healthInteroperability ?? 52) < 35 && state.mandateDay >= 15,
     interop_crisis:      (state.healthInteroperability ?? 52) < 20 && state.mandateDay >= 25,
     interop_opportunity: (state.healthInteroperability ?? 52) >= 70 && state.mandateDay >= 30,
+    // ── Bilan sanitaire intermédiaire ────────────────────────────────────────
+    health_bilan_eligible: state.mandateDay >= 50,
   };
 }
 

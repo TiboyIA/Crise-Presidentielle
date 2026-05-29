@@ -114,4 +114,51 @@ export const MEDICAL_EVENTS: NewsEvent[] = [
     ],
   },
 
+
+  // ── Bilan sanitaire intermédiaire — jalon périodique ──────────────────────
+  {
+    id:          "health_bilan_intermediaire",
+    title:       "Bilan sanitaire intermédiaire — synthèse du pilotage présidentiel",
+    source:      "Secrétariat Général de la Santé",
+    type:        "national",
+    urgency:     "faible",
+    description:
+      "Le Secrétariat Général de la Santé présente un bilan de mi-mandat de la politique d'information médicale. Les indicateurs de qualité des données, de pression hospitalière et de confiance dans les chiffres sont passés en revue. Ce rapport confidentiel sert de base aux arbitrages présidentiels pour la suite du mandat.",
+    isInteractive: true,
+    conditionKey:  "health_bilan_eligible",
+    minActionsGap: 40,
+    choices: [
+      {
+        id:          "bilan_renforcer_veille",
+        label:       "Renforcer la veille sanitaire nationale pour la suite du mandat",
+        consequence:
+          "Le gouvernement décide d'intensifier le dispositif de surveillance. Les moyens alloués à la collecte et à l'analyse des données sanitaires sont augmentés.",
+        effects:               { money: -250, technology: 4 },
+        hiddenPoliticsEffects: { institutionalStability: 4, eliteTrust: 3, scandalRisk: -3 },
+        communicationRegister: "institutionnel",
+        declarationTheme:      "securite",
+        declarationStance:     "pro",
+      },
+      {
+        id:          "bilan_nommer_referent",
+        label:       "Nommer un référent national à la qualité des données sanitaires",
+        consequence:
+          "Une nomination symbolique et structurelle. Le référent coordonne les acteurs et crée une accountability claire sur la qualité de l'information médicale.",
+        effects:               { influence: -10 },
+        hiddenPoliticsEffects: { institutionalStability: 5, eliteTrust: 4, mediaMood: 3 },
+        communicationRegister: "empathique",
+      },
+      {
+        id:          "bilan_prendre_note",
+        label:       "Prendre note du bilan et maintenir le cap actuel",
+        consequence:
+          "Le rapport est archivé. Les orientations actuelles sont confirmées sans modification. Une occasion d'amélioration est manquée mais les ressources sont préservées.",
+        effects:               {},
+        hiddenPoliticsEffects: { eliteTrust: -2 },
+        pathologyDelta:        { minimization: 3 },
+        communicationRegister: "technocratique",
+      },
+    ],
+  },
+
 ];
