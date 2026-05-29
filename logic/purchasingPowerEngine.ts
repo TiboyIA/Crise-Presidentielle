@@ -110,6 +110,13 @@ export function computePurchasingPowerTarget(state: StrategyGameState): number {
   if (stability >= 70)     target += 3;
   else if (stability < 35) target -= 4;
 
+  // Productivité nationale — richesse créée et distribuée aux ménages
+  const productivity = state.productivity ?? 50;
+  if (productivity >= 75)      target += 6;
+  else if (productivity >= 60) target += 3;
+  else if (productivity <= 25) target -= 6;
+  else if (productivity <= 40) target -= 3;
+
   return Math.max(0, Math.min(100, target));
 }
 

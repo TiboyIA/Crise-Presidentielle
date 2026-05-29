@@ -149,6 +149,13 @@ export function computeInflationTarget(state: StrategyGameState): number {
   if (completed.includes("research_datacenter_cooling"))     target -= 3;
   if (completed.includes("research_digital_twin"))           target -= 2;
 
+  // Productivité nationale — haute productivité absorbe les chocs de coûts
+  const productivity = state.productivity ?? 50;
+  if (productivity >= 75)      target -= 5;
+  else if (productivity >= 60) target -= 3;
+  else if (productivity <= 25) target += 5;
+  else if (productivity <= 40) target += 3;
+
   return Math.max(0, Math.min(100, target));
 }
 

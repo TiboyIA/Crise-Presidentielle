@@ -64,6 +64,7 @@ import {
   DEFAULT_LABOR_SHORTAGE,
   DEFAULT_YOUTH_UNEMPLOYMENT,
 } from "@/logic/laborMarketEngine";
+import { getProductivityBandInfo, DEFAULT_PRODUCTIVITY } from "@/logic/productivityEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -194,6 +195,8 @@ export default function JournalDeCriseScreen() {
   const laborShortageValue   = state.laborShortage   ?? DEFAULT_LABOR_SHORTAGE;
   const laborShortageInfo    = getLaborShortageBandInfo(laborShortageValue);
   const youthUnempValue      = state.youthUnemployment ?? DEFAULT_YOUTH_UNEMPLOYMENT;
+  const productivityValue    = state.productivity    ?? DEFAULT_PRODUCTIVITY;
+  const productivityInfo     = getProductivityBandInfo(productivityValue);
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
@@ -374,8 +377,8 @@ export default function JournalDeCriseScreen() {
       )}
 
 
-      {/* ── Baromètre économique — Inflation & Pouvoir d'achat ─────────────── */}
-      {(inflationValue >= 35 || purchasingPowerValue < 45) && !lowLoad && (
+      {/* ── Baromètre économique — Inflation, Pouvoir d'achat & Productivité ── */}
+      {(inflationValue >= 35 || purchasingPowerValue < 45 || productivityValue <= 35 || productivityValue >= 76) && !lowLoad && (
         <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: inflationValue >= 61 ? inflationInfo.color + "33" : purchasingPowerInfo.color + "33" }]}>
           <View style={styles.waveHeader}>
             <MaterialCommunityIcons name="chart-line" size={12} color={inflationValue >= 61 ? inflationInfo.color : purchasingPowerInfo.color} />
@@ -386,6 +389,11 @@ export default function JournalDeCriseScreen() {
             {"   ·   "}
             <Text style={{ color: purchasingPowerInfo.color }}>{"Pouvoir d'achat : " + purchasingPowerInfo.label}</Text>
           </Text>
+          {(productivityValue <= 35 || productivityValue >= 76) && (
+            <Text style={styles.stormDesc}>
+              <Text style={{ color: productivityInfo.color }}>{"Productivité : " + productivityInfo.label}</Text>
+            </Text>
+          )}
         </View>
       )}
 

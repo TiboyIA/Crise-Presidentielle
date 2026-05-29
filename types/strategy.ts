@@ -885,4 +885,6 @@ export interface StrategyGameState {
   youthUnemployment?: number;
   // Pénurie de main-d'œuvre — 0-100 (optional pour backward compat)
   laborShortage?: number;
+  // Productivité nationale — 0-100 (optional pour backward compat)
+  productivity?: number;
 }

@@ -229,6 +229,11 @@ export function computeUnemploymentTarget(state: StrategyGameState): number {
   if (shortage > 60)       target -= 6;
   else if (shortage > 40)  target -= 3;
 
+  // Productivité nationale — économie productive = plus d'emplois créés
+  const productivity = state.productivity ?? 50;
+  if (productivity >= 70)      target -= 4;
+  else if (productivity <= 30) target += 4;
+
   return Math.max(0, Math.min(100, target));
 }
 
@@ -269,6 +274,11 @@ export function computeJobQualityTarget(state: StrategyGameState): number {
   // Recherche — effets sur les conditions de travail
   if (completed.includes("research_digital_twin")) target += 5;  // meilleure ergonomie
   if (completed.includes("research_admin_ai"))     target -= 4;  // ubérisation / gig economy
+
+  // Productivité nationale — haute productivité améliore les conditions d'emploi
+  const productivity = state.productivity ?? 50;
+  if (productivity >= 70)      target += 5;
+  else if (productivity <= 30) target -= 5;
 
   return Math.max(0, Math.min(100, target));
 }
