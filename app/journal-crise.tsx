@@ -67,6 +67,7 @@ import {
 import { getProductivityBandInfo, DEFAULT_PRODUCTIVITY } from "@/logic/productivityEngine";
 import { getSupplyRiskBandInfo, computeOverallSupplyRisk, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
 import { SECTOR_IDS, STRATEGIC_SECTORS } from "@/data/strategicSectors";
+import { getInvestorConfidenceBandInfo, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
   critique: "▲",
@@ -200,6 +201,10 @@ export default function JournalDeCriseScreen() {
   const productivityValue    = state.productivity    ?? DEFAULT_PRODUCTIVITY;
   const productivityInfo     = getProductivityBandInfo(productivityValue);
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
+
+  const investorConfValue = state.investorConfidence ?? DEFAULT_INVESTOR_CONFIDENCE;
+  const investorConfInfo  = getInvestorConfidenceBandInfo(investorConfValue);
+  const showInvestorPanel = investorConfValue < 46 || investorConfValue >= 75;
 
   const supplyChainSt    = state.supplyChain ?? DEFAULT_SUPPLY_CHAIN_STATE;
   const supplyAvgRisk    = computeOverallSupplyRisk(supplyChainSt);
@@ -422,6 +427,25 @@ export default function JournalDeCriseScreen() {
               </>
             )}
           </Text>
+        </View>
+      )}
+
+      {/* ── Confiance des marchés fictifs ────────────────────────────────────── */}
+      {showInvestorPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: investorConfInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="trending-up" size={12} color={investorConfInfo.color} />
+            <Text style={[styles.waveTitle, { color: investorConfInfo.color }]}>CONFIANCE DES MARCHÉS</Text>
+            <View style={[styles.waveBadge, { backgroundColor: investorConfInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: investorConfInfo.color }]}>
+                {investorConfInfo.label.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.waveBadgeText, { color: investorConfInfo.color, marginLeft: 4 }]}>
+              {Math.round(investorConfValue)}
+            </Text>
+          </View>
+          <Text style={styles.stormDesc}>{investorConfInfo.message}</Text>
         </View>
       )}
 

@@ -623,6 +623,8 @@ export interface NewsChoice {
   inertiaEffects?: Partial<Record<import("@/logic/inertiaEngine").InertiaDomain, number>>;
   /** Effets sur les chaînes d'approvisionnement — deltas appliqués aux secteurs stratégiques. */
   supplyChainEffects?: Partial<Record<import("@/data/strategicSectors").SectorId, Partial<import("@/logic/supplyChainEngine").SectorState>>>;
+  /** Delta direct sur la confiance des investisseurs — appliqué immédiatement lors de la résolution du choix. */
+  investorConfidenceDelta?: number;
   /** Amortissement des ondes de crise actives — réduit l'intensité de toutes les ondes. */
   waveDamping?: number;
   /** Réduction d'usure des infrastructures — appliquée à tous les bâtiments actifs. */
@@ -891,4 +893,6 @@ export interface StrategyGameState {
   productivity?: number;
   // Chaînes d'approvisionnement stratégiques — MODE DELTA (optional pour backward compat)
   supplyChain?: import("@/logic/supplyChainEngine").SupplyChainState;
+  // Confiance des investisseurs — 0-100 (optional pour backward compat)
+  investorConfidence?: number;
 }

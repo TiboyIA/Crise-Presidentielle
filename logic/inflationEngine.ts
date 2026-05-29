@@ -156,6 +156,11 @@ export function computeInflationTarget(state: StrategyGameState): number {
   else if (productivity <= 25) target += 5;
   else if (productivity <= 40) target += 3;
 
+  // Confiance des investisseurs — anticipations et primes de risque
+  const investorConf = state.investorConfidence ?? 55;
+  if (investorConf >= 75)      target -= 2;
+  else if (investorConf <= 20) target += 3;
+
   // Chaînes d'approvisionnement — ruptures énergétiques et logistiques
   const sc = state.supplyChain;
   if (sc) {

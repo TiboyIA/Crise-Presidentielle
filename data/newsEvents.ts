@@ -17,6 +17,7 @@ import { HEALTH_INTEROPERABILITY_EVENTS } from "@/data/healthInteroperabilityEve
 import { INFLATION_EVENTS } from "@/data/inflationEvents";
 import { LABOR_MARKET_EVENTS } from "@/data/laborMarketEvents";
 import { SUPPLY_CHAIN_EVENTS } from "@/data/supplyChainEvents";
+import { INVESTOR_CONFIDENCE_EVENTS } from "@/data/investorConfidenceEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3692,6 +3693,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...LABOR_MARKET_EVENTS,
   // ── CHAÎNES D'APPROVISIONNEMENT STRATÉGIQUES ─────────────────────────────────
   ...SUPPLY_CHAIN_EVENTS,
+  // ── CONFIANCE DES INVESTISSEURS ───────────────────────────────────────────────
+  ...INVESTOR_CONFIDENCE_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

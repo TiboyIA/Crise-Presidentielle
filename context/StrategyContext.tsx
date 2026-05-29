@@ -234,6 +234,7 @@ import { tickPurchasingPower } from "@/logic/purchasingPowerEngine";
 import { tickLaborMarket } from "@/logic/laborMarketEngine";
 import { tickProductivity } from "@/logic/productivityEngine";
 import { tickSupplyChain, DEFAULT_SUPPLY_CHAIN_STATE } from "@/logic/supplyChainEngine";
+import { tickInvestorConfidence, DEFAULT_INVESTOR_CONFIDENCE } from "@/logic/investorConfidenceEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -1645,7 +1646,13 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           supplyChain = updated;
         }
 
-        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain };
+        // Confiance des investisseurs — delta direct issu du choix de crise
+        let investorConfidence = prev.investorConfidence ?? DEFAULT_INVESTOR_CONFIDENCE;
+        if (choice?.investorConfidenceDelta) {
+          investorConfidence = Math.max(0, Math.min(100, investorConfidence + choice.investorConfidenceDelta));
+        }
+
+        const assembled: StrategyGameState = { ...prev, news, resources, nationalDebt, nationalIndicators, hiddenPolitics, relations, delayedConsequences, discoursePathology, semanticContamination, oppositionPower, pendingDeclarations, contradictionHistory, resilienceFund, insurancePolicies, activeCatBonds, catBondMarket, reinsurancePool, longTailLiabilities, weatherAlertTrust, cosmicState, supplyChain, investorConfidence };
         const withInertia = choice?.inertiaEffects
           ? queueInertiaChoiceEffects(assembled, choice.inertiaEffects, event.id)
           : assembled;
@@ -2543,6 +2550,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickSupplyChain(s);
       s = tickInflation(s);
       s = tickPurchasingPower(s);
+      s = tickInvestorConfidence(s);
     }
   }
 

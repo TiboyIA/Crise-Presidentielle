@@ -234,6 +234,12 @@ export function computeUnemploymentTarget(state: StrategyGameState): number {
   if (productivity >= 70)      target -= 4;
   else if (productivity <= 30) target += 4;
 
+  // Confiance des investisseurs — financement des entreprises et création d'emplois
+  const investorConf = state.investorConfidence ?? 55;
+  if (investorConf >= 70)       target -= 3;
+  else if (investorConf <= 25)  target += 5;
+  else if (investorConf <= 40)  target += 3;
+
   return Math.max(0, Math.min(100, target));
 }
 
@@ -279,6 +285,12 @@ export function computeJobQualityTarget(state: StrategyGameState): number {
   const productivity = state.productivity ?? 50;
   if (productivity >= 70)      target += 5;
   else if (productivity <= 30) target -= 5;
+
+  // Confiance des investisseurs — emplois de qualité créés par l'investissement privé fictif
+  const investorConf = state.investorConfidence ?? 55;
+  if (investorConf >= 70)      target += 4;
+  else if (investorConf <= 25) target -= 4;
+  else if (investorConf <= 40) target -= 2;
 
   return Math.max(0, Math.min(100, target));
 }

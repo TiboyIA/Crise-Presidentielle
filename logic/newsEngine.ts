@@ -318,6 +318,12 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       const hasTech   = completed.includes("research_digital_twin") || completed.includes("research_energy_sovereign");
       return hasTech && (state.productivity ?? 50) >= 60 && state.mandateDay >= 25;
     })(),
+    // ── Confiance des investisseurs ──────────────────────────────────────────
+    investor_signal_weak:      (state.investorConfidence ?? 55) >= 35 && (state.investorConfidence ?? 55) < 52 && state.mandateDay >= 10,
+    investor_defiance_rising:  (state.investorConfidence ?? 55) < 40 && state.mandateDay >= 15,
+    investor_capital_flight:   (state.investorConfidence ?? 55) <= 20 && state.mandateDay >= 20,
+    investor_confidence_boom:  (state.investorConfidence ?? 55) >= 75 && state.mandateDay >= 25,
+    investor_reform_signal:    (state.reforms ?? []).some((r) => r.applied) && (state.investorConfidence ?? 55) >= 40 && (state.investorConfidence ?? 55) < 65 && state.mandateDay >= 20,
   };
 }
 
