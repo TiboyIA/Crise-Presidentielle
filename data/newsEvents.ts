@@ -13,6 +13,7 @@ import { HEALTH_REPORTING_EVENTS } from "@/data/healthReportingEvents";
 import { HOSPITAL_PRESSURE_EVENTS } from "@/data/hospitalPressureEvents";
 import { HEALTH_UNDERDETECTION_EVENTS } from "@/data/healthUnderDetectionEvents";
 import { HEALTH_STATISTICS_SCANDAL_EVENTS } from "@/data/healthStatisticsScandalEvents";
+import { HEALTH_INTEROPERABILITY_EVENTS } from "@/data/healthInteroperabilityEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3680,6 +3681,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...HEALTH_UNDERDETECTION_EVENTS,
   // ── SCANDALE DES CHIFFRES DE SANTÉ ───────────────────────────────────────────
   ...HEALTH_STATISTICS_SCANDAL_EVENTS,
+  // ── INTEROPÉRABILITÉ DES SYSTÈMES DE SANTÉ ───────────────────────────────────
+  ...HEALTH_INTEROPERABILITY_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

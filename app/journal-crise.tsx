@@ -53,6 +53,7 @@ import {
   canSetSurveillanceLevel,
 } from "@/logic/healthSurveillanceEngine";
 import { DEFAULT_STATISTICS_SCANDAL_PRESSURE } from "@/logic/healthStatisticsScandalEngine";
+import { getInteroperabilityBandInfo, DEFAULT_HEALTH_INTEROPERABILITY } from "@/logic/healthInteroperabilityEngine";
 import { generateHealthSnapshot } from "@/logic/anonymizedHealthRecordsEngine";
 
 const URGENCY_SHAPES: Record<string, string> = {
@@ -172,7 +173,9 @@ export default function JournalDeCriseScreen() {
   const healthTrustInfo  = getHealthDataTrustBandInfo(healthTrust);
   const underDetection    = state.underDetectionPressure    ?? DEFAULT_UNDER_DETECTION_PRESSURE;
   const scandalPressure   = state.statisticsScandalPressure ?? DEFAULT_STATISTICS_SCANDAL_PRESSURE;
-  const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85 || scandalPressure >= 85;
+  const interopValue      = state.healthInteroperability     ?? DEFAULT_HEALTH_INTEROPERABILITY;
+  const interopInfo       = getInteroperabilityBandInfo(interopValue);
+  const hasCriticalHealth = hospPressure >= 81 || healthTrust <= 20 || underDetection >= 85 || scandalPressure >= 85 || interopValue < 20;
   const healthSnapshot   = useMemo(() => generateHealthSnapshot(state), [state.mandateDay, state.hospitalPressure, state.medicalDataQuality, state.hospitalCodingQuality, state.healthReportingDelay, state.underDetectionPressure]);
 
   const activeEvent = activeModal ? NEWS_EVENT_MAP[activeModal] : null;
@@ -526,6 +529,27 @@ export default function JournalDeCriseScreen() {
               </Text>
             </View>
             <Text style={styles.stormDesc}>{medicalInfo.message}</Text>
+          </View>
+
+          {/* ── Interopérabilité des systèmes de santé ───────────────────── */}
+          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: interopInfo.color + "33" }]}>
+            <View style={styles.waveHeader}>
+              <MaterialCommunityIcons name="lan-connect" size={12} color={interopInfo.color} />
+              <Text style={[styles.waveTitle, { color: interopInfo.color }]}>INTEROPÉRABILITÉ SYS. SANTÉ</Text>
+              <View style={[styles.waveBadge, { backgroundColor: interopInfo.color + "22" }]}>
+                <Text style={[styles.waveBadgeText, { color: interopInfo.color }]}>{interopInfo.label.toUpperCase()}</Text>
+              </View>
+              <Text style={[styles.waveBadgeText, { color: interopInfo.color, marginLeft: 4 }]}>
+                {Math.round(interopValue)}
+              </Text>
+            </View>
+            <View style={hospStyles.bar}>
+              <View style={[hospStyles.fill, { width: `${interopValue}%` as `${number}%`, backgroundColor: interopInfo.color }]} />
+              {([20, 40, 60, 80] as const).map((t) => (
+                <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
+              ))}
+            </View>
+            <Text style={styles.stormDesc}>{interopInfo.message}</Text>
           </View>
 
           {/* ── Action : Audit DIM National ──────────────────────────────── */}

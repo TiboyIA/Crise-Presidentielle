@@ -151,6 +151,13 @@ export function computeMedicalQualityTarget(state: StrategyGameState): number {
   else if (surveillance === "renforcee") score += 12;
   else if (surveillance === "standard")  score += 6;
 
+  // Interopérabilité des systèmes — qualité de la consolidation des données
+  const interop = state.healthInteroperability ?? 52;
+  if      (interop >= 80) score += 10;
+  else if (interop >= 60) score += 5;
+  else if (interop <  30) score -= 8;
+  else if (interop <  20) score -= 15;
+
   return Math.max(0, Math.min(100, score));
 }
 

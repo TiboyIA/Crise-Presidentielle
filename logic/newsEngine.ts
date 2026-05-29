@@ -272,6 +272,10 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     health_scandal_emerging: (state.statisticsScandalPressure ?? 10) >= 35 && state.mandateDay >= 20,
     health_scandal_active:   (state.statisticsScandalPressure ?? 10) >= 65 && state.mandateDay >= 25,
     health_scandal_crisis:   (state.statisticsScandalPressure ?? 10) >= 85 && state.mandateDay >= 30,
+    // ── Interopérabilité des systèmes de santé ───────────────────────────────
+    interop_degraded:    (state.healthInteroperability ?? 52) < 35 && state.mandateDay >= 15,
+    interop_crisis:      (state.healthInteroperability ?? 52) < 20 && state.mandateDay >= 25,
+    interop_opportunity: (state.healthInteroperability ?? 52) >= 70 && state.mandateDay >= 30,
   };
 }
 

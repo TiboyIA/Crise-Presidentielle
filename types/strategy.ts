@@ -871,4 +871,6 @@ export interface StrategyGameState {
   healthSurveillanceLevel?: import("@/logic/healthSurveillanceEngine").SurveillanceLevelId;
   // Pression de scandale statistique sanitaire — 0-100 (optional pour backward compat)
   statisticsScandalPressure?: number;
+  // Interopérabilité des systèmes de santé — 0-100 (optional pour backward compat)
+  healthInteroperability?: number;
 }

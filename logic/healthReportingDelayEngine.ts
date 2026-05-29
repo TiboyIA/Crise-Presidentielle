@@ -154,6 +154,13 @@ export function computeHealthReportingDelayTarget(state: StrategyGameState): num
   else if (surveillance === "renforcee") delay -= 6;
   else if (surveillance === "standard")  delay -= 3;
 
+  // Interopérabilité — fluidité des échanges inter-systèmes
+  const interop = state.healthInteroperability ?? 52;
+  if      (interop >= 80) delay -= 4;
+  else if (interop >= 60) delay -= 2;
+  else if (interop <  30) delay += 4;
+  else if (interop <  20) delay += 8;
+
   return Math.max(0, Math.min(30, delay));
 }
 
