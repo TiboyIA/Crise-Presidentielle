@@ -491,6 +491,40 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     compliance_whistleblower:      (state.complianceState?.whistleblowerRisk  ?? 15) >= 70 && state.mandateDay >= 20,
     compliance_crisis:             (state.complianceState?.complianceScore    ?? 70) < 25  && state.mandateDay >= 25,
     compliance_emergency_powers:   (state.complianceState?.emergencyPowersAbuse ?? 10) >= 60 && state.mandateDay >= 15,
+    // ── Conflits d'intérêts ministériels ──────────────────────────────────────
+    minister_conflict_hidden: (() => {
+      const profiles = state.ministerConflicts ?? {};
+      return state.strategyMinisters.some((m) => {
+        const p = profiles[m.id];
+        return p && p.overallRisk >= 55 && p.disclosureStatus === "non déclaré";
+      }) && state.mandateDay >= 12;
+    })(),
+    minister_conflict_scandal: (() => {
+      const profiles = state.ministerConflicts ?? {};
+      return state.strategyMinisters.some((m) => {
+        const p = profiles[m.id];
+        return p && (p.overallRisk >= 75 || p.disclosureStatus === "problématique");
+      }) && state.mandateDay >= 15;
+    })(),
+    minister_conflict_loyal_exposed: (() => {
+      const profiles = state.ministerConflicts ?? {};
+      return state.strategyMinisters.some((m) => {
+        const p = profiles[m.id];
+        return m.loyalty >= 70 && p && p.overallRisk >= 60 && p.disclosureStatus === "non déclaré";
+      }) && state.mandateDay >= 15;
+    })(),
+    minister_conflict_competent_toxic: (() => {
+      const profiles = state.ministerConflicts ?? {};
+      return state.strategyMinisters.some((m) => {
+        const p = profiles[m.id];
+        return m.competence >= 75 && p && p.overallRisk >= 70;
+      }) && state.mandateDay >= 18;
+    })(),
+    minister_conflict_cleaned_up: (() => {
+      const profiles = state.ministerConflicts ?? {};
+      if (Object.keys(profiles).length === 0) return false;
+      return Object.values(profiles).every((p) => p.overallRisk < 30) && state.mandateDay >= 20;
+    })(),
     // ── Lanceurs d'alerte ──────────────────────────────────────────────────────
     whistleblower_alert_pending: (() => {
       const now = state.news.actionCount;

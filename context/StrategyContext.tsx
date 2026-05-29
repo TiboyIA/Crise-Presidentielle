@@ -254,6 +254,10 @@ import {
   protectWhistleblower, launchInternalAudit, correctQuietly, tickWhistleblower,
 } from "@/logic/whistleblowerEngine";
 import {
+  requestDeclaration, launchEthicsAudit, suspendMinisterCoi, defendPublicly,
+  tickConflictOfInterest,
+} from "@/logic/conflictOfInterestEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -452,6 +456,10 @@ interface StrategyContextValue {
   protectWhistleblower: (id: string) => { success: boolean; reason?: string };
   launchWhistleblowerAudit: (id: string) => { success: boolean; reason?: string };
   correctWhistleblowerQuietly: (id: string) => { success: boolean; reason?: string };
+  requestMinisterDeclaration: (ministerId: string) => { success: boolean; reason?: string };
+  launchMinisterEthicsAudit: (ministerId: string) => { success: boolean; reason?: string };
+  suspendMinisterForConflict: (ministerId: string) => { success: boolean; reason?: string };
+  defendMinisterPublicly: (ministerId: string) => { success: boolean; reason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -2170,6 +2178,62 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const requestMinisterDeclarationCb = useCallback(
+    (ministerId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = requestDeclaration(prev, ministerId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const launchMinisterEthicsAuditCb = useCallback(
+    (ministerId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = launchEthicsAudit(prev, ministerId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const suspendMinisterForConflictCb = useCallback(
+    (ministerId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = suspendMinisterCoi(prev, ministerId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
+  const defendMinisterPubliclyCb = useCallback(
+    (ministerId: string): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = defendPublicly(prev, ministerId);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.newState : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const launchDimAuditCb = useCallback(
     (): { result: DimAuditResult | null; failReason?: string } => {
       if (!state) return { result: null, failReason: "Jeu non initialisé." };
@@ -2419,6 +2483,10 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       protectWhistleblower:        protectWhistleblowerCb,
       launchWhistleblowerAudit:    launchWhistleblowerAuditCb,
       correctWhistleblowerQuietly: correctWhistleblowerQuietlyCb,
+      requestMinisterDeclaration:  requestMinisterDeclarationCb,
+      launchMinisterEthicsAudit:   launchMinisterEthicsAuditCb,
+      suspendMinisterForConflict:  suspendMinisterForConflictCb,
+      defendMinisterPublicly:      defendMinisterPubliclyCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2444,6 +2512,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       activateCrisisStaffing, launchDimAuditCb, setHealthSurveillanceLevelCb,
       justifyDerogationCb, auditDerogationCb, ignoreDerogationCb,
       protectWhistleblowerCb, launchWhistleblowerAuditCb, correctWhistleblowerQuietlyCb,
+      requestMinisterDeclarationCb, launchMinisterEthicsAuditCb, suspendMinisterForConflictCb, defendMinisterPubliclyCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2733,6 +2802,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickProcurement(s);
       s = tickDerogations(s);
       s = tickWhistleblower(s);
+      s = tickConflictOfInterest(s);
       s = tickInvestorConfidence(s);
     }
   }

@@ -986,4 +986,6 @@ export interface StrategyGameState {
   procurementState?: import("@/logic/procurementComplianceEngine").ProcurementState;
   // Lanceurs d'alerte — alertes internes actives (optional pour backward compat)
   whistleblowerAlerts?: import("@/logic/whistleblowerEngine").WhistleblowerAlert[];
+  // Conflits d'intérêts ministériels — profils par ministre (optional pour backward compat)
+  ministerConflicts?: Record<string, import("@/logic/conflictOfInterestEngine").MinisterConflictProfile>;
 }

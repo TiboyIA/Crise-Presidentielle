@@ -37,6 +37,11 @@ import {
   getTalentDrainTier,
 } from "@/logic/publicTalentDrainEngine";
 import {
+  getConflictBandInfo, getDisclosureStatusColor,
+  DECLARATION_COST_INFLUENCE, ETHICS_AUDIT_COST_INFLUENCE,
+  SUSPEND_COST_INFLUENCE, DEFEND_COST_INFLUENCE,
+} from "@/logic/conflictOfInterestEngine";
+import {
   canActivateStaffing, STAFFING_COST_INFLUENCE, STAFFING_OUTCOMES, STAFFING_COOLDOWN_ACTIONS,
 } from "@/logic/crisisStaffingEngine";
 import { NEWS_EVENT_MAP } from "@/data/newsEvents";
@@ -283,7 +288,11 @@ function MinisterFullCard({
   onFire: () => void;
   fatigueMap: Record<string, number>;
 }) {
-  const { state, startMinisterTraining } = useStrategy();
+  const {
+    state, startMinisterTraining,
+    requestMinisterDeclaration, launchMinisterEthicsAudit,
+    suspendMinisterForConflict, defendMinisterPublicly,
+  } = useStrategy();
   const [trainingExpanded, setTrainingExpanded] = useState(false);
   if (!state) return null;
   const def = STRATEGY_MINISTERS[ministerId];
@@ -390,6 +399,131 @@ function MinisterFullCard({
           </View>
         )}
       </View>
+
+      {/* ── Conflits d'intérêts ────────────────────────────────────────────── */}
+      {(() => {
+        const profile = state.ministerConflicts?.[ministerId];
+        if (!profile || profile.overallRisk < 25) return null;
+        const band = getConflictBandInfo(profile.overallRisk);
+        const statusColor = getDisclosureStatusColor(profile.disclosureStatus);
+        const canDeclare  = profile.disclosureStatus === "non déclaré";
+        const canAudit    = profile.disclosureStatus !== "audité";
+        const canSuspend  = !profile.suspended && profile.overallRisk >= 45;
+        const canDefend   = profile.overallRisk >= 35;
+
+        return (
+          <View style={styles.coiBlock}>
+            <View style={styles.coiHeader}>
+              <MaterialCommunityIcons name={band.icon as any} size={11} color={band.color} />
+              <Text style={[styles.coiTitle, { color: band.color }]}>CONFLIT D'INTÉRÊTS</Text>
+              <View style={[styles.coiBadge, { backgroundColor: band.color + "22" }]}>
+                <Text style={[styles.coiBadgeText, { color: band.color }]}>{band.label}</Text>
+              </View>
+              <View style={[styles.coiBadge, { backgroundColor: statusColor + "22" }]}>
+                <Text style={[styles.coiBadgeText, { color: statusColor }]}>{profile.disclosureStatus.toUpperCase()}</Text>
+              </View>
+            </View>
+
+            <View style={styles.coiBarRow}>
+              <Text style={styles.coiBarLabel}>EXPOSITION</Text>
+              <View style={styles.coiTrack}>
+                <View style={[styles.coiFill, { width: `${profile.overallRisk}%` as `${number}%`, backgroundColor: band.color }]} />
+              </View>
+              <Text style={[styles.coiBarVal, { color: band.color }]}>{profile.overallRisk}</Text>
+            </View>
+
+            {profile.suspended && (
+              <Text style={[styles.coiSuspendedNote, { color: "#e8c44f" }]}>
+                Écarté — réintégration dans {Math.max(0, profile.suspendedUntilAction - state.news.actionCount)} actions
+              </Text>
+            )}
+
+            <View style={styles.coiActions}>
+              {canDeclare && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(
+                      "Demander une déclaration d'intérêts",
+                      `Coût : ${DECLARATION_COST_INFLUENCE} Influence\n\nLe ministre déclare formellement ses intérêts. Réduit le risque et passe au statut "déclaré".`,
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        { text: "Demander", onPress: () => {
+                          const r = requestMinisterDeclaration(ministerId);
+                          if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur.");
+                        }},
+                      ],
+                    );
+                  }}
+                  style={({ pressed }) => [styles.coiBtn, styles.coiBtnBlue, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={[styles.coiBtnText, { color: "#4a9fff" }]}>Déclaration — {DECLARATION_COST_INFLUENCE} INF</Text>
+                </Pressable>
+              )}
+              {canAudit && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(
+                      "Lancer un audit éthique",
+                      `Coût : ${ETHICS_AUDIT_COST_INFLUENCE} Influence\n\nAudit complet des conflits d'intérêts. Réduit fortement le risque, passe au statut "audité".`,
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        { text: "Lancer l'audit", onPress: () => {
+                          const r = launchMinisterEthicsAudit(ministerId);
+                          if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur.");
+                        }},
+                      ],
+                    );
+                  }}
+                  style={({ pressed }) => [styles.coiBtn, styles.coiBtnGreen, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={[styles.coiBtnText, { color: "#4caf82" }]}>Audit — {ETHICS_AUDIT_COST_INFLUENCE} INF</Text>
+                </Pressable>
+              )}
+              {canSuspend && !profile.suspended && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(
+                      "Écarter temporairement",
+                      `Coût : ${SUSPEND_COST_INFLUENCE} Influence\n\nLe ministre est mis à l'écart pour 15 actions. Réduit le risque de scandale immédiat.`,
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        { text: "Écarter", style: "destructive", onPress: () => {
+                          const r = suspendMinisterForConflict(ministerId);
+                          if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur.");
+                        }},
+                      ],
+                    );
+                  }}
+                  style={({ pressed }) => [styles.coiBtn, styles.coiBtnOrange, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={[styles.coiBtnText, { color: "#e8864f" }]}>Écarter — {SUSPEND_COST_INFLUENCE} INF</Text>
+                </Pressable>
+              )}
+              {canDefend && !profile.defended && (
+                <Pressable
+                  onPress={() => {
+                    const highRisk = profile.overallRisk >= 60;
+                    Alert.alert(
+                      "Défendre publiquement",
+                      `Coût : ${DEFEND_COST_INFLUENCE} Influence\n\n${highRisk ? "⚠️ Risque élevé — une défense publique peut se retourner si des preuves émergent." : "Défense présidentielle claire. Réduit les pressions médiatiques à court terme."}`,
+                      [
+                        { text: "Annuler", style: "cancel" },
+                        { text: "Défendre", onPress: () => {
+                          const r = defendMinisterPublicly(ministerId);
+                          if (!r.success) Alert.alert("Impossible", r.reason ?? "Erreur.");
+                        }},
+                      ],
+                    );
+                  }}
+                  style={({ pressed }) => [styles.coiBtn, styles.coiBtnGold, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Text style={[styles.coiBtnText, { color: PALETTE.gold }]}>Défendre — {DEFEND_COST_INFLUENCE} INF</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        );
+      })()}
 
       {/* Actions rapides */}
       <View style={styles.ministerActions}>
@@ -1168,6 +1302,34 @@ const styles = StyleSheet.create({
   },
   actionChipDanger: { borderColor: PALETTE.danger + "44" },
   actionChipToggle: { marginLeft: "auto" },
+
+  // ── Conflits d'intérêts ─────────────────────────────────────────────────────
+  coiBlock: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: PALETTE.panelEdge,
+    paddingHorizontal: 12, paddingVertical: 8, gap: 6,
+    backgroundColor: "rgba(232,134,79,0.04)",
+  },
+  coiHeader: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" },
+  coiTitle:  { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 2, flex: 1 },
+  coiBadge:  { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3 },
+  coiBadgeText: { fontSize: 7, fontFamily: FONT.bold, letterSpacing: 1 },
+  coiBarRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  coiBarLabel: { fontSize: 7, fontFamily: FONT.bold, color: PALETTE.textLow, width: 62, letterSpacing: 1 },
+  coiTrack:  { flex: 1, height: 3, borderRadius: 2, backgroundColor: PALETTE.panelEdge },
+  coiFill:   { height: 3, borderRadius: 2 },
+  coiBarVal: { fontSize: 9, fontFamily: FONT.bold, width: 24, textAlign: "right" },
+  coiSuspendedNote: { fontSize: 9, fontFamily: FONT.reg },
+  coiActions: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 2 },
+  coiBtn: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4,
+    borderWidth: 1, alignItems: "center",
+  },
+  coiBtnBlue:   { backgroundColor: "#4a9fff18", borderColor: "#4a9fff44" },
+  coiBtnGreen:  { backgroundColor: "#4caf8218", borderColor: "#4caf8244" },
+  coiBtnOrange: { backgroundColor: "#e8864f18", borderColor: "#e8864f44" },
+  coiBtnGold:   { backgroundColor: "#c9a84c18", borderColor: "#c9a84c44" },
+  coiBtnText:   { fontSize: 9, fontFamily: FONT.bold },
   actionChipTraining: { borderColor: PALETTE.info + "44" },
   actionChipTrainingActive: { borderColor: PALETTE.info + "44", backgroundColor: PALETTE.info + "11", maxWidth: 160 },
   actionChipText: { fontSize: 9, fontFamily: FONT.bold },
