@@ -959,4 +959,6 @@ export interface StrategyGameState {
   monetaryTension?: number;
   // Profil du gouverneur de la banque centrale (optional pour backward compat)
   centralBankProfile?: import("@/logic/centralBankEngine").CentralBankProfile;
+  // Indice composite de stagflation 0-100 (optional pour backward compat)
+  stagflationIndex?: number;
 }

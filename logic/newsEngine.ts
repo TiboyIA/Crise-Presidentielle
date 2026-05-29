@@ -423,6 +423,8 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
     cb_credibility_warning:     (state.centralBankCredibility ?? 65) <= 35 && state.mandateDay >= 20,
     cb_governor_nomination:     (state.hiddenPolitics?.institutionalStability ?? 70) >= 65 && state.mandateDay >= 40,
     cb_monetary_tension_crisis: (state.monetaryTension ?? 20) >= 65 && state.mandateDay >= 20,
+    // ── Stagflation ────────────────────────────────────────────────────────────
+    stagflation_crisis: (state.stagflationIndex ?? 0) >= 50 && state.mandateDay >= 20,
   };
 }
 

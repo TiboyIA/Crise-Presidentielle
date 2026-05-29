@@ -243,6 +243,7 @@ import { tickProductiveFabric, DEFAULT_PRODUCTIVE_FABRIC } from "@/logic/product
 import { createEconomicShockFromEvent, dampenEconomicShock, tickEconomicShocks } from "@/logic/economicShockEngine";
 import { createFiscalProgram, tickFiscalMultiplier } from "@/logic/fiscalMultiplierEngine";
 import { tickCentralBank, DEFAULT_CB_CREDIBILITY, DEFAULT_MONETARY_TENSION } from "@/logic/centralBankEngine";
+import { tickStagflation } from "@/logic/stagflationEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -2613,6 +2614,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickEconomicShocks(s);
       s = tickFiscalMultiplier(s);
       s = tickCentralBank(s);
+      s = tickStagflation(s);
       s = tickInvestorConfidence(s);
     }
   }

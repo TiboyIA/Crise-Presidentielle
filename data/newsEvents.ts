@@ -26,6 +26,7 @@ import { PRODUCTIVE_FABRIC_EVENTS } from "@/data/productiveFabricEvents";
 import { ECONOMIC_SHOCK_EVENTS } from "@/data/economicShockEvents";
 import { FISCAL_MULTIPLIER_EVENTS } from "@/data/fiscalMultiplierEvents";
 import { CENTRAL_BANK_EVENTS } from "@/data/centralBankEvents";
+import { STAGFLATION_EVENTS } from "@/data/stagflationEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3719,6 +3720,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...FISCAL_MULTIPLIER_EVENTS,
   // ── BANQUE CENTRALE FICTIVE ───────────────────────────────────────────────────
   ...CENTRAL_BANK_EVENTS,
+  // ── STAGFLATION ───────────────────────────────────────────────────────────────
+  ...STAGFLATION_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));
