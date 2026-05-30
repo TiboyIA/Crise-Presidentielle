@@ -91,7 +91,9 @@ export default function RankingGlobalScreen() {
         style={({ pressed }) => [styles.row, isTop3 && styles.rowTop3, { opacity: pressed ? 0.7 : 1 }]}
       >
         <Text style={[styles.rank, { color: rankColor, width: rank >= 10 ? 28 : 22 }]}>
-          {rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : `#${rank}`}
+          {rank <= 3
+            ? <MaterialCommunityIcons name="medal" size={16} color={["#d4af37", "#bfc3c9", "#cd7f32"][rank - 1]} />
+            : `#${rank}`}
         </Text>
         <Text style={styles.flag}>{flag}</Text>
         <View style={{ flex: 1 }}>

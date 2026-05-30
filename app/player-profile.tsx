@@ -219,9 +219,9 @@ export default function PlayerProfileScreen() {
               )}
             </View>
             <View style={[styles.rankBadge, { borderColor: rankColor + "88" }]}>
-              <Text style={[styles.rankBadgeText, { color: rankColor }]}>
-                {rankMedal(rank)}
-              </Text>
+              {rank <= 3
+                ? <MaterialCommunityIcons name="medal" size={18} color={["#d4af37", "#bfc3c9", "#cd7f32"][rank - 1]} />
+                : <Text style={[styles.rankBadgeText, { color: rankColor }]}>{rankMedal(rank)}</Text>}
             </View>
           </View>
         </LinearGradient>
