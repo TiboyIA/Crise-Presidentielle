@@ -635,6 +635,12 @@ export default function NationScreen() {
                 <View style={[compStyles.badge, { backgroundColor: info.color + "22" }]}>
                   <Text style={[compStyles.badgeText, { color: info.color }]}>{info.label.toUpperCase()}</Text>
                 </View>
+                <Pressable
+                  onPress={() => router.push("/compliance" as any)}
+                  style={({ pressed }) => [styles.cabinetNavBtn, { opacity: pressed ? 0.7 : 1, marginLeft: 4 }]}
+                >
+                  <Text style={styles.cabinetNavBtnText}>CARTE →</Text>
+                </Pressable>
               </View>
               {/* Barre de score */}
               <View style={compStyles.barRow}>

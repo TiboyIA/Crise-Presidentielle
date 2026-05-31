@@ -90,6 +90,7 @@ function RootLayoutNav() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="saves" />
       <Stack.Screen name="strategy-debug" />
+      <Stack.Screen name="compliance" />
       <Stack.Screen name="strategy-cabinet" />
       <Stack.Screen name="dev-sandbox" />
       <Stack.Screen name="chat" />
