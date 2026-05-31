@@ -1,5 +1,6 @@
-import type { OperationType, CountryId, CountryRelation, StrategyResources } from "@/types/strategy";
+import type { OperationType, CountryId, CountryRelation, StrategyResources, StrategyGameState } from "@/types/strategy";
 import type { MissionReport, MissionClassification, MissionReportSections, MissionReportOperative, MissionReportIntelligence } from "@/types/missionReport";
+import { evaluateCovertOpsCompliance } from "@/logic/covertOpsComplianceEngine";
 import { OPERATIONS } from "@/logic/operationEngine";
 import { generateWeatherState } from "@/logic/weatherEngine";
 import { getOperationWeatherModifier } from "@/logic/operationWeatherModifier";
@@ -164,12 +165,13 @@ export interface MissionReportParams {
   relationDelta: number;
   rankingPoints: number;
   reportIndex:   number;
+  gameState?:    StrategyGameState;
 }
 
 export function generateMissionReport(params: MissionReportParams): MissionReport {
   const {
     type, success, targetCountryId, relation,
-    mandateDay, rewards, cost, relationDelta, rankingPoints, reportIndex,
+    mandateDay, rewards, cost, relationDelta, rankingPoints, reportIndex, gameState,
   } = params;
 
   const op              = OPERATIONS[type];
@@ -229,5 +231,8 @@ export function generateMissionReport(params: MissionReportParams): MissionRepor
     costPaid,
     relationDelta,
     rankingPoints,
+    covertCompliance: gameState
+      ? evaluateCovertOpsCompliance(type, success, gameState)
+      : undefined,
   };
 }

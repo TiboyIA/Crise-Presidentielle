@@ -1104,6 +1104,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           relationDelta: result.relationDelta,
           rankingPoints: result.rankingPoints,
           reportIndex: prevReports.length,
+          gameState: prev,
         });
         const missionReports = [missionReport, ...prevReports].slice(0, 50);
 

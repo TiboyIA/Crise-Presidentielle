@@ -1,4 +1,5 @@
 import type { OperationType, CountryId } from "@/types/strategy";
+import type { CovertComplianceReport } from "@/logic/covertOpsComplianceEngine";
 
 export type MissionClassification = "TOP SECRET" | "SECRET" | "CONFIDENTIEL";
 export type MissionOutcome = "success" | "failure";
@@ -49,4 +50,6 @@ export interface MissionReport {
   perspective?:         MissionPerspective;
   attackerCountryId?:   CountryId;
   attackerCountryName?: string;
+  // Conformité des opérations secrètes (MODE DELTA) — absent pour les opérations publiques
+  covertCompliance?: CovertComplianceReport;
 }

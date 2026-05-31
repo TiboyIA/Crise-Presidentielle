@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useStrategy } from "@/context/StrategyContext";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import type { MissionReport, MissionClassification } from "@/types/missionReport";
+import { getRiskColor } from "@/logic/covertOpsComplianceEngine";
 
 // ── Constantes visuelles ──────────────────────────────────────────────────────
 
@@ -176,6 +177,38 @@ function ReportModal({ report, onClose }: { report: MissionReport; onClose: () =
               </>
             )}
           </View>
+
+          {/* Conformité opérations secrètes — MODE DELTA */}
+          {!isEnemy && report.covertCompliance?.isCovertOperation && (
+            <View style={styles.intelBlock}>
+              <Text style={styles.intelHeader}>CONFORMITÉ OPÉRATIONNELLE</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                <View style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: "#ffffff14" }}>
+                  <View style={{
+                    width: `${report.covertCompliance.riskScore}%` as `${number}%`,
+                    height: 3, borderRadius: 2,
+                    backgroundColor: report.covertCompliance.verdictColor,
+                  }} />
+                </View>
+                <Text style={[styles.intelValue, { color: report.covertCompliance.verdictColor, marginLeft: 8 }]}>
+                  {report.covertCompliance.riskScore} / 100
+                </Text>
+              </View>
+              <IntelRow
+                label="Verdict"
+                value={report.covertCompliance.verdictLabel}
+                valueColor={report.covertCompliance.verdictColor}
+              />
+              <IntelRow label="Attribution"   value={`${report.covertCompliance.profile.attributionRisk} %`}    valueColor={getRiskColor(report.covertCompliance.profile.attributionRisk)} />
+              <IntelRow label="Défensabilité" value={`${report.covertCompliance.profile.legalDefensibility} %`} valueColor={getRiskColor(100 - report.covertCompliance.profile.legalDefensibility)} />
+              <IntelRow label="Exposition"    value={`${report.covertCompliance.profile.diplomaticExposure} %`} valueColor={getRiskColor(report.covertCompliance.profile.diplomaticExposure)} />
+              <IntelRow label="Traces"        value={`${report.covertCompliance.profile.evidenceTrail} %`}      valueColor={getRiskColor(report.covertCompliance.profile.evidenceTrail)} />
+              <IntelRow label="Contrôle"      value={`${report.covertCompliance.profile.oversightRisk} %`}      valueColor={getRiskColor(report.covertCompliance.profile.oversightRisk)} />
+              {report.covertCompliance.notes.map((note, i) => (
+                <Text key={i} style={[styles.intelNote, { color: PALETTE.textLow }]}>— {note}</Text>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.modalFooter}>
             {isEnemy
@@ -678,6 +711,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: PALETTE.textHigh,
     flex: 1,
+  },
+  intelNote: {
+    fontFamily: FONT.reg,
+    fontSize: 10,
+    marginTop: 3,
+    lineHeight: 14,
   },
   noImpact: {
     fontFamily: FONT.reg,
