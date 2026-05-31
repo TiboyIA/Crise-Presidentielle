@@ -266,6 +266,9 @@ import {
   type AntiCorruptionLevel,
 } from "@/logic/antiCorruptionProgramEngine";
 import {
+  tickAIGovernance, applyAIGovernanceDeltas,
+} from "@/logic/aiGovernanceComplianceEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -1793,8 +1796,12 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
             },
           };
         })();
+        // Gouvernance IA — deltas immédiats si le choix le déclare
+        const withAI = choice?.aiGovernanceDeltas
+          ? applyAIGovernanceDeltas(withAbuse, choice.aiGovernanceDeltas)
+          : withAbuse;
         // Renforcement des marges de rupture — si le choix est un investissement structurel
-        const withBreakpoint = choice ? reinforceBreakpointMargins(withAbuse, choice) : withAbuse;
+        const withBreakpoint = choice ? reinforceBreakpointMargins(withAI, choice) : withAI;
         // Résonance sociale — amplification si contexte sensible
         const { state: withResonance, note: resonanceNote } = evaluateResonance(withBreakpoint, event);
         const withResonanceNote = resonanceNote
@@ -2894,6 +2901,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickOversight(s);
       s = tickAbuseOfPower(s);
       s = tickAntiCorruption(s);
+      s = tickAIGovernance(s);
       s = tickInvestorConfidence(s);
     }
   }

@@ -641,6 +641,40 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       return (ac.level === "renforcé" || ac.level === "indépendant") &&
              state.mandateDay - ac.launchedAtDay >= 25;
     })(),
+    // ── Gouvernance IA ────────────────────────────────────────────────────────
+    ai_deployed:         (() => {
+      const completed = state.strategyResearch?.completed ?? [];
+      return completed.includes("research_admin_ai") && state.mandateDay >= 3;
+    })(),
+    ai_risk_elevated:    (() => {
+      const ag = state.aiGovernanceState;
+      return !!ag && ag.algorithmicRisk >= 55 && ag.activeDeployments.length > 0;
+    })(),
+    ai_justice_active:   (() => {
+      const ag = state.aiGovernanceState;
+      if (!ag) return false;
+      return ag.activeDeployments.includes("justice_ai") && ag.algorithmicRisk >= 45;
+    })(),
+    ai_social_risk:      (() => {
+      const ag = state.aiGovernanceState;
+      if (!ag) return false;
+      return (ag.activeDeployments.includes("social_scoring") ||
+              ag.automationAbuseRisk >= 60) && state.mandateDay >= 10;
+    })(),
+    ai_crisis:           (() => {
+      const ag = state.aiGovernanceState;
+      if (!ag) return false;
+      // Inline de computeAIRiskScore pour éviter la dépendance circulaire
+      const riskScore = Math.max(0, Math.min(100, Math.round(
+        ag.algorithmicRisk * 0.35 + ag.automationAbuseRisk * 0.30 +
+        (100 - ag.humanOversight) * 0.20 + (100 - ag.publicTrustAI) * 0.15,
+      )));
+      return riskScore >= 71 && state.mandateDay >= 15;
+    })(),
+    ai_transparency_action: (() => {
+      const ag = state.aiGovernanceState;
+      return !!ag && ag.aiTransparency >= 65 && ag.activeDeployments.length > 0 && state.mandateDay >= 20;
+    })(),
   };
 }
 

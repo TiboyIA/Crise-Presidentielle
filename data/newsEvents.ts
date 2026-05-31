@@ -36,6 +36,7 @@ import { MINISTER_CONFLICT_EVENTS } from "@/data/ministerConflictEvents";
 import { OVERSIGHT_EVENTS } from "@/data/oversightEvents";
 import { ABUSE_EVENTS } from "@/data/abuseOfPowerEvents";
 import { ANTI_CORRUPTION_EVENTS } from "@/data/antiCorruptionEvents";
+import { AI_GOVERNANCE_EVENTS } from "@/data/aiGovernanceEvents";
 
 export const NEWS_EVENTS: NewsEvent[] = [
   // ── CYBER ────────────────────────────────────────────────────
@@ -3749,6 +3750,8 @@ export const NEWS_EVENTS: NewsEvent[] = [
   ...ABUSE_EVENTS,
   // ── PROGRAMME ANTI-CORRUPTION ─────────────────────────────────────────────────
   ...ANTI_CORRUPTION_EVENTS,
+  // ── GOUVERNANCE IA ────────────────────────────────────────────────────────────
+  ...AI_GOVERNANCE_EVENTS,
 ];
 
 export const NEWS_EVENT_MAP = Object.fromEntries(NEWS_EVENTS.map((e) => [e.id, e]));

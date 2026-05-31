@@ -99,6 +99,10 @@ import {
   DEFAULT_ANTI_CORRUPTION_STATE,
 } from "@/logic/antiCorruptionProgramEngine";
 import type { AntiCorruptionLevel } from "@/logic/antiCorruptionProgramEngine";
+import {
+  computeAIRiskScore, getAIRiskInfo, getAITransparencyLabel, getOversightLabel,
+  DEFAULT_AI_GOVERNANCE_STATE, AI_DEPLOYMENT_LABELS,
+} from "@/logic/aiGovernanceComplianceEngine";
 import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
 import {
   getInterestRateBandInfo, getCredibilityBandInfo,
@@ -323,6 +327,14 @@ export default function JournalDeCriseScreen() {
   const acLevelInfo      = getLevelInfo(acState.level);
   const acInitialPhase   = isInitialPhase(acState, state.mandateDay);
   const showAcPanel      = acState.level !== "absent" || (state.complianceState?.corruptionExposure ?? 10) >= 40;
+
+  const aiState          = state.aiGovernanceState ?? DEFAULT_AI_GOVERNANCE_STATE;
+  const aiRiskScore      = computeAIRiskScore(aiState);
+  const aiRiskInfo       = getAIRiskInfo(aiRiskScore);
+  const completedResearch = state.strategyResearch?.completed ?? [];
+  const aiIsActive       = completedResearch.includes("research_admin_ai") ||
+                           aiState.activeDeployments.length > 0;
+  const showAiPanel      = aiIsActive || aiRiskScore >= 30;
 
   const activeOversightInvs = getActiveInvestigations(state);
   const oversightMaxPressure = activeOversightInvs.length > 0
@@ -1363,6 +1375,75 @@ export default function JournalDeCriseScreen() {
               );
             })}
           </View>
+        </View>
+      )}
+
+      {/* GOUVERNANCE IA GOUVERNEMENTALE */}
+      {showAiPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: aiRiskInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="robot-outline" size={12} color={aiRiskInfo.color} />
+            <Text style={[styles.waveTitle, { color: aiRiskInfo.color }]}>GOUVERNANCE IA D'ÉTAT</Text>
+            <View style={[styles.waveBadge, { backgroundColor: aiRiskInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: aiRiskInfo.color }]}>{aiRiskInfo.label.toUpperCase()}</Text>
+            </View>
+          </View>
+
+          {/* Barre de risque global */}
+          <View style={{ marginTop: 8, marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+              <Text style={[styles.waveBadgeText, { color: PALETTE.textMid }]}>Score de risque algorithmique</Text>
+              <Text style={[styles.waveBadgeText, { color: aiRiskInfo.color }]}>{aiRiskScore} / 100</Text>
+            </View>
+            <View style={{ height: 5, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden" }}>
+              <View style={{ width: `${aiRiskScore}%` as `${number}%`, height: "100%", backgroundColor: aiRiskInfo.color, borderRadius: 3 }} />
+            </View>
+          </View>
+
+          <Text style={[styles.stormDesc, { marginBottom: 8 }]}>{aiRiskInfo.description}</Text>
+
+          {/* Indicateurs */}
+          <View style={{ gap: 3, marginBottom: 8 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Transparence</Text>
+              <Text style={[styles.waveBadgeText, { color: aiState.aiTransparency >= 50 ? "#4caf82" : aiState.aiTransparency >= 30 ? "#e8c44f" : "#e54848" }]}>
+                {getAITransparencyLabel(aiState.aiTransparency)} ({aiState.aiTransparency})
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Supervision humaine</Text>
+              <Text style={[styles.waveBadgeText, { color: aiState.humanOversight >= 60 ? "#4caf82" : aiState.humanOversight >= 40 ? "#e8c44f" : "#e54848" }]}>
+                {getOversightLabel(aiState.humanOversight)} ({aiState.humanOversight})
+              </Text>
+            </View>
+            {aiState.automationAbuseRisk >= 30 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Risque abus auto.</Text>
+                <Text style={[styles.waveBadgeText, { color: aiState.automationAbuseRisk >= 60 ? "#e54848" : "#e8864f" }]}>
+                  {aiState.automationAbuseRisk}
+                </Text>
+              </View>
+            )}
+            {aiState.hiddenErrors > 0 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[styles.waveBadgeText, { color: PALETTE.textLow }]}>Erreurs dissimulées</Text>
+                <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>{aiState.hiddenErrors}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Systèmes actifs */}
+          {aiState.activeDeployments.length > 0 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+              {aiState.activeDeployments.map((dep) => (
+                <View key={dep} style={[styles.waveBadge, { backgroundColor: "#4a9fff18" }]}>
+                  <Text style={[styles.waveBadgeText, { color: "#4a9fff" }]}>
+                    {AI_DEPLOYMENT_LABELS[dep]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       )}
 

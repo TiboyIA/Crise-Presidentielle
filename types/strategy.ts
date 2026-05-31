@@ -681,6 +681,8 @@ export interface NewsChoice {
   deliveryReliabilityDelta?:    number;
   /** Delta sur l'indice d'abus de pouvoir — appliqué lors de la résolution du choix. */
   abuseOfPowerIndexDelta?: number;
+  /** Deltas sur les indicateurs de gouvernance IA — appliqués lors de la résolution du choix. */
+  aiGovernanceDeltas?: import("@/logic/aiGovernanceComplianceEngine").AIGovernanceDeltas;
   /** Crée une dérogation d'urgence lors de la résolution de ce choix. */
   createsDerogation?: {
     type: import("@/logic/emergencyDerogationEngine").DerogationType;
@@ -996,4 +998,6 @@ export interface StrategyGameState {
   abuseOfPowerState?: import("@/logic/abuseOfPowerEngine").AbuseOfPowerState;
   // Programme anti-corruption d'État (optional pour backward compat)
   antiCorruptionState?: import("@/logic/antiCorruptionProgramEngine").AntiCorruptionState;
+  // Conformité IA gouvernementale (optional pour backward compat)
+  aiGovernanceState?: import("@/logic/aiGovernanceComplianceEngine").AIGovernanceState;
 }
