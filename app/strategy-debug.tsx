@@ -9,6 +9,8 @@ import { STRATEGY_RESEARCH } from "@/data/strategyResearch";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { RESOURCE_ICONS, RESOURCE_LABELS } from "@/types/strategy";
 import type { ResourceKey } from "@/types/strategy";
+import { DEFAULT_COMPLIANCE_STATE } from "@/logic/complianceEngine";
+import { queueNews } from "@/logic/newsEngine";
 
 // Dev-only balancing dashboard — never rendered in prod (__DEV__ gate).
 // Access: discrete ⚙ button in nation.tsx header, only visible in __DEV__.
@@ -74,7 +76,7 @@ function hiddenColor(key: string, value: number): string {
 export default function StrategyDebugScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, startNewGame } = useStrategy();
+  const { state, startNewGame, applySandboxMutation, isSandboxActive, enableSandboxMode, disableSandboxMode } = useStrategy();
 
   useEffect(() => {
     if (!__DEV__) router.replace("/nation");
@@ -129,10 +131,18 @@ export default function StrategyDebugScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.banner}>
+        <View style={[styles.banner, isSandboxActive && { backgroundColor: "#7c3aed22", borderColor: "#7c3aed55" }]}>
           <Text style={styles.bannerText}>
-            Lecture seule · Jour {state.mandateDay} · Moy. jauges : {avgIndicator}/100
+            {isSandboxActive ? "⚡ SANDBOX ACTIF" : "Lecture seule"} · Jour {state.mandateDay} · Moy. jauges : {avgIndicator}/100
           </Text>
+          <Pressable
+            onPress={() => isSandboxActive ? disableSandboxMode() : enableSandboxMode()}
+            style={({ pressed }) => [sandboxStyles.toggleBtn, isSandboxActive && sandboxStyles.toggleBtnActive, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={[sandboxStyles.toggleBtnText, isSandboxActive && sandboxStyles.toggleBtnTextActive]}>
+              {isSandboxActive ? "DÉSACTIVER" : "ACTIVER SANDBOX"}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Reset */}
@@ -270,6 +280,83 @@ export default function StrategyDebugScreen() {
             );
           })}
         </Section>
+
+        {/* ── CONFORMITÉ ── */}
+        <Section label="CONFORMITÉ DE L'ÉTAT">
+          {(() => {
+            const cs = state.complianceState ?? DEFAULT_COMPLIANCE_STATE;
+            const abuse = state.abuseOfPowerState;
+            const ag = state.aiGovernanceState;
+            const fields: { key: string; label: string; val: number; step: number;
+              setter: (v: number) => void }[] = [
+              { key: "complianceScore",      label: "Score conformité",     val: cs.complianceScore,      step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, complianceState: { ...(s.complianceState ?? DEFAULT_COMPLIANCE_STATE), complianceScore: v } })) },
+              { key: "legalRisk",            label: "Risque juridique",     val: cs.legalRisk,            step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, complianceState: { ...(s.complianceState ?? DEFAULT_COMPLIANCE_STATE), legalRisk: v } })) },
+              { key: "auditPressure",        label: "Pression d'audit",     val: cs.auditPressure,        step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, complianceState: { ...(s.complianceState ?? DEFAULT_COMPLIANCE_STATE), auditPressure: v } })) },
+              { key: "corruptionExposure",   label: "Exposition corruption", val: cs.corruptionExposure,  step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, complianceState: { ...(s.complianceState ?? DEFAULT_COMPLIANCE_STATE), corruptionExposure: v } })) },
+              { key: "emergencyPowersAbuse", label: "Abus pouvoirs urgence", val: cs.emergencyPowersAbuse, step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, complianceState: { ...(s.complianceState ?? DEFAULT_COMPLIANCE_STATE), emergencyPowersAbuse: v } })) },
+              { key: "whistleblowerRisk",    label: "Risque lanceurs",      val: cs.whistleblowerRisk,    step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, complianceState: { ...(s.complianceState ?? DEFAULT_COMPLIANCE_STATE), whistleblowerRisk: v } })) },
+              { key: "abuseIndex",           label: "Indice abus pouvoir",  val: abuse?.index ?? 0,       step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, abuseOfPowerState: { ...(s.abuseOfPowerState ?? { index: 5, lastDeriveAt: -999 }), index: v } })) },
+              { key: "aiRisk",               label: "Risque IA gouvern.",   val: ag?.algorithmicRisk ?? 0, step: 5,
+                setter: (v) => applySandboxMutation((s) => ({ ...s, aiGovernanceState: { ...(s.aiGovernanceState ?? { aiTransparency: 30, humanOversight: 60, algorithmicRisk: 10, publicTrustAI: 55, automationAbuseRisk: 5, lastEventAt: 0, activeDeployments: [], hiddenErrors: 0 }), algorithmicRisk: v } })) },
+            ];
+            return fields.map(({ key, label, val, step, setter }) => (
+              <View key={key} style={sandboxStyles.fieldRow}>
+                <Text style={[styles.rowLabel, { flex: 1 }]}>{label}</Text>
+                <Text style={[styles.rowValue, { width: 32, textAlign: "center" }]}>{val}</Text>
+                {isSandboxActive && (
+                  <View style={sandboxStyles.stepper}>
+                    <Pressable style={sandboxStyles.stepBtn} onPress={() => setter(Math.max(0, val - step))}>
+                      <Text style={sandboxStyles.stepBtnText}>−</Text>
+                    </Pressable>
+                    <Pressable style={sandboxStyles.stepBtn} onPress={() => setter(Math.min(100, val + step))}>
+                      <Text style={sandboxStyles.stepBtnText}>+</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            ));
+          })()}
+        </Section>
+
+        {/* ── ÉVÉNEMENTS CONFORMITÉ ── */}
+        <Section label="FORCER ÉVÉNEMENT CONFORMITÉ">
+          {isSandboxActive ? (
+            <View style={sandboxStyles.eventsGrid}>
+              {([
+                { id: "abuse_concern_oversight",    label: "Inquiétude contre-pouvoirs",         color: "#e8c44f" },
+                { id: "abuse_crisis_institutions",  label: "Crise institutionnelle",             color: "#e8864f" },
+                { id: "abuse_derive_du_pouvoir",    label: "Dérive du pouvoir ⚠️",               color: "#e54848" },
+                { id: "acep_audit_revelation",      label: "Audit révèle irrégularités",         color: "#4a9fff" },
+                { id: "acep_ally_exposure",         label: "Allié exposé (prog. indépendant)",   color: "#a78bfa" },
+                { id: "ai_deploy_notification",     label: "Déploiement IA administrative",      color: "#4a9fff" },
+                { id: "ai_error_hidden",            label: "Erreur algorithmique détectée",      color: "#e8864f" },
+                { id: "ai_crisis_drift",            label: "Dérive algorithmique systémique ⚠️", color: "#e54848" },
+                { id: "ai_social_scoring",          label: "Scoring citoyen révélé ⚠️",          color: "#e54848" },
+                { id: "oversight_haip_inquiry",     label: "Enquête HAIP",                       color: "#e8c44f" },
+                { id: "oversight_all_cleared",      label: "Autorités apaisées",                 color: "#4caf82" },
+                { id: "abuse_restored",             label: "Équilibre institutionnel rétabli",   color: "#4caf82" },
+              ] as { id: string; label: string; color: string }[]).map(({ id, label, color }) => (
+                <Pressable
+                  key={id}
+                  style={({ pressed }) => [sandboxStyles.eventBtn, { borderColor: color + "55", opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => applySandboxMutation((s) => ({ ...s, news: queueNews(s.news, id) }))}
+                >
+                  <View style={[sandboxStyles.eventDot, { backgroundColor: color }]} />
+                  <Text style={sandboxStyles.eventLabel}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.rowLabel, { fontStyle: "italic", color: PALETTE.textLow }]}>Activez le mode sandbox pour déclencher des événements.</Text>
+          )}
+        </Section>
       </ScrollView>
     </View>
   );
@@ -359,4 +446,31 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.danger + "12",
   },
   resetBtnText: { fontSize: 12, fontFamily: FONT.bold, color: PALETTE.danger, letterSpacing: 1 },
+});
+
+const sandboxStyles = StyleSheet.create({
+  toggleBtn: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.xs,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: "#ffffff33",
+    backgroundColor: "#ffffff0a", marginLeft: 8,
+  },
+  toggleBtnActive: { borderColor: "#7c3aed88", backgroundColor: "#7c3aed22" },
+  toggleBtnText:       { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textLow, letterSpacing: 1 },
+  toggleBtnTextActive: { color: "#a78bfa" },
+  fieldRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
+  stepper: { flexDirection: "row", gap: 4 },
+  stepBtn: {
+    width: 26, height: 22, borderRadius: RADIUS.xs, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#ffffff12", borderWidth: StyleSheet.hairlineWidth, borderColor: "#ffffff22",
+  },
+  stepBtnText: { fontSize: 14, fontFamily: FONT.bold, color: PALETTE.textHigh, lineHeight: 18 },
+  eventsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  eventBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: RADIUS.xs, borderWidth: 1,
+    backgroundColor: "#ffffff08",
+  },
+  eventDot:   { width: 6, height: 6, borderRadius: 3 },
+  eventLabel: { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid },
 });
