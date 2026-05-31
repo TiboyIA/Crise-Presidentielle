@@ -29,6 +29,7 @@ import { DEFAULT_COSMIC_STATE, COSMIC_STAGE_LABELS } from "@/types/cosmic";
 import { getMoralBalanceLabel, getMoralBalanceColor, getCosmicCredibilityLabel } from "@/logic/cosmicEngine";
 import { computeHealthMandateBilan } from "@/logic/healthMandateReviewEngine";
 import { computeAbuseBilan } from "@/logic/abuseOfPowerEngine";
+import { computeComplianceBilan } from "@/logic/complianceBilanEngine";
 import { computeEconomicOverview } from "@/logic/economyEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
@@ -812,6 +813,71 @@ export default function MandateReviewScreen() {
                   <MaterialCommunityIcons name="alert-circle-outline" size={12} color={PALETTE.danger} />
                   <Text style={{ fontSize: 10, fontFamily: FONT.semi, color: PALETTE.danger }}>
                     Malus bilan : {abuseBilan.scorePenalty} pts
+                  </Text>
+                </View>
+              )}
+            </Panel>
+          );
+        })()}
+
+        {/* BILAN CONFORMITÉ */}
+        {(() => {
+          const cb = computeComplianceBilan(state);
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="shield-check-outline" size={14} color={cb.verdictColor} />
+                <Text style={[styles.sectionTitle, { color: cb.verdictColor }]}>BILAN CONFORMITÉ</Text>
+                <View style={{ marginLeft: "auto", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: cb.verdictColor + "22" }}>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: cb.verdictColor, letterSpacing: 0.8 }}>
+                    {cb.verdictTitle.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Sous-titre verdict */}
+              <Text style={{ fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16, marginTop: 6, marginBottom: 10, fontStyle: "italic" }}>
+                {cb.verdictSubtitle}
+              </Text>
+
+              {/* Barre score conformité */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <Text style={{ fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow, width: 110 }}>Score conformité</Text>
+                <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: "#ffffff18" }}>
+                  <View style={{ width: `${cb.complianceScore}%` as `${number}%`, height: 5, borderRadius: 3, backgroundColor: cb.verdictColor }} />
+                </View>
+                <Text style={{ fontSize: 12, fontFamily: FONT.bold, color: cb.verdictColor, width: 28, textAlign: "right" }}>{cb.complianceScore}</Text>
+              </View>
+
+              {/* Grille de métriques */}
+              <View style={{ gap: 5, marginBottom: 10 }}>
+                {[
+                  { icon: "alert-circle-outline",      label: "Scandales déclenchés",        val: cb.scandalesDeclenches,       warnGt: 1, good: cb.scandalesDeclenches === 0 },
+                  { icon: "check-circle-outline",       label: "Audits acceptés",              val: cb.auditsAcceptes,            warnGt: -1, good: cb.auditsAcceptes > 0 },
+                  { icon: "close-circle-outline",       label: "Audits ignorés",               val: cb.auditsIgnores,             warnGt: 0, good: cb.auditsIgnores === 0 },
+                  { icon: "account-tie-outline",        label: "Conflits d'intérêts",          val: cb.conflitsInterets,          warnGt: 1, good: cb.conflitsInterets === 0 },
+                  { icon: "gavel",                      label: "Abus pouvoirs d'urgence",      val: cb.abusPouvoirsUrgence,       warnGt: 50, good: cb.abusPouvoirsUrgence < 25 },
+                  { icon: "bank-outline",               label: "Réputation institutionnelle",  val: cb.reputationInstitutionnelle, warnGt: -1, good: cb.reputationInstitutionnelle >= 60 },
+                  ...(cb.aiRiskFinal > 20 ? [{ icon: "robot-outline" as const,     label: "Risque IA gouvernementale",    val: cb.aiRiskFinal,              warnGt: 50, good: cb.aiRiskFinal < 25 }] : []),
+                  ...(cb.abuseOfPowerFinal > 10 ? [{ icon: "eye-off-outline" as const,     label: "Indice abus de pouvoir",       val: cb.abuseOfPowerFinal,        warnGt: 30, good: cb.abuseOfPowerFinal < 15 }] : []),
+                ].map((m) => {
+                  const color = m.good ? PALETTE.success : m.val > m.warnGt ? PALETTE.danger : PALETTE.textMid;
+                  return (
+                    <View key={m.label} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <MaterialCommunityIcons name={m.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]} size={11} color={color} />
+                      <Text style={{ flex: 1, fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow }}>{m.label}</Text>
+                      <Text style={{ fontSize: 11, fontFamily: FONT.semi, color }}>{m.val}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Pénalité score */}
+              {cb.scorePenalty < 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#ffffff14" }}>
+                  <MaterialCommunityIcons name="minus-circle-outline" size={12} color={PALETTE.danger} />
+                  <Text style={{ fontSize: 10, fontFamily: FONT.semi, color: PALETTE.danger }}>
+                    Malus conformité : {cb.scorePenalty} pts sur le score final
                   </Text>
                 </View>
               )}
