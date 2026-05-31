@@ -1,7 +1,0 @@
-
-> @workspace/etat-de-crise@0.0.0 start
-> expo start --tunnel --clear
-
-Starting project at C:\Users\serci\Desktop\Projet jeu visual code\etat-de-crise-source\etat-de-crise
-› Port 8081 is being used by another process
-› Skipping dev server

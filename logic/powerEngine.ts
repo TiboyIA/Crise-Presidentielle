@@ -16,13 +16,13 @@ const BUILDING_WEIGHTS: Record<string, number> = {
 };
 
 const RESOURCE_WEIGHTS: Partial<Record<keyof StrategyResources, number>> = {
-  money: 0.01,
-  influence: 0.3,
-  military: 0.5,
-  cyberDefense: 0.4,
-  technology: 0.35,
-  intelligence: 0.2,
-  energy: 0.15,
+  money: 0.005,
+  influence: 0.18,
+  military: 0.30,
+  cyberDefense: 0.24,
+  technology: 0.20,
+  intelligence: 0.12,
+  energy: 0.09,
 };
 
 export function calculateGlobalPower(
@@ -34,7 +34,7 @@ export function calculateGlobalPower(
   for (const b of buildings) {
     if (b.level === 0) continue;
     const weight = BUILDING_WEIGHTS[b.id] ?? 10;
-    power += weight * b.level * 1.5;
+    power += weight * b.level;
   }
 
   for (const [key, weight] of Object.entries(RESOURCE_WEIGHTS) as [keyof StrategyResources, number][]) {
