@@ -74,6 +74,7 @@ function RootLayoutNav() {
       <Stack.Screen name="ranking" />
       <Stack.Screen name="missions" />
       <Stack.Screen name="journal-crise" />
+      <Stack.Screen name="cellule-sante" />
       <Stack.Screen name="strategy-research" />
       <Stack.Screen name="ranking-global" />
       <Stack.Screen name="player-profile" />
