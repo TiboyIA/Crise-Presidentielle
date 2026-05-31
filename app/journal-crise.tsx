@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStrategy } from "@/context/StrategyContext";
 import { useResponsive } from "@/utils/responsive";
@@ -148,12 +149,11 @@ const hospStyles = StyleSheet.create({
 
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, setWeatherDoctrine, launchDimAudit, setHealthSurveillanceLevel, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly, oversightCooperate, oversightJustify, oversightContest } = useStrategy();
+  const router = useRouter();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly, oversightCooperate, oversightJustify, oversightContest } = useStrategy();
   const { hPad, width } = useResponsive();
 
-  const { prepareForecast, issuePublicAlert } = useStrategy();
   const { enabled: comfort, fs, pad, lowLoad, reducedInfo, extraConfirm } = useComfort();
-  const [activeTab, setActiveTab] = useState<"journal" | "sante">("journal");
   const [filter, setFilter] = useState<NewsType | "all">("all");
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [logExpanded, setLogExpanded] = useState(false);
@@ -355,31 +355,30 @@ export default function JournalDeCriseScreen() {
       <SectionBackdrop section="journal" intensity={0.45} />
       <ScreenHeader title="Journal de Crise" kicker="DESK PRÉSIDENTIEL" />
 
-      {/* ── Onglets ────────────────────────────────────────────────────────── */}
+      {/* ── Accès aux salles dédiées (santé / météo) ───────────────────────── */}
       <View style={tabStyles.bar}>
-        {(["journal", "sante"] as const).map((tab) => {
-          const active = activeTab === tab;
-          return (
-            <Pressable
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              style={[tabStyles.tab, active && tabStyles.tabActive]}
-            >
-              <Text style={[tabStyles.tabText, active && tabStyles.tabTextActive]}>
-                {tab === "journal" ? "JOURNAL" : "SANTÉ"}
-              </Text>
-              {tab === "sante" && hasCriticalHealth && !active && (
-                <View style={tabStyles.dot} />
-              )}
-            </Pressable>
-          );
-        })}
+        <Pressable
+          onPress={() => router.push("/cellule-sante" as any)}
+          style={({ pressed }) => [tabStyles.link, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="hospital-box-outline" size={14} color="#2fb8a6" />
+          <Text style={tabStyles.linkText}>CELLULE SANTÉ</Text>
+          {hasCriticalHealth && <View style={tabStyles.dot} />}
+        </Pressable>
+        <View style={tabStyles.linkDivider} />
+        <Pressable
+          onPress={() => router.push("/weather-room" as any)}
+          style={({ pressed }) => [tabStyles.link, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialCommunityIcons name="radar" size={14} color={PALETTE.info} />
+          <Text style={tabStyles.linkText}>SALLE MÉTÉO</Text>
+        </Pressable>
       </View>
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* ONGLET JOURNAL — ticker + décisions + alertes + archives              */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "journal" && (
+      {(
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -1423,689 +1422,6 @@ export default function JournalDeCriseScreen() {
       )}
       {/* fin onglet JOURNAL */}
 
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* ONGLET SANTÉ — tableau de bord sanitaire MODE DELTA                  */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "sante" && (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 0 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ── Pression hospitalière ────────────────────────────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, marginTop: 8, borderColor: hospPressureInfo.color + "33" }]}>
-            <View style={styles.waveHeader}>
-              <MaterialCommunityIcons name="hospital-building" size={12} color={hospPressureInfo.color} />
-              <Text style={[styles.waveTitle, { color: hospPressureInfo.color }]}>PRESSION HOSPITALIÈRE</Text>
-              <View style={[styles.waveBadge, { backgroundColor: hospPressureInfo.color + "22" }]}>
-                <Text style={[styles.waveBadgeText, { color: hospPressureInfo.color }]}>
-                  {hospPressureInfo.label.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={[styles.waveBadgeText, { color: hospPressureInfo.color, marginLeft: 4 }]}>
-                {Math.round(hospPressure)}
-              </Text>
-            </View>
-            <View style={hospStyles.bar}>
-              <View style={[hospStyles.fill, { width: `${hospPressure}%` as `${number}%`, backgroundColor: hospPressureInfo.color }]} />
-              {([31, 61, 81] as const).map((t) => (
-                <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
-              ))}
-            </View>
-            <Text style={styles.stormDesc}>{hospPressureInfo.message}</Text>
-          </View>
-
-          {/* ── Cellule de Veille Sanitaire ──────────────────────────────── */}
-          {(() => {
-            const currentLevel = state.healthSurveillanceLevel ?? DEFAULT_SURVEILLANCE_LEVEL;
-            const currentDef   = SURVEILLANCE_LEVELS[currentLevel];
-            return (
-              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: currentDef.color + "33" }]}>
-                <View style={styles.waveHeader}>
-                  <MaterialCommunityIcons name="radar" size={12} color={currentDef.color} />
-                  <Text style={[styles.waveTitle, { color: currentDef.color }]}>VEILLE SANITAIRE</Text>
-                  <View style={[styles.waveBadge, { backgroundColor: currentDef.color + "22" }]}>
-                    <Text style={[styles.waveBadgeText, { color: currentDef.color }]}>{currentDef.label.toUpperCase()}</Text>
-                  </View>
-                  {currentDef.dailyCostMoney > 0 && (
-                    <Text style={[styles.waveBadgeText, { color: PALETTE.textLow, marginLeft: 4 }]}>
-                      {`−${currentDef.dailyCostMoney} M€/j`}
-                    </Text>
-                  )}
-                </View>
-                <Text style={[styles.stormDesc, { marginBottom: 8 }]}>{currentDef.description}</Text>
-                <View style={survStyles.grid}>
-                  {SURVEILLANCE_ORDER.map((levelId) => {
-                    const def      = SURVEILLANCE_LEVELS[levelId];
-                    const isActive = levelId === currentLevel;
-                    const check    = isActive ? { ok: false } : canSetSurveillanceLevel(state, levelId);
-                    return (
-                      <Pressable
-                        key={levelId}
-                        disabled={isActive}
-                        style={({ pressed }) => [
-                          survStyles.btn,
-                          isActive && { borderColor: def.color, backgroundColor: def.color + "22" },
-                          !isActive && !check.ok && survStyles.btnDim,
-                          { opacity: pressed ? 0.75 : 1 },
-                        ]}
-                        onPress={() => {
-                          const r = setHealthSurveillanceLevel(levelId);
-                          if (!r.success) Alert.alert("Indisponible", r.reason ?? "Conditions non remplies.", [{ text: "OK" }]);
-                        }}
-                      >
-                        <Text style={[survStyles.btnLabel, { color: isActive ? def.color : check.ok ? PALETTE.textHigh : PALETTE.textLow }]}>
-                          {def.label}
-                        </Text>
-                        {def.dailyCostMoney > 0 && (
-                          <Text style={[survStyles.btnCost, { color: isActive ? def.color : PALETTE.textLow }]}>
-                            {`${def.dailyCostMoney} M€/j`}
-                          </Text>
-                        )}
-                        {!isActive && def.upgradeCostMoney > 0 && check.ok && (
-                          <Text style={survStyles.btnUpgrade}>
-                            {`${def.upgradeCostMoney} M€ · ${def.upgradeCostInfluence} INF`}
-                          </Text>
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })()}
-
-          {/* ── Cellule DIM Nationale ─────────────────────────────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: medicalInfo.color + "33" }]}>
-            <View style={styles.waveHeader}>
-              <MaterialCommunityIcons name="hospital-box-outline" size={12} color={medicalInfo.color} />
-              <Text style={[styles.waveTitle, { color: medicalInfo.color }]}>CELLULE DIM NATIONALE</Text>
-              <View style={[styles.waveBadge, { backgroundColor: medicalInfo.color + "22" }]}>
-                <Text style={[styles.waveBadgeText, { color: medicalInfo.color }]}>
-                  {medicalInfo.label.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={[styles.waveBadgeText, { color: medicalInfo.color, marginLeft: 4 }]}>
-                {Math.round(medicalQuality)}
-              </Text>
-            </View>
-            <Text style={styles.stormDesc}>{medicalInfo.message}</Text>
-          </View>
-
-          {/* ── Interopérabilité des systèmes de santé ───────────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: interopInfo.color + "33" }]}>
-            <View style={styles.waveHeader}>
-              <MaterialCommunityIcons name="lan-connect" size={12} color={interopInfo.color} />
-              <Text style={[styles.waveTitle, { color: interopInfo.color }]}>INTEROPÉRABILITÉ SYS. SANTÉ</Text>
-              <View style={[styles.waveBadge, { backgroundColor: interopInfo.color + "22" }]}>
-                <Text style={[styles.waveBadgeText, { color: interopInfo.color }]}>{interopInfo.label.toUpperCase()}</Text>
-              </View>
-              <Text style={[styles.waveBadgeText, { color: interopInfo.color, marginLeft: 4 }]}>
-                {Math.round(interopValue)}
-              </Text>
-            </View>
-            <View style={hospStyles.bar}>
-              <View style={[hospStyles.fill, { width: `${interopValue}%` as `${number}%`, backgroundColor: interopInfo.color }]} />
-              {([20, 40, 60, 80] as const).map((t) => (
-                <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
-              ))}
-            </View>
-            <Text style={styles.stormDesc}>{interopInfo.message}</Text>
-          </View>
-
-          {/* ── Action : Audit DIM National ──────────────────────────────── */}
-          {(() => {
-            const auditCheck = canLaunchDimAudit(state);
-            const canAudit   = auditCheck.ok;
-            return (
-              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#4a9fff33" }]}>
-                <View style={styles.waveHeader}>
-                  <MaterialCommunityIcons name="magnify-scan" size={12} color="#4a9fff" />
-                  <Text style={[styles.waveTitle, { color: "#4a9fff" }]}>AUDIT DIM NATIONAL</Text>
-                </View>
-                <Text style={[styles.stormDesc, { marginBottom: 8 }]}>
-                  Commandite un audit indépendant des données hospitalières. Améliore la qualité du codage et des données sanitaires, mais peut révéler des anomalies à risque politique.
-                </Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.forecastBtn,
-                    !canAudit && styles.forecastBtnDim,
-                    { opacity: pressed ? 0.75 : 1, alignSelf: "flex-start" },
-                  ]}
-                  disabled={!canAudit}
-                  onPress={() => {
-                    if (!canAudit) {
-                      Alert.alert("Audit indisponible", auditCheck.reason ?? "Conditions non remplies.", [{ text: "OK" }]);
-                      return;
-                    }
-                    Alert.alert(
-                      "Lancer l'audit DIM ?",
-                      `Coût : ${DIM_AUDIT_COST_MONEY} M€ · ${DIM_AUDIT_COST_INFLUENCE} Influence\n\nLe résultat est incertain et dépend de l'état du système de santé.`,
-                      [
-                        { text: "Annuler", style: "cancel" },
-                        {
-                          text: "Lancer l'audit",
-                          onPress: () => {
-                            const r = launchDimAudit();
-                            if (r.failReason) {
-                              Alert.alert("Audit impossible", r.failReason, [{ text: "OK" }]);
-                            } else if (r.result) {
-                              Alert.alert(r.result.def.label, r.result.def.description, [{ text: "OK" }]);
-                            }
-                          },
-                        },
-                      ],
-                    );
-                  }}
-                >
-                  <MaterialCommunityIcons name="magnify-scan" size={11} color={canAudit ? "#4a9fff" : PALETTE.textLow} />
-                  <Text style={[styles.forecastBtnText, { color: canAudit ? "#4a9fff" : PALETTE.textLow }]}>
-                    {canAudit
-                      ? `Lancer l'audit — ${DIM_AUDIT_COST_MONEY} M€ · ${DIM_AUDIT_COST_INFLUENCE} INF`
-                      : (auditCheck.reason ?? "Indisponible")}
-                  </Text>
-                </Pressable>
-              </View>
-            );
-          })()}
-
-          {/* ── Rapports DIM anonymisés (agrégats fictifs) ───────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#4a9fff22" }]}>
-            <Pressable
-              style={styles.waveHeader}
-              onPress={() => setDimExpanded((v) => !v)}
-            >
-              <MaterialCommunityIcons name="file-chart-outline" size={12} color="#4a9fff" />
-              <Text style={[styles.waveTitle, { color: "#4a9fff" }]}>RAPPORTS DIM — AGRÉGATS FICTIFS</Text>
-              <View style={[styles.waveBadge, { backgroundColor: "#4a9fff22" }]}>
-                <Text style={[styles.waveBadgeText, { color: "#4a9fff" }]}>SEM.{Math.ceil(state.mandateDay / 7) + 1}</Text>
-              </View>
-              <MaterialCommunityIcons
-                name={dimExpanded ? "chevron-up" : "chevron-down"}
-                size={12} color="#4a9fff"
-                style={{ marginLeft: "auto" }}
-              />
-            </Pressable>
-
-            {/* Agrégats synthétiques — toujours visibles */}
-            <View style={{ gap: 4, marginTop: 6 }}>
-              <View style={dimStyles.row}>
-                <MaterialCommunityIcons name="alert-circle-outline" size={10} color={PALETTE.textLow} />
-                <Text style={dimStyles.label}>Passages urgences (fictif)</Text>
-                <Text style={[dimStyles.value, { color: healthSnapshot.urgencyTrend === "hausse" ? PALETTE.danger : healthSnapshot.urgencyTrend === "baisse" ? PALETTE.success : PALETTE.textHigh }]}>
-                  {healthSnapshot.urgencyPassages.toLocaleString("fr-FR")}
-                  {healthSnapshot.urgencyTrend === "hausse" ? " ↑" : healthSnapshot.urgencyTrend === "baisse" ? " ↓" : " →"}
-                </Text>
-              </View>
-              <View style={dimStyles.row}>
-                <MaterialCommunityIcons name="clock-outline" size={10} color={PALETTE.textLow} />
-                <Text style={dimStyles.label}>Délai médian attente (fictif)</Text>
-                <Text style={[dimStyles.value, { color: healthSnapshot.averageWaitMinutes >= 200 ? PALETTE.danger : healthSnapshot.averageWaitMinutes >= 120 ? PALETTE.warning : PALETTE.textHigh }]}>
-                  {healthSnapshot.averageWaitMinutes >= 60
-                    ? `${Math.floor(healthSnapshot.averageWaitMinutes / 60)}h${String(healthSnapshot.averageWaitMinutes % 60).padStart(2, "0")}`
-                    : `${healthSnapshot.averageWaitMinutes} min`}
-                </Text>
-              </View>
-              <View style={dimStyles.row}>
-                <MaterialCommunityIcons name="bed-outline" size={10} color={PALETTE.textLow} />
-                <Text style={dimStyles.label}>Occupation lits (fictif)</Text>
-                <Text style={[dimStyles.value, { color: healthSnapshot.bedOccupancyRate >= 95 ? PALETTE.danger : healthSnapshot.bedOccupancyRate >= 88 ? PALETTE.warning : PALETTE.textHigh }]}>
-                  {healthSnapshot.bedOccupancyRate} %
-                </Text>
-              </View>
-              <View style={dimStyles.row}>
-                <MaterialCommunityIcons name="alert-outline" size={10} color={PALETTE.textLow} />
-                <Text style={dimStyles.label}>Anomalies codage (fictif)</Text>
-                <Text style={[dimStyles.value, { color: healthSnapshot.codingAnomalyRate >= 1.5 ? PALETTE.danger : healthSnapshot.codingAnomalyRate >= 0.8 ? PALETTE.warning : PALETTE.textHigh }]}>
-                  {healthSnapshot.codingAnomalies.toLocaleString("fr-FR")} ({healthSnapshot.codingAnomalyRate.toFixed(2)} %)
-                </Text>
-              </View>
-            </View>
-
-            {/* Signaux faibles */}
-            {healthSnapshot.weakSignals.length > 0 && (
-              <View style={{ marginTop: 8, gap: 3 }}>
-                {healthSnapshot.weakSignals.map((sig) => (
-                  <View key={sig.code} style={dimStyles.signalRow}>
-                    <Text style={[dimStyles.signalCode, { color: sig.color }]}>{sig.code}</Text>
-                    <Text style={[dimStyles.signalLabel, { color: sig.color }]}>{sig.label}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Rapports DIM dépliables */}
-            {dimExpanded && (
-              <View style={{ marginTop: 10, gap: 8 }}>
-                {healthSnapshot.reportSamples.map((rep) => (
-                  <View key={rep.id} style={[dimStyles.report, { borderLeftColor: rep.color }]}>
-                    <View style={dimStyles.reportHeader}>
-                      <Text style={[dimStyles.reportTitle, { color: rep.color }]}>{rep.title.toUpperCase()}</Text>
-                      <View style={[dimStyles.reportBadge, { backgroundColor: rep.color + "22" }]}>
-                        <Text style={[dimStyles.reportBadgeText, { color: rep.color }]}>{rep.status.toUpperCase()}</Text>
-                      </View>
-                    </View>
-                    <Text style={dimStyles.reportPeriod}>{rep.period}</Text>
-                    <Text style={dimStyles.reportSummary}>{rep.summary}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* ── Codage hospitalier ────────────────────────────────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: codingInfo.color + "33" }]}>
-            <View style={styles.waveHeader}>
-              <MaterialCommunityIcons name="clipboard-pulse-outline" size={12} color={codingInfo.color} />
-              <Text style={[styles.waveTitle, { color: codingInfo.color }]}>CODAGE HOSPITALIER</Text>
-              <View style={[styles.waveBadge, { backgroundColor: codingInfo.color + "22" }]}>
-                <Text style={[styles.waveBadgeText, { color: codingInfo.color }]}>
-                  {codingInfo.label.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={[styles.waveBadgeText, { color: codingInfo.color, marginLeft: 4 }]}>
-                {Math.round(codingQuality)}
-              </Text>
-            </View>
-            <Text style={styles.stormDesc}>{codingInfo.message}</Text>
-          </View>
-
-          {/* ── Retard remontée données santé ────────────────────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: reportingInfo.color + "33" }]}>
-            <View style={styles.waveHeader}>
-              <MaterialCommunityIcons name="database-clock-outline" size={12} color={reportingInfo.color} />
-              <Text style={[styles.waveTitle, { color: reportingInfo.color }]}>DONNÉES SANTÉ</Text>
-              <View style={[styles.waveBadge, { backgroundColor: reportingInfo.color + "22" }]}>
-                <Text style={[styles.waveBadgeText, { color: reportingInfo.color }]}>
-                  {reportingInfo.label.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={[styles.waveBadgeText, { color: reportingInfo.color, marginLeft: 4 }]}>
-                {`−${Math.round(reportingDelay)} actions`}
-              </Text>
-            </View>
-            <Text style={styles.stormDesc}>{reportingInfo.message}</Text>
-          </View>
-
-          {/* ── Confiance dans les chiffres de santé ─────────────────────── */}
-          <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: healthTrustInfo.color + "33" }]}>
-            <View style={styles.waveHeader}>
-              <MaterialCommunityIcons name="shield-check-outline" size={12} color={healthTrustInfo.color} />
-              <Text style={[styles.waveTitle, { color: healthTrustInfo.color }]}>CONFIANCE DONNÉES SANTÉ</Text>
-              <View style={[styles.waveBadge, { backgroundColor: healthTrustInfo.color + "22" }]}>
-                <Text style={[styles.waveBadgeText, { color: healthTrustInfo.color }]}>
-                  {healthTrustInfo.label.toUpperCase()}
-                </Text>
-              </View>
-              <Text style={[styles.waveBadgeText, { color: healthTrustInfo.color, marginLeft: 4 }]}>
-                {Math.round(healthTrust)}
-              </Text>
-            </View>
-            <View style={hospStyles.bar}>
-              <View style={[hospStyles.fill, { width: `${healthTrust}%` as `${number}%`, backgroundColor: healthTrustInfo.color }]} />
-              {([20, 40, 60, 80] as const).map((t) => (
-                <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
-              ))}
-            </View>
-            <Text style={styles.stormDesc}>{healthTrustInfo.message}</Text>
-          </View>
-
-          {/* ── Tempête solaire active ────────────────────────────────────── */}
-          {state.solarStorm && (() => {
-            const storm = getSolarStormInfo(state.solarStorm.level);
-            return (
-              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: storm.color + "33" }]}>
-                <View style={styles.waveHeader}>
-                  <MaterialCommunityIcons name="weather-sunny-alert" size={12} color={storm.color} />
-                  <Text style={[styles.waveTitle, { color: storm.color }]}>TEMPÊTE SOLAIRE ACTIVE</Text>
-                  <View style={[styles.waveBadge, { backgroundColor: storm.color + "22" }]}>
-                    <Text style={[styles.waveBadgeText, { color: storm.color }]}>
-                      {storm.level.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.stormDesc}>{storm.description}</Text>
-              </View>
-            );
-          })()}
-
-          {/* ── Sous-détection sanitaire cachée ──────────────────────────── */}
-          {underDetection >= 35 && (() => {
-            const color =
-              underDetection >= 85 ? "#e54848" :
-              underDetection >= 60 ? "#e8864f" : "#e8c44f";
-            const label =
-              underDetection >= 85 ? "CRITIQUE" :
-              underDetection >= 60 ? "ALERTE" : "SIGNAL FAIBLE";
-            const msg =
-              underDetection >= 85
-                ? "Des données sanitaires incohérentes masquent probablement une crise plus grave. Un événement critique est imminent si aucune correction n'est apportée."
-                : underDetection >= 60
-                ? "Des anomalies statistiques persistantes suggèrent une sous-déclaration significative. Le système d'information sanitaire nécessite une investigation urgente."
-                : "Un signal anormal a été détecté dans les données hospitalières. La situation reste sous contrôle mais mérite attention.";
-            return (
-              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: color + "33" }]}>
-                <View style={styles.waveHeader}>
-                  <MaterialCommunityIcons name="eye-off-outline" size={12} color={color} />
-                  <Text style={[styles.waveTitle, { color }]}>SOUS-DÉTECTION SANITAIRE</Text>
-                  <View style={[styles.waveBadge, { backgroundColor: color + "22" }]}>
-                    <Text style={[styles.waveBadgeText, { color }]}>{label}</Text>
-                  </View>
-                  <Text style={[styles.waveBadgeText, { color, marginLeft: 4 }]}>
-                    {Math.round(underDetection)}
-                  </Text>
-                </View>
-                <View style={hospStyles.bar}>
-                  <View style={[hospStyles.fill, { width: `${underDetection}%` as `${number}%`, backgroundColor: color }]} />
-                  {([35, 60, 85] as const).map((t) => (
-                    <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
-                  ))}
-                </View>
-                <Text style={styles.stormDesc}>{msg}</Text>
-              </View>
-            );
-          })()}
-
-          {/* ── Scandale des chiffres de santé ───────────────────────────── */}
-          {scandalPressure >= 35 && (() => {
-            const color =
-              scandalPressure >= 85 ? "#e54848" :
-              scandalPressure >= 65 ? "#e8864f" : "#e8c44f";
-            const label =
-              scandalPressure >= 85 ? "SCANDALE" :
-              scandalPressure >= 65 ? "CONTROVERSE" : "INCOHÉRENCES";
-            const msg =
-              scandalPressure >= 85
-                ? "Un scandale statistique majeur est en cours. La crédibilité des données officielles de santé est ouvertement contestée. Le gouvernement est en position de crise."
-                : scandalPressure >= 65
-                ? "La controverse sur les données sanitaires est entrée dans l'arène publique. L'opposition et la presse amplifient les incohérences signalées."
-                : "Des experts indépendants ont signalé des incohérences dans les données sanitaires officielles. La pression monte dans les milieux spécialisés.";
-            return (
-              <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: color + "33" }]}>
-                <View style={styles.waveHeader}>
-                  <MaterialCommunityIcons name="chart-line-variant" size={12} color={color} />
-                  <Text style={[styles.waveTitle, { color }]}>SCANDALE STATISTIQUE</Text>
-                  <View style={[styles.waveBadge, { backgroundColor: color + "22" }]}>
-                    <Text style={[styles.waveBadgeText, { color }]}>{label}</Text>
-                  </View>
-                  <Text style={[styles.waveBadgeText, { color, marginLeft: 4 }]}>
-                    {Math.round(scandalPressure)}
-                  </Text>
-                </View>
-                <View style={hospStyles.bar}>
-                  <View style={[hospStyles.fill, { width: `${scandalPressure}%` as `${number}%`, backgroundColor: color }]} />
-                  {([35, 65, 85] as const).map((t) => (
-                    <View key={t} style={[hospStyles.tick, { left: `${t}%` as `${number}%` }]} />
-                  ))}
-                </View>
-                <Text style={styles.stormDesc}>{msg}</Text>
-              </View>
-            );
-          })()}
-
-          {/* ── Ruptures systémiques ──────────────────────────────────────── */}
-          {rupturedSystems.length > 0 && (
-            <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: "#e5484833" }]}>
-              <View style={styles.waveHeader}>
-                <MaterialCommunityIcons name="alert-octagon" size={12} color="#e54848" />
-                <Text style={[styles.waveTitle, { color: "#e54848" }]}>RUPTURES SYSTÉMIQUES</Text>
-                <View style={[styles.waveBadge, { backgroundColor: "#e5484822" }]}>
-                  <Text style={[styles.waveBadgeText, { color: "#e54848" }]}>{rupturedSystems.length}</Text>
-                </View>
-              </View>
-              {rupturedSystems.map((bp) => (
-                <Text key={bp.id} style={styles.stormDesc}>
-                  {"▲ "}{bp.label} — stress {Math.round(bp.stress)} / seuil {Math.round(bp.threshold)}
-                </Text>
-              ))}
-            </View>
-          )}
-
-          {/* ── Prévisions météo incertaines ──────────────────────────────── */}
-          {forecast && (
-            <View style={[styles.forecastBlock, { marginHorizontal: hPad }]}>
-              <View style={styles.forecastHeader}>
-                <MaterialCommunityIcons name="weather-partly-cloudy" size={12} color={PALETTE.textLow} />
-                <Text style={styles.forecastTitle}>PRÉVISIONS INCERTAINES</Text>
-                <View style={[styles.forecastSevBadge, { backgroundColor: SEVERITY_DEFS[forecast.expectedSeverity].color + "22" }]}>
-                  <Text style={[styles.forecastSevText, { color: SEVERITY_DEFS[forecast.expectedSeverity].color }]}>
-                    {SEVERITY_DEFS[forecast.expectedSeverity].label.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.forecastRow}>
-                <MaterialCommunityIcons
-                  name={forecast.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                  size={20}
-                  color={CONFIDENCE_DEFS[forecast.confidence].color}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.forecastPhenomenon, { color: CONFIDENCE_DEFS[forecast.confidence].color }]}>
-                    {forecast.phenomenon}
-                  </Text>
-                  <Text style={styles.forecastMeta}>
-                    {forecast.probability} % de probabilité · Confiance{" "}
-                    <Text style={{ color: CONFIDENCE_DEFS[forecast.confidence].color }}>
-                      {CONFIDENCE_DEFS[forecast.confidence].label}
-                    </Text>
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.forecastHint}>{CONFIDENCE_DEFS[forecast.confidence].description}</Text>
-              {(() => {
-                const trust = state?.weatherAlertTrust ?? WEATHER_ALERT_TRUST_INITIAL;
-                const level = getTrustLevel(trust);
-                const def   = TRUST_LEVEL_DEFS[level];
-                return (
-                  <View style={styles.trustRow}>
-                    <Text style={styles.trustLabel}>CONFIANCE ALERTES</Text>
-                    <View style={styles.trustTrack}>
-                      <View style={[styles.trustFill, { width: `${trust}%` as `${number}%`, backgroundColor: def.color }]} />
-                    </View>
-                    <View style={[styles.trustBadge, { backgroundColor: def.color + "22" }]}>
-                      <Text style={[styles.trustBadgeText, { color: def.color }]}>{def.label.toUpperCase()}</Text>
-                    </View>
-                  </View>
-                );
-              })()}
-              {transportDisruption && (
-                <View style={styles.transportRow}>
-                  <MaterialCommunityIcons
-                    name={transportDisruption.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                    size={13}
-                    color={transportDisruption.color}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.transportLabel, { color: transportDisruption.color }]} numberOfLines={1}>
-                      {transportDisruption.label}
-                    </Text>
-                    <Text style={styles.transportEffects}>
-                      {[
-                        transportDisruption.moneyDelta !== 0    && `${transportDisruption.moneyDelta > 0 ? "+" : ""}${transportDisruption.moneyDelta} M€`,
-                        transportDisruption.militaryDelta !== 0 && `${transportDisruption.militaryDelta > 0 ? "+" : ""}${transportDisruption.militaryDelta} Mil.`,
-                        transportDisruption.economyDelta !== 0  && `Éco ${transportDisruption.economyDelta > 0 ? "+" : ""}${transportDisruption.economyDelta}`,
-                      ].filter(Boolean).join(" · ")}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              <View style={styles.forecastSystemsRow}>
-                {forecast.affectedSystems.map((s) => (
-                  <View key={s} style={styles.forecastChip}>
-                    <Text style={styles.forecastChipText}>{s}</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.forecastActions}>
-                {(() => {
-                  const canPrep = state ? canPrepareForecast(state) : { ok: false };
-                  return (
-                    <Pressable
-                      style={({ pressed }) => [styles.forecastBtn, !canPrep.ok && styles.forecastBtnDim, { opacity: pressed ? 0.75 : 1 }]}
-                      disabled={!canPrep.ok}
-                      onPress={() => {
-                        const r = prepareForecast();
-                        if (r.outcome) Alert.alert(r.wasRealEvent ? "Anticipation réussie" : "Fausse alerte", r.outcome, [{ text: "OK" }]);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="shield-check-outline" size={11} color={canPrep.ok ? "#3fbe7a" : PALETTE.textLow} />
-                      <Text style={[styles.forecastBtnText, { color: canPrep.ok ? "#3fbe7a" : PALETTE.textLow }]}>
-                        {canPrep.ok ? `Préparer — ${PREPARE_COST_MONEY} M€` : "Préparé ce cycle"}
-                      </Text>
-                    </Pressable>
-                  );
-                })()}
-                {(() => {
-                  const canAlert = state ? canIssueAlert(state) : { ok: false };
-                  return (
-                    <Pressable
-                      style={({ pressed }) => [styles.forecastBtn, !canAlert.ok && styles.forecastBtnDim, { opacity: pressed ? 0.75 : 1 }]}
-                      disabled={!canAlert.ok}
-                      onPress={() => {
-                        const r = issuePublicAlert();
-                        if (r.outcome) Alert.alert(r.wasRealEvent ? "Alerte confirmée" : "Fausse alerte publique", r.outcome, [{ text: "OK" }]);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="bullhorn-outline" size={11} color={canAlert.ok ? "#4a9fff" : PALETTE.textLow} />
-                      <Text style={[styles.forecastBtnText, { color: canAlert.ok ? "#4a9fff" : PALETTE.textLow }]}>
-                        {canAlert.ok ? `Émettre alerte — ${ALERT_COST_INFLUENCE} INF` : "Alerte émise ce cycle"}
-                      </Text>
-                    </Pressable>
-                  );
-                })()}
-              </View>
-            </View>
-          )}
-
-          {/* ── Météo agricole ────────────────────────────────────────────── */}
-          {agroSnapshot && (
-            <View style={[styles.agroBlock, { marginHorizontal: hPad }]}>
-              <View style={styles.agroHeader}>
-                <MaterialCommunityIcons name="sprout" size={12} color={PALETTE.textLow} />
-                <Text style={styles.agroTitle}>MÉTÉO AGRICOLE</Text>
-                <View style={[styles.agroHarvestBadge, {
-                  backgroundColor:
-                    agroSnapshot.harvestForecast === "bonne"    ? "#3fbe7a22" :
-                    agroSnapshot.harvestForecast === "mauvaise" ? "#e5484822" : "#e8a93a22",
-                }]}>
-                  <Text style={[styles.agroHarvestText, {
-                    color:
-                      agroSnapshot.harvestForecast === "bonne"    ? PALETTE.success :
-                      agroSnapshot.harvestForecast === "mauvaise" ? PALETTE.danger   : PALETTE.warning,
-                  }]}>
-                    {agroSnapshot.harvestForecast.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.agroPhenRow}>
-                <MaterialCommunityIcons
-                  name={agroSnapshot.phenomenon.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                  size={18}
-                  color={agroSnapshot.phenomenon.color}
-                />
-                <Text style={[styles.agroPhenLabel, { color: agroSnapshot.phenomenon.color }]}>
-                  {agroSnapshot.phenomenon.label}
-                </Text>
-              </View>
-              <View style={styles.agroIndicators}>
-                <AgroBar label="Humidité sol" value={agroSnapshot.soilMoisture}
-                  color={agroSnapshot.soilMoisture < 25 ? PALETTE.danger : agroSnapshot.soilMoisture < 50 ? PALETTE.warning : "#4a9fff"} />
-                <AgroBar label="Stress cultures" value={agroSnapshot.cropStress}
-                  color={agroSnapshot.cropStress > 65 ? PALETTE.danger : agroSnapshot.cropStress > 40 ? PALETTE.warning : PALETTE.success} invert />
-              </View>
-            </View>
-          )}
-
-          {/* ── Fenêtre météo favorable ───────────────────────────────────── */}
-          <View style={[styles.opportunityBlock, { marginHorizontal: hPad }]}>
-            <View style={styles.opportunityHeader}>
-              <MaterialCommunityIcons name="weather-partly-cloudy" size={12} color={PALETTE.textLow} />
-              <Text style={styles.opportunityTitle}>FENÊTRE MÉTÉO FAVORABLE</Text>
-            </View>
-            {opportunitySnapshot ? (
-              <>
-                <View style={styles.opportunityRow}>
-                  <MaterialCommunityIcons
-                    name={opportunitySnapshot.def.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                    size={20} color={opportunitySnapshot.def.color}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.opportunityLabel, { color: opportunitySnapshot.def.color }]}>{opportunitySnapshot.def.label}</Text>
-                    <Text style={styles.opportunityDesc} numberOfLines={2}>{opportunitySnapshot.def.description}</Text>
-                  </View>
-                </View>
-                <View style={styles.opportunityBonusRow}>
-                  <MaterialCommunityIcons name="trending-up" size={11} color={PALETTE.success} />
-                  <Text style={styles.opportunityBonusText}>{opportunitySnapshot.def.bonusLabel}</Text>
-                </View>
-                <View style={styles.opportunityFooter}>
-                  <View style={styles.opportunityProgressTrack}>
-                    <View style={[styles.opportunityProgressFill, {
-                      width: `${Math.round(opportunitySnapshot.progress * 100)}%` as `${number}%`,
-                      backgroundColor: opportunitySnapshot.def.color,
-                    }]} />
-                  </View>
-                  <Text style={styles.opportunityDaysLeft}>{opportunitySnapshot.daysLeft}j</Text>
-                </View>
-              </>
-            ) : (
-              <View style={styles.opportunityEmpty}>
-                <MaterialCommunityIcons name="cloud-outline" size={15} color={PALETTE.textLow} />
-                <Text style={styles.opportunityEmptyText}>Aucune fenêtre favorable active</Text>
-              </View>
-            )}
-          </View>
-
-          {/* ── Doctrine météo ────────────────────────────────────────────── */}
-          <View style={[styles.doctrineBlock, { marginHorizontal: hPad }]}>
-            <View style={styles.doctrineHeader}>
-              <MaterialCommunityIcons name="shield-star-outline" size={12} color={PALETTE.textLow} />
-              <Text style={styles.doctrineTitle}>DOCTRINE MÉTÉO</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.doctrineScroll} nestedScrollEnabled>
-              {WEATHER_DOCTRINES_LIST.map((doc) => {
-                const active = (state?.weatherDoctrine ?? WEATHER_DOCTRINE_DEFAULT) === doc.id;
-                return (
-                  <Pressable
-                    key={doc.id}
-                    onPress={() => setWeatherDoctrine(doc.id)}
-                    style={({ pressed }) => [
-                      styles.doctrineChip,
-                      { borderColor: active ? doc.color : PALETTE.panelEdge, backgroundColor: active ? doc.color + "22" : PALETTE.panelHi, opacity: pressed ? 0.8 : 1 },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={doc.icon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                      size={13} color={active ? doc.color : PALETTE.textLow}
-                    />
-                    <Text style={[styles.doctrineChipLabel, { color: active ? doc.color : PALETTE.textMid }]}>{doc.shortLabel}</Text>
-                    {active && <View style={[styles.doctrineActiveDot, { backgroundColor: doc.color }]} />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            {(() => {
-              const activeDoc = WEATHER_DOCTRINES_LIST.find((d) => d.id === (state?.weatherDoctrine ?? WEATHER_DOCTRINE_DEFAULT));
-              if (!activeDoc) return null;
-              return (
-                <View style={styles.doctrineTradeoffs}>
-                  <View style={styles.doctrineTradeoffItem}>
-                    <MaterialCommunityIcons name="plus-circle-outline" size={10} color={PALETTE.success} />
-                    <Text style={[styles.doctrineTradeoffText, { color: PALETTE.success }]}>{activeDoc.tradeoffPos}</Text>
-                  </View>
-                  <View style={styles.doctrineTradeoffItem}>
-                    <MaterialCommunityIcons name="minus-circle-outline" size={10} color={PALETTE.danger} />
-                    <Text style={[styles.doctrineTradeoffText, { color: PALETTE.danger }]}>{activeDoc.tradeoffNeg}</Text>
-                  </View>
-                </View>
-              );
-            })()}
-          </View>
-
-        </ScrollView>
-      )}
-      {/* fin onglet SANTÉ */}
-
       <InteractiveNewsModal
         event={activeEvent}
         visible={!!activeModal}
@@ -2298,9 +1614,30 @@ const styles = StyleSheet.create({
 const tabStyles = StyleSheet.create({
   bar: {
     flexDirection: "row",
+    alignItems: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: PALETTE.panelEdge,
-    backgroundColor: PALETTE.ink,
+    backgroundColor: "transparent",
+  },
+  link: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+    gap: 7,
+  },
+  linkText: {
+    fontSize: 11,
+    fontFamily: FONT.bold,
+    color: PALETTE.textMid,
+    letterSpacing: 1.2,
+  },
+  linkDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+    backgroundColor: PALETTE.panelEdge,
+    marginVertical: 6,
   },
   tab: {
     flex: 1,
