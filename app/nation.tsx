@@ -39,6 +39,7 @@ import {
   computeProtectionPct,
   getProtectionLabel,
 } from "@/logic/resilienceFundEngine";
+import { getComplianceBandInfo, DEFAULT_COMPLIANCE_STATE } from "@/logic/complianceEngine";
 import type { ContributionTier } from "@/logic/resilienceFundEngine";
 import { GridStabilityBadge } from "@/components/GridStabilityBadge";
 import { ThermalStressBadge } from "@/components/ThermalStressBadge";
@@ -607,6 +608,53 @@ export default function NationScreen() {
                       </View>
                       <Text style={styles.reformDesc} numberOfLines={2}>{def.description}</Text>
                     </Pressable>
+                  ))}
+                </View>
+              )}
+            </Panel>
+          );
+        })()}
+
+        {/* CONFORMITÉ DE L'ÉTAT */}
+        {(() => {
+          const cs   = state.complianceState ?? DEFAULT_COMPLIANCE_STATE;
+          const info = getComplianceBandInfo(cs.complianceScore);
+          const showCard = cs.complianceScore < 65 || cs.auditPressure >= 45 || cs.legalRisk >= 45;
+          if (!showCard) return null;
+          const details = ([
+            { icon: "scale-balance" as McIconName,         label: "Risque juridique",    value: cs.legalRisk,            warnAt: 45 },
+            { icon: "magnify-scan" as McIconName,          label: "Pression d'audit",    value: cs.auditPressure,        warnAt: 45 },
+            { icon: "eye-off-outline" as McIconName,       label: "Exposure corruption", value: cs.corruptionExposure,   warnAt: 35 },
+            { icon: "account-alert-outline" as McIconName, label: "Risque lanceurs",     value: cs.whistleblowerRisk,    warnAt: 50 },
+          ] as { icon: McIconName; label: string; value: number; warnAt: number }[]).filter((d) => d.value >= d.warnAt);
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="shield-check-outline" size={14} color={info.color} />
+                <Text style={[styles.sectionTitle, { color: info.color }]}>CONFORMITÉ DE L'ÉTAT</Text>
+                <View style={[compStyles.badge, { backgroundColor: info.color + "22" }]}>
+                  <Text style={[compStyles.badgeText, { color: info.color }]}>{info.label.toUpperCase()}</Text>
+                </View>
+              </View>
+              {/* Barre de score */}
+              <View style={compStyles.barRow}>
+                <Text style={compStyles.barLabel}>Score</Text>
+                <View style={compStyles.track}>
+                  <View style={[compStyles.fill, { width: `${cs.complianceScore}%` as `${number}%`, backgroundColor: info.color }]} />
+                </View>
+                <Text style={[compStyles.barVal, { color: info.color }]}>{cs.complianceScore}</Text>
+              </View>
+              <Text style={compStyles.message}>{info.message}</Text>
+              {/* Indicateurs à risque */}
+              {details.length > 0 && (
+                <View style={compStyles.detailsRow}>
+                  {details.map((d) => (
+                    <View key={d.label} style={compStyles.chip}>
+                      <MaterialCommunityIcons name={d.icon} size={10} color={d.value >= 65 ? PALETTE.danger : PALETTE.warning} />
+                      <Text style={[compStyles.chipText, { color: d.value >= 65 ? PALETTE.danger : PALETTE.warning }]}>
+                        {d.label.toUpperCase()} {d.value}
+                      </Text>
+                    </View>
                   ))}
                 </View>
               )}
@@ -1329,4 +1377,18 @@ const styles = StyleSheet.create({
   tierLabel: { fontSize: 10, fontFamily: FONT.bold, color: PALETTE.textHigh },
   tierCost: { fontSize: 9, fontFamily: FONT.semi, color: PALETTE.danger },
   tierGain: { fontSize: 8, fontFamily: FONT.reg, color: "#3fbe7a" },
+});
+
+const compStyles = StyleSheet.create({
+  badge:       { paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.pill, marginLeft: "auto" as any },
+  badgeText:   { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  barRow:      { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  barLabel:    { fontSize: 9, fontFamily: FONT.bold, color: PALETTE.textLow, width: 38, letterSpacing: 0.5 },
+  track:       { flex: 1, height: 5, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden" },
+  fill:        { height: "100%", borderRadius: 3 },
+  barVal:      { fontSize: 10, fontFamily: FONT.bold, width: 28, textAlign: "right" },
+  message:     { fontSize: 10, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 15, marginTop: 6 },
+  detailsRow:  { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 8 },
+  chip:        { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 3, backgroundColor: PALETTE.panelHi, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.panelEdge },
+  chipText:    { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.3 },
 });
