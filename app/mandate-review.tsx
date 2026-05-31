@@ -28,6 +28,7 @@ import { getRiskAppetiteDef } from "@/logic/riskAppetiteEngine";
 import { DEFAULT_COSMIC_STATE, COSMIC_STAGE_LABELS } from "@/types/cosmic";
 import { getMoralBalanceLabel, getMoralBalanceColor, getCosmicCredibilityLabel } from "@/logic/cosmicEngine";
 import { computeHealthMandateBilan } from "@/logic/healthMandateReviewEngine";
+import { computeAbuseBilan } from "@/logic/abuseOfPowerEngine";
 import { computeEconomicOverview } from "@/logic/economyEngine";
 
 const PROMISE_LABELS: Record<PromiseDomain, string> = {
@@ -781,6 +782,39 @@ export default function MandateReviewScreen() {
                   </Text>
                 </View>
               </View>
+            </Panel>
+          );
+        })()}
+
+        {/* ABUS DE POUVOIR */}
+        {(() => {
+          const abuseBilan = computeAbuseBilan(state);
+          if (abuseBilan.level === "stable" && abuseBilan.index < 15) return null;
+          return (
+            <Panel style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="gavel" size={14} color={abuseBilan.color} />
+                <Text style={[styles.sectionTitle, { color: abuseBilan.color }]}>BILAN DÉMOCRATIQUE</Text>
+                <View style={{ marginLeft: "auto", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: abuseBilan.color + "22" }}>
+                  <Text style={{ fontSize: 9, fontFamily: FONT.semi, color: abuseBilan.color }}>{abuseBilan.label.toUpperCase()}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textLow }}>Indice d'abus</Text>
+                <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: "#ffffff18" }}>
+                  <View style={{ width: `${abuseBilan.index}%` as `${number}%`, height: 4, borderRadius: 2, backgroundColor: abuseBilan.color }} />
+                </View>
+                <Text style={{ fontSize: 12, fontFamily: FONT.bold, color: abuseBilan.color }}>{abuseBilan.index}</Text>
+              </View>
+              <Text style={{ fontSize: 11, fontFamily: FONT.reg, color: PALETTE.textMid, lineHeight: 16 }}>{abuseBilan.bilanText}</Text>
+              {abuseBilan.scorePenalty < 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 }}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={12} color={PALETTE.danger} />
+                  <Text style={{ fontSize: 10, fontFamily: FONT.semi, color: PALETTE.danger }}>
+                    Malus bilan : {abuseBilan.scorePenalty} pts
+                  </Text>
+                </View>
+              )}
             </Panel>
           );
         })()}

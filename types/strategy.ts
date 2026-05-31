@@ -679,6 +679,8 @@ export interface NewsChoice {
   vendorConcentrationDelta?:    number;
   conflictOfInterestRiskDelta?: number;
   deliveryReliabilityDelta?:    number;
+  /** Delta sur l'indice d'abus de pouvoir — appliqué lors de la résolution du choix. */
+  abuseOfPowerIndexDelta?: number;
   /** Crée une dérogation d'urgence lors de la résolution de ce choix. */
   createsDerogation?: {
     type: import("@/logic/emergencyDerogationEngine").DerogationType;
@@ -990,4 +992,6 @@ export interface StrategyGameState {
   ministerConflicts?: Record<string, import("@/logic/conflictOfInterestEngine").MinisterConflictProfile>;
   // Autorités indépendantes fictives — état du système de contrôle (optional pour backward compat)
   oversightState?: import("@/logic/oversightEngine").OversightState;
+  // Indice d'abus de pouvoir (optional pour backward compat)
+  abuseOfPowerState?: import("@/logic/abuseOfPowerEngine").AbuseOfPowerState;
 }

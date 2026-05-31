@@ -597,6 +597,24 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       const allTrust  = Object.values(os.authorityTrust).every((t) => t >= 65);
       return !hasActive && allTrust && state.mandateDay >= 30;
     })(),
+    // ── Abus de pouvoir ──────────────────────────────────────────────────────
+    abuse_concern:  (() => {
+      const idx = state.abuseOfPowerState?.index ?? 5;
+      return idx >= 30 && idx < 55 && state.mandateDay >= 10;
+    })(),
+    abuse_crisis:   (() => {
+      const idx = state.abuseOfPowerState?.index ?? 5;
+      return idx >= 55 && idx < 75 && state.mandateDay >= 15;
+    })(),
+    abuse_critical: (() => {
+      const idx = state.abuseOfPowerState?.index ?? 5;
+      return idx >= 75 && state.mandateDay >= 20;
+    })(),
+    abuse_stable:   (() => {
+      const idx = state.abuseOfPowerState?.index ?? 5;
+      const prev = state.hiddenPolitics.scandalRisk;
+      return idx <= 15 && prev <= 20 && state.mandateDay >= 20;
+    })(),
   };
 }
 

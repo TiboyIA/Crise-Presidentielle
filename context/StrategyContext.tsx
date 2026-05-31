@@ -260,6 +260,7 @@ import {
 import {
   cooperateWithInvestigation, justifyToAuthority, contestAuthority, tickOversight,
 } from "@/logic/oversightEngine";
+import { tickAbuseOfPower } from "@/logic/abuseOfPowerEngine";
 import {
   tickInfrastructureWear,
   applyWearReduction,
@@ -980,7 +981,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
           globalPower: power,
           presidentLevel: xpResult.level,
           presidentXP: xpResult.xpInLevel,
-          rankingPoints: Math.max(withMandate.stats.rankingPoints, power * 2),
+          rankingPoints: withMandate.stats.rankingPoints,
         },
         ranking,
         missions,
@@ -1772,8 +1773,22 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
         const withNote = pressureNote
           ? { ...withPressure, recentPressureNote: pressureNote }
           : withPressure;
+        // Indice d'abus de pouvoir — delta immédiat si le choix le déclare
+        const withAbuse = (() => {
+          const d = choice?.abuseOfPowerIndexDelta;
+          if (!d || d === 0) return withNote;
+          const cur = withNote.abuseOfPowerState?.index ?? 5;
+          const newIdx = Math.max(0, Math.min(100, Math.round(cur + d)));
+          return {
+            ...withNote,
+            abuseOfPowerState: {
+              ...(withNote.abuseOfPowerState ?? { lastDeriveAt: -999 }),
+              index: newIdx,
+            },
+          };
+        })();
         // Renforcement des marges de rupture — si le choix est un investissement structurel
-        const withBreakpoint = choice ? reinforceBreakpointMargins(withNote, choice) : withNote;
+        const withBreakpoint = choice ? reinforceBreakpointMargins(withAbuse, choice) : withAbuse;
         // Résonance sociale — amplification si contexte sensible
         const { state: withResonance, note: resonanceNote } = evaluateResonance(withBreakpoint, event);
         const withResonanceNote = resonanceNote
@@ -2856,6 +2871,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickWhistleblower(s);
       s = tickConflictOfInterest(s);
       s = tickOversight(s);
+      s = tickAbuseOfPower(s);
       s = tickInvestorConfidence(s);
     }
   }
