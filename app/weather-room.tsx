@@ -10,6 +10,7 @@ import { useStrategy } from "@/context/StrategyContext";
 import { generateWeatherState, daysUntilNextUpdate } from "@/logic/weatherEngine";
 import { FONT, PALETTE, RADIUS } from "@/constants/uiTokens";
 import { SectionBackdrop } from "@/components/ui/SectionBackdrop";
+import { WeatherPanels } from "@/components/WeatherPanels";
 
 type McIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -211,6 +212,9 @@ export default function WeatherRoomScreen() {
             </View>
           </View>
         </View>
+
+          {/* ── Panneaux météo détaillés (migrés du Journal) ───────────────────── */}
+          <WeatherPanels />
 
         {/* ── Retour ─────────────────────────────────────────────────────────── */}
         <Pressable
