@@ -994,4 +994,6 @@ export interface StrategyGameState {
   oversightState?: import("@/logic/oversightEngine").OversightState;
   // Indice d'abus de pouvoir (optional pour backward compat)
   abuseOfPowerState?: import("@/logic/abuseOfPowerEngine").AbuseOfPowerState;
+  // Programme anti-corruption d'État (optional pour backward compat)
+  antiCorruptionState?: import("@/logic/antiCorruptionProgramEngine").AntiCorruptionState;
 }

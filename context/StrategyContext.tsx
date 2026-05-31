@@ -262,6 +262,10 @@ import {
 } from "@/logic/oversightEngine";
 import { tickAbuseOfPower } from "@/logic/abuseOfPowerEngine";
 import {
+  tickAntiCorruption, setAntiCorruptionLevel,
+  type AntiCorruptionLevel,
+} from "@/logic/antiCorruptionProgramEngine";
+import {
   tickInfrastructureWear,
   applyWearReduction,
   MAINTENANCE_COST,
@@ -467,6 +471,7 @@ interface StrategyContextValue {
   oversightCooperate: (investigationId: string) => { success: boolean; reason?: string };
   oversightJustify:   (investigationId: string) => { success: boolean; reason?: string };
   oversightContest:   (investigationId: string) => { success: boolean; reason?: string };
+  setAntiCorruptionLevel: (level: AntiCorruptionLevel) => { success: boolean; reason?: string };
   prepareForecast: () => ForecastActionResult;
   issuePublicAlert: () => ForecastActionResult;
   setWeatherDoctrine: (id: import("@/logic/weatherDoctrineEngine").WeatherDoctrineId) => void;
@@ -2298,6 +2303,20 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
     [state, update],
   );
 
+  const setAntiCorruptionLevelCb = useCallback(
+    (level: AntiCorruptionLevel): { success: boolean; reason?: string } => {
+      if (!state) return { success: false, reason: "Jeu non initialisé." };
+      let out: { success: boolean; reason?: string } = { success: false };
+      update((prev) => {
+        const r = setAntiCorruptionLevel(prev, level);
+        out = { success: r.success, reason: r.reason };
+        return r.success ? r.state : prev;
+      });
+      return out;
+    },
+    [state, update],
+  );
+
   const launchDimAuditCb = useCallback(
     (): { result: DimAuditResult | null; failReason?: string } => {
       if (!state) return { result: null, failReason: "Jeu non initialisé." };
@@ -2554,6 +2573,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       oversightCooperate: oversightCooperateCb,
       oversightJustify:   oversightJustifyCb,
       oversightContest:   oversightContestCb,
+      setAntiCorruptionLevel: setAntiCorruptionLevelCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2580,7 +2600,7 @@ export function StrategyProvider({ children }: { children: React.ReactNode }) {
       justifyDerogationCb, auditDerogationCb, ignoreDerogationCb,
       protectWhistleblowerCb, launchWhistleblowerAuditCb, correctWhistleblowerQuietlyCb,
       requestMinisterDeclarationCb, launchMinisterEthicsAuditCb, suspendMinisterForConflictCb, defendMinisterPubliclyCb,
-      oversightCooperateCb, oversightJustifyCb, oversightContestCb,
+      oversightCooperateCb, oversightJustifyCb, oversightContestCb, setAntiCorruptionLevelCb,
       prepareForecast, issuePublicAlert,
       setWeatherDoctrine,
       deleteMissionReport, clearAllMissionReports,
@@ -2873,6 +2893,7 @@ function advanceMandateDay(state: StrategyGameState, days: number): StrategyGame
       s = tickConflictOfInterest(s);
       s = tickOversight(s);
       s = tickAbuseOfPower(s);
+      s = tickAntiCorruption(s);
       s = tickInvestorConfidence(s);
     }
   }

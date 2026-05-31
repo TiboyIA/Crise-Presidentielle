@@ -615,6 +615,32 @@ function evaluateConditions(state: StrategyGameState): Record<string, boolean> {
       const prev = state.hiddenPolitics.scandalRisk;
       return idx <= 15 && prev <= 20 && state.mandateDay >= 20;
     })(),
+    // ── Programme anti-corruption ────────────────────────────────────────────
+    acep_level_actif:     (() => {
+      const lvl = state.antiCorruptionState?.level ?? "absent";
+      return (lvl === "actif" || lvl === "renforcé" || lvl === "indépendant") &&
+             state.mandateDay >= 5;
+    })(),
+    acep_renforcé_initial: (() => {
+      const ac = state.antiCorruptionState;
+      if (!ac || ac.level !== "renforcé") return false;
+      return state.mandateDay - ac.launchedAtDay < 15;
+    })(),
+    acep_ally_risk:        (() => {
+      const ac = state.antiCorruptionState;
+      return ac?.level === "indépendant" && (ac.allyExposures ?? 0) > 0;
+    })(),
+    acep_absent_risk:      (() => {
+      const lvl = state.antiCorruptionState?.level ?? "absent";
+      const cs  = state.complianceState;
+      return lvl === "absent" && (cs?.corruptionExposure ?? 10) >= 50 && state.mandateDay >= 15;
+    })(),
+    acep_mature_results:   (() => {
+      const ac = state.antiCorruptionState;
+      if (!ac) return false;
+      return (ac.level === "renforcé" || ac.level === "indépendant") &&
+             state.mandateDay - ac.launchedAtDay >= 25;
+    })(),
   };
 }
 

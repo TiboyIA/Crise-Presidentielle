@@ -94,6 +94,11 @@ import {
 } from "@/logic/oversightEngine";
 import { OVERSIGHT_AUTHORITY_DEFS, AUTHORITY_IDS } from "@/data/oversightAuthorities";
 import { CYCLE_META, DEFAULT_BUSINESS_CYCLE_PHASE, DEFAULT_CYCLE_MOMENTUM } from "@/logic/businessCycleEngine";
+import {
+  getLevelInfo, isInitialPhase, LEVEL_ORDER, LEVEL_LABELS, UPGRADE_COSTS,
+  DEFAULT_ANTI_CORRUPTION_STATE,
+} from "@/logic/antiCorruptionProgramEngine";
+import type { AntiCorruptionLevel } from "@/logic/antiCorruptionProgramEngine";
 import { getStagflationBandInfo, DEFAULT_STAGFLATION_INDEX } from "@/logic/stagflationEngine";
 import {
   getInterestRateBandInfo, getCredibilityBandInfo,
@@ -150,7 +155,7 @@ const hospStyles = StyleSheet.create({
 export default function JournalDeCriseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { state, resolveInteractiveNews, dismissNews, markNewsRead, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly, oversightCooperate, oversightJustify, oversightContest } = useStrategy();
+  const { state, resolveInteractiveNews, dismissNews, markNewsRead, justifyDerogation, auditDerogation, ignoreDerogation, protectWhistleblower, launchWhistleblowerAudit, correctWhistleblowerQuietly, oversightCooperate, oversightJustify, oversightContest, setAntiCorruptionLevel } = useStrategy();
   const { hPad, width } = useResponsive();
 
   const { enabled: comfort, fs, pad, lowLoad, reducedInfo, extraConfirm } = useComfort();
@@ -313,6 +318,11 @@ export default function JournalDeCriseScreen() {
   const WB_RISK_LABEL: Record<string, string> = {
     safe: "AUCUNE ALERTE", watch: "SOUS SURVEILLANCE", alert: "RISQUE ÉLEVÉ", critical: "CRISE",
   };
+
+  const acState          = state.antiCorruptionState ?? DEFAULT_ANTI_CORRUPTION_STATE;
+  const acLevelInfo      = getLevelInfo(acState.level);
+  const acInitialPhase   = isInitialPhase(acState, state.mandateDay);
+  const showAcPanel      = acState.level !== "absent" || (state.complianceState?.corruptionExposure ?? 10) >= 40;
 
   const activeOversightInvs = getActiveInvestigations(state);
   const oversightMaxPressure = activeOversightInvs.length > 0
@@ -1350,6 +1360,104 @@ export default function JournalDeCriseScreen() {
                     </View>
                   )}
                 </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* PROGRAMME ANTI-CORRUPTION */}
+      {showAcPanel && !lowLoad && (
+        <View style={[styles.waveBlock, { marginHorizontal: hPad, borderColor: acLevelInfo.color + "33" }]}>
+          <View style={styles.waveHeader}>
+            <MaterialCommunityIcons name="shield-search" size={12} color={acLevelInfo.color} />
+            <Text style={[styles.waveTitle, { color: acLevelInfo.color }]}>PROGRAMME ANTI-CORRUPTION</Text>
+            <View style={[styles.waveBadge, { backgroundColor: acLevelInfo.color + "22" }]}>
+              <Text style={[styles.waveBadgeText, { color: acLevelInfo.color }]}>{acLevelInfo.label.toUpperCase()}</Text>
+            </View>
+          </View>
+
+          {/* Barre d'efficacité */}
+          <View style={{ marginTop: 8, marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+              <Text style={[styles.waveBadgeText, { color: PALETTE.textMid }]}>Efficacité du programme</Text>
+              <Text style={[styles.waveBadgeText, { color: acLevelInfo.color }]}>{acLevelInfo.efficiency}%</Text>
+            </View>
+            <View style={{ height: 5, backgroundColor: PALETTE.panelEdge, borderRadius: 3, overflow: "hidden" }}>
+              <View style={{ width: `${acLevelInfo.efficiency}%` as `${number}%`, height: "100%", backgroundColor: acLevelInfo.color, borderRadius: 3 }} />
+            </View>
+          </View>
+
+          <Text style={[styles.stormDesc, { marginBottom: 8 }]}>{acLevelInfo.description}</Text>
+
+          {/* Phase initiale renforcé */}
+          {acInitialPhase && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <MaterialCommunityIcons name="alert-outline" size={11} color="#e8c44f" />
+              <Text style={[styles.waveBadgeText, { color: "#e8c44f" }]}>
+                Phase de révélation initiale — J+{state.mandateDay - acState.launchedAtDay}/15
+              </Text>
+            </View>
+          )}
+
+          {/* Compteurs */}
+          {(acState.revealedCount > 0 || acState.allyExposures > 0) && (
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              {acState.revealedCount > 0 && (
+                <View style={[styles.waveBadge, { backgroundColor: "#e8c44f22" }]}>
+                  <Text style={[styles.waveBadgeText, { color: "#e8c44f" }]}>
+                    {acState.revealedCount} irrégularité{acState.revealedCount > 1 ? "s" : ""} révélée{acState.revealedCount > 1 ? "s" : ""}
+                  </Text>
+                </View>
+              )}
+              {acState.allyExposures > 0 && (
+                <View style={[styles.waveBadge, { backgroundColor: "#a78bfa22" }]}>
+                  <Text style={[styles.waveBadgeText, { color: "#a78bfa" }]}>
+                    {acState.allyExposures} allié{acState.allyExposures > 1 ? "s" : ""} exposé{acState.allyExposures > 1 ? "s" : ""}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Sélecteur de niveau */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {(LEVEL_ORDER as AntiCorruptionLevel[]).filter((l) => l !== "absent").map((lvl) => {
+              const info    = getLevelInfo(lvl);
+              const cost    = UPGRADE_COSTS[lvl];
+              const current = acState.level === lvl;
+              const canUp   = LEVEL_ORDER.indexOf(lvl) > LEVEL_ORDER.indexOf(acState.level);
+              const canDown = LEVEL_ORDER.indexOf(lvl) < LEVEL_ORDER.indexOf(acState.level);
+              if (!current && !canUp && !canDown) return null;
+              return (
+                <Pressable
+                  key={lvl}
+                  onPress={() => {
+                    if (current) return;
+                    const msg = canDown
+                      ? `Rétrograder vers "${LEVEL_LABELS[lvl]}" ? Cela réduira la crédibilité institutionnelle.`
+                      : `Passer au niveau "${LEVEL_LABELS[lvl]}" ? Coût : ${cost?.influence ?? 0} influence${cost?.money ? ` + ${cost.money} budget` : ""}.`;
+                    Alert.alert("Programme anti-corruption", msg, [
+                      { text: "Annuler", style: "cancel" },
+                      { text: "Confirmer", onPress: () => setAntiCorruptionLevel(lvl) },
+                    ]);
+                  }}
+                  style={[
+                    styles.waveBadge,
+                    {
+                      backgroundColor: current ? info.color + "33" : "#ffffff0a",
+                      borderWidth: 1,
+                      borderColor: current ? info.color : "#ffffff18",
+                      paddingVertical: 5,
+                      paddingHorizontal: 10,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.waveBadgeText, { color: current ? info.color : PALETTE.textMid }]}>
+                    {current ? "▶ " : ""}{LEVEL_LABELS[lvl]}
+                    {!current && cost && canUp ? ` (${cost.influence}inf${cost.money ? `+${cost.money}€` : ""})` : ""}
+                  </Text>
+                </Pressable>
               );
             })}
           </View>
